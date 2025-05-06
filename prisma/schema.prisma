@@ -27,6 +27,8 @@ model User {
   sessions    Session[]
   connections Connection[]
   passkey     Passkey[]
+  Cart        Cart[]
+  Order       Order[]
 }
 
 model Note {
@@ -185,48 +187,81 @@ model Passkey {
   @@index(userId)
 }
 
-model ProductCategory {
-  id   String @id @default(cuid())
-  name String
-  slug String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  products Product[]
-
-  @@unique([slug])
+model Product {
+  id          String         @id @default(cuid())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  name        String
+  description String
+  price       Float
+  inventory   Int            @default(0)
+  images      ProductImage[]
+  categories  Category[]
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
 }
 
 model ProductImage {
   id        String  @id @default(cuid())
+  url       String
   altText   String?
-  objectKey String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   productId String
-
-  // non-unique foreign key
-  @@index([productId])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
-model Product {
-  id    String @id @default(cuid())
-  name  String
-  price String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  images      ProductImage[]
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
   description String?
+  products    Product[]
+}
 
-  productCategory   ProductCategory? @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
-  productCategoryId String?          @default("default-category") // ID de la catégorie par défaut
+model Cart {
+  id        String     @id @default(cuid())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items     CartItem[]
+}
 
-  // This helps our order by in the user search a LOT
-  @@index([updatedAt])
+model CartItem {
+  id        String  @id @default(cuid())
+  quantity  Int
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartId    String
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  status          OrderStatus @default(PENDING)
+  total           Float
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items           OrderItem[]
+  paymentIntentId String?     @unique
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  quantity  Int
+  price     Float
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
 }
