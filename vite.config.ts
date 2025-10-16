@@ -4,6 +4,7 @@ import {
 	sentryReactRouter,
 } from '@sentry/react-router'
 import tailwindcss from '@tailwindcss/vite'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { reactRouterDevTools } from 'react-router-devtools'
 import { defineConfig } from 'vite'
 import { envOnlyMacros } from 'vite-env-only'
@@ -40,7 +41,7 @@ export default defineConfig((config) => ({
 	plugins: [
 		envOnlyMacros(),
 		tailwindcss(),
-		reactRouterDevTools(),
+		// reactRouterDevTools(),
 
 		iconsSpritesheet({
 			inputDir: './other/svg-icons',

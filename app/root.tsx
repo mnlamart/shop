@@ -191,9 +191,28 @@ function App() {
 	const theme = useTheme()
 	const matches = useMatches()
 	const isOnSearchPage = matches.find((m) => m.id === 'routes/users+/index')
+	const isOnAdminPage = matches.some((m) => m.id?.includes('routes/admin+'))
 	const searchBar = isOnSearchPage ? null : <SearchBar status="idle" />
 	useToast(data.toast)
 
+	// If we're on an admin page, render without the main site header/footer
+	// The admin layout will handle its own header/footer
+	if (isOnAdminPage) {
+		return (
+			<OpenImgContextProvider
+				optimizerEndpoint="/resources/images"
+				getSrc={getImgSrc}
+			>
+				<div className="min-h-screen bg-background">
+					<Outlet />
+				</div>
+				<EpicToaster closeButton position="bottom-center" theme={theme} />
+				<EpicProgress />
+			</OpenImgContextProvider>
+		)
+	}
+
+	// Main site layout with header and footer
 	return (
 		<OpenImgContextProvider
 			optimizerEndpoint="/resources/images"
@@ -228,7 +247,7 @@ function App() {
 					<ThemeSwitch userPreference={data.requestInfo.userPrefs.theme} />
 				</div>
 			</div>
-			<EpicToaster closeButton position="top-center" theme={theme} />
+			<EpicToaster closeButton position="bottom-center" theme={theme} />
 			<EpicProgress />
 		</OpenImgContextProvider>
 	)

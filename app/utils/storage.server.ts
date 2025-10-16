@@ -49,6 +49,25 @@ export async function uploadNoteImage(
 	return uploadToStorage(file, key)
 }
 
+export async function uploadProductImage(
+	productId: string,
+	file: File | FileUpload,
+) {
+	const fileId = createId()
+	const fileExtension = file.name.split('.').pop() || ''
+	const timestamp = Date.now()
+	const key = `products/${productId}/images/${timestamp}-${fileId}.${fileExtension}`
+	return uploadToStorage(file, key)
+}
+
+export async function uploadProductImages(
+	productId: string,
+	files: Array<File | FileUpload>,
+) {
+	const uploadPromises = files.map(file => uploadProductImage(productId, file))
+	return Promise.all(uploadPromises)
+}
+
 function hmacSha256(key: string | Buffer, message: string) {
 	const hmac = createHmac('sha256', key)
 	hmac.update(message)
@@ -80,7 +99,7 @@ function getBaseSignedRequestInfo({
 	contentType,
 	uploadDate,
 }: {
-	method: 'GET' | 'PUT'
+	method: 'GET' | 'PUT' | 'DELETE'
 	key: string
 	contentType?: string
 	uploadDate?: string
@@ -176,4 +195,37 @@ export function getSignedGetRequestInfo(key: string) {
 		url,
 		headers: baseHeaders,
 	}
+}
+
+function getSignedDeleteRequestInfo(key: string) {
+	const { url, baseHeaders } = getBaseSignedRequestInfo({
+		method: 'DELETE',
+		key,
+	})
+
+	return {
+		url,
+		headers: baseHeaders,
+	}
+}
+
+export async function deleteObjectFromStorage(objectKey: string): Promise<void> {
+	const { url, headers } = getSignedDeleteRequestInfo(objectKey)
+
+	const deleteResponse = await fetch(url, {
+		method: 'DELETE',
+		headers,
+	})
+
+	// Silently succeed if object doesn't exist (idempotent)
+	if (!deleteResponse.ok && deleteResponse.status !== 404) {
+		const errorMessage = `Failed to delete object from storage. Server responded with ${deleteResponse.status}: ${deleteResponse.statusText}`
+		console.error(errorMessage)
+		throw new Error(`Failed to delete object: ${objectKey}`)
+	}
+}
+
+export async function deleteProductImages(objectKeys: string[]): Promise<void> {
+	const deletePromises = objectKeys.map(key => deleteObjectFromStorage(key))
+	await Promise.all(deletePromises)
 }

@@ -7,6 +7,12 @@ function isUser(
 	return user && typeof user === 'object' && typeof user.id === 'string'
 }
 
+export function isAdmin(
+	user: any,
+): user is Awaited<ReturnType<typeof rootLoader>>['data']['user'] {
+	return user && typeof user === 'object' && typeof user.id === 'string' && user.roles.some((role: any) => role.name === 'admin')
+}
+
 export function useOptionalUser() {
 	const data = useRouteLoaderData<typeof rootLoader>('root')
 	if (!data || !isUser(data.user)) {
