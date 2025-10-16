@@ -2,7 +2,7 @@ import { Img } from 'openimg/react'
 import { useRef } from 'react'
 import { Link, Form } from 'react-router'
 import { getUserImgSrc } from '#app/utils/misc.tsx'
-import { useUser } from '#app/utils/user.ts'
+import { userHasRole, useUser } from '#app/utils/user.ts'
 import { Button } from './ui/button'
 import {
 	DropdownMenu,
@@ -15,6 +15,7 @@ import { Icon } from './ui/icon'
 
 export function UserDropdown() {
 	const user = useUser()
+	const isAdmin = userHasRole(user, 'admin');
 	const formRef = useRef<HTMLFormElement>(null)
 	return (
 		<DropdownMenu>
@@ -50,6 +51,15 @@ export function UserDropdown() {
 							</Icon>
 						</Link>
 					</DropdownMenuItem>
+					{isAdmin && (
+						<DropdownMenuItem asChild>
+							<Link prefetch="intent" to={`/admin`}>
+								<Icon className="text-body-md" name="gear">
+									Admin
+								</Icon>
+							</Link>
+						</DropdownMenuItem>
+					)}
 					<DropdownMenuItem asChild>
 						<Link prefetch="intent" to={`/users/${user.username}/notes`}>
 							<Icon className="text-body-md" name="pencil-2">

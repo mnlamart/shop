@@ -32,6 +32,29 @@ npx epicli
 [Read the docs](https://github.com/epicweb-dev/epic-stack/blob/main/docs)
 (please 🙏).
 
+## E-commerce Features
+
+This Epic Stack instance includes a complete admin product management system:
+
+- **Product Management**: CRUD operations with variants, images, and inventory tracking
+- **Category System**: Hierarchical categories with parent-child relationships  
+- **Attribute System**: Flexible product attributes (Size, Color, Material, etc.) with relational database structure
+- **Image Handling**: Multi-image upload with high-quality fixture system for development
+- **Admin Dashboard**: Role-based access with ARIA-compliant UI following Epic Stack patterns
+
+### Key Architectural Decisions
+
+- **Relational Variants**: Normalized database structure for better performance and type safety
+- **Fixture Images**: Picsum Photos placeholder images for consistent development experience
+- **Accessibility First**: ARIA-compliant components with full keyboard navigation
+- **Epic Stack Patterns**: Follows established conventions for forms, routing, and state management
+
+See `docs/` for detailed architecture documentation:
+- [Product Images](docs/product-images.md) - Fixture system and image handling
+- [Relational Variants](docs/relational-variants.md) - Database architecture for product variants
+- [Admin Dashboard](docs/admin-dashboard.md) - Complete admin interface architecture
+- [Implementation Notes](docs/implementation-notes.md) - Key decisions and trade-offs
+
 ## Support
 
 - 🆘 Join the

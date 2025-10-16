@@ -5,6 +5,22 @@ import { useFormAction, useNavigation } from 'react-router'
 import { useSpinDelay } from 'spin-delay'
 import { twMerge } from 'tailwind-merge'
 
+export function useIsMobile() {
+	const [isMobile, setIsMobile] = useState(false)
+
+	useEffect(() => {
+		const mql = window.matchMedia('(max-width: 768px)')
+		const onChange = () => {
+			setIsMobile(window.innerWidth < 768)
+		}
+		mql.addEventListener('change', onChange)
+		setIsMobile(window.innerWidth < 768)
+		return () => mql.removeEventListener('change', onChange)
+	}, [])
+
+	return isMobile
+}
+
 export function getUserImgSrc(objectKey?: string | null) {
 	return objectKey
 		? `/resources/images?objectKey=${encodeURIComponent(objectKey)}`

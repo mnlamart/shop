@@ -1,13 +1,231 @@
 import { faker } from '@faker-js/faker'
+import { UNCATEGORIZED_CATEGORY_ID } from '#app/utils/category.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { MOCK_CODE_GITHUB } from '#app/utils/providers/constants'
+import { slugify } from '#app/utils/slug.ts'
 import {
 	createPassword,
 	createUser,
 	getNoteImages,
 	getUserImages,
+	getProductImages,
 } from '#tests/db-utils.ts'
 import { insertGitHubUser } from '#tests/mocks/github.ts'
+
+// Product seeding helper functions
+async function createCategory(name: string, parentId?: string, description?: string) {
+	const slug = slugify(name)
+	return await prisma.category.create({
+		data: {
+			name,
+			slug,
+			description: description || faker.lorem.sentence(),
+			parentId,
+		},
+	})
+}
+
+async function createProduct(categoryId?: string) {
+	const name = faker.commerce.productName()
+	const baseSlug = slugify(name)
+	const slug = `${baseSlug}-${faker.string.alphanumeric(4)}`
+	
+	const product = await prisma.product.create({
+		data: {
+			name,
+			slug,
+			description: faker.commerce.productDescription() + '\n\n' + faker.lorem.paragraphs(2),
+			sku: faker.string.alphanumeric(8).toUpperCase(),
+			price: Number(faker.commerce.price({ min: 10, max: 500, dec: 2 })),
+			currency: 'USD',
+			status: faker.helpers.weightedArrayElement([
+				{ weight: 20, value: 'DRAFT' },
+				{ weight: 70, value: 'ACTIVE' },
+				{ weight: 10, value: 'ARCHIVED' },
+			]),
+			categoryId,
+		},
+	})
+
+	// Create 2-5 images per product
+	const imageCount = faker.number.int({ min: 2, max: 5 })
+	const productImages = await getProductImages()
+
+	for (let i = 0; i < imageCount; i++) {
+		const randomImage = faker.helpers.arrayElement(productImages)
+		await prisma.productImage.create({
+			data: {
+				productId: product.id,
+				objectKey: randomImage.objectKey,
+				altText: `${name} - Image ${i + 1}`,
+				displayOrder: i,
+				isPrimary: i === 0,
+			},
+		})
+	}
+
+	// 40% chance of having variants
+	if (faker.datatype.boolean({ probability: 0.4 })) {
+		// Get attribute values for creating variants
+		const sizeValues = await prisma.attributeValue.findMany({
+			where: { attribute: { name: 'Size' } },
+		})
+		const colorValues = await prisma.attributeValue.findMany({
+			where: { attribute: { name: 'Color' } },
+		})
+		
+		// Create 2-6 variants
+		const variantCount = faker.number.int({ min: 2, max: 6 })
+		const usedCombinations = new Set<string>()
+		
+		for (let i = 0; i < variantCount; i++) {
+			let sizeValue, colorValue, combination
+			// Ensure unique size-color combinations
+			do {
+				sizeValue = faker.helpers.arrayElement(sizeValues)
+				colorValue = faker.helpers.arrayElement(colorValues)
+				combination = `${sizeValue.value}-${colorValue.value}`
+			} while (usedCombinations.has(combination))
+			
+			usedCombinations.add(combination)
+			
+			await prisma.productVariant.create({
+				data: {
+					productId: product.id,
+					sku: `${product.sku}-${combination}-${faker.string.alphanumeric(4)}`,
+					price: Number(faker.commerce.price({ 
+						min: Number(product.price) * 0.8, 
+						max: Number(product.price) * 1.2, 
+						dec: 2 
+					})),
+					stockQuantity: faker.number.int({ min: 0, max: 100 }),
+					attributeValues: {
+						create: [
+							{ attributeValueId: sizeValue.id },
+							{ attributeValueId: colorValue.id },
+						],
+					},
+				},
+			})
+		}
+	}
+
+	return product
+}
+
+async function seedProductData() {
+	// Create Uncategorized category first with fixed ID
+	await prisma.category.upsert({
+		where: { id: UNCATEGORIZED_CATEGORY_ID },
+		create: {
+			id: UNCATEGORIZED_CATEGORY_ID,
+			name: 'Uncategorized',
+			slug: 'uncategorized',
+			description: 'Products without a specific category',
+		},
+		update: {},
+	})
+
+	// Create attributes with their values
+	await prisma.attribute.create({
+		data: {
+			name: 'Size',
+			displayOrder: 0,
+			values: {
+				create: [
+					{ value: 'XS', displayOrder: 0 },
+					{ value: 'S', displayOrder: 1 },
+					{ value: 'M', displayOrder: 2 },
+					{ value: 'L', displayOrder: 3 },
+					{ value: 'XL', displayOrder: 4 },
+					{ value: 'XXL', displayOrder: 5 },
+				],
+			},
+		},
+	})
+
+	await prisma.attribute.create({
+		data: {
+			name: 'Color',
+			displayOrder: 1,
+			values: {
+				create: [
+					{ value: 'Red', displayOrder: 0 },
+					{ value: 'Blue', displayOrder: 1 },
+					{ value: 'Green', displayOrder: 2 },
+					{ value: 'Black', displayOrder: 3 },
+					{ value: 'White', displayOrder: 4 },
+					{ value: 'Navy', displayOrder: 5 },
+					{ value: 'Gray', displayOrder: 6 },
+				],
+			},
+		},
+	})
+
+	await prisma.attribute.create({
+		data: {
+			name: 'Material',
+			displayOrder: 2,
+			values: {
+				create: [
+					{ value: 'Cotton', displayOrder: 0 },
+					{ value: 'Polyester', displayOrder: 1 },
+					{ value: 'Wool', displayOrder: 2 },
+					{ value: 'Silk', displayOrder: 3 },
+					{ value: 'Leather', displayOrder: 4 },
+				],
+			},
+		},
+	})
+
+	// Create categories with hierarchy
+	const electronics = await createCategory('Electronics')
+	const laptops = await createCategory('Laptops', electronics.id)
+	const smartphones = await createCategory('Smartphones', electronics.id)
+	
+	const clothing = await createCategory('Clothing')
+	const mens = await createCategory("Men's", clothing.id)
+	const tshirts = await createCategory('T-Shirts', mens.id)
+	const womens = await createCategory("Women's", clothing.id)
+	
+	const home = await createCategory('Home & Garden')
+	const furniture = await createCategory('Furniture', home.id)
+	const decor = await createCategory('Decor', home.id)
+
+	// Create product tags
+	const tags = [
+		'bestseller', 'new-arrival', 'on-sale', 'eco-friendly', 'limited-edition',
+		'trending', 'seasonal', 'premium', 'budget-friendly', 'handmade',
+		'organic', 'vintage', 'modern', 'classic', 'innovative'
+	]
+
+	const createdTags = []
+	for (const tagName of tags) {
+		const tag = await prisma.productTag.create({
+			data: { name: tagName },
+		})
+		createdTags.push(tag)
+	}
+
+	// Create products across categories
+	const categories = [laptops, smartphones, tshirts, womens, furniture, decor]
+	
+	for (let i = 0; i < 40; i++) {
+		const category = faker.helpers.arrayElement(categories)
+		const product = await createProduct(category.id)
+		
+		// Assign 1-3 random tags to each product
+		const productTags = faker.helpers.arrayElements(createdTags, { min: 1, max: 3 })
+		for (const tag of productTags) {
+			await prisma.productToTag.create({
+				data: {
+					productId: product.id,
+					tagId: tag.id,
+				},
+			})
+		}
+	}
+}
 
 async function seed() {
 	console.log('🌱 Seeding...')
@@ -245,6 +463,11 @@ async function seed() {
 	}
 
 	console.timeEnd(`🐨 Created admin user "kody"`)
+
+	// Seed Product Data
+	console.time(`🛍️ Created product data...`)
+	await seedProductData()
+	console.timeEnd(`🛍️ Created product data...`)
 
 	console.timeEnd(`🌱 Database has been seeded`)
 }

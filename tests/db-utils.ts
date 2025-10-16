@@ -98,3 +98,16 @@ export async function getUserImages() {
 
 	return userImages
 }
+
+let productImages: Array<{ objectKey: string }> | undefined
+export async function getProductImages() {
+	if (productImages) return productImages
+
+	productImages = await Promise.all(
+		Array.from({ length: 30 }, (_, index) => ({
+			objectKey: `products/${index}.jpg`,
+		})),
+	)
+
+	return productImages
+}

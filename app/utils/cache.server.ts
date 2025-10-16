@@ -15,7 +15,7 @@ import {
 import { remember } from '@epic-web/remember'
 import { LRUCache } from 'lru-cache'
 import { z } from 'zod'
-import { updatePrimaryCacheValue } from '#app/routes/admin+/cache_.sqlite.server.ts'
+// import { updatePrimaryCacheValue } from '#app/routes/admin+/cache_.sqlite.server.ts'
 import { getInstanceInfo, getInstanceInfoSync } from './litefs.server.ts'
 import { cachifiedTimingReporter, type Timings } from './timing.server.ts'
 
@@ -140,43 +140,43 @@ export const cache: CachifiedCache = {
 		return { metadata, value }
 	},
 	async set(key, entry) {
-		const { currentIsPrimary, primaryInstance } = await getInstanceInfo()
+		const { currentIsPrimary, primaryInstance: ignoredPrimaryInstance } = await getInstanceInfo()
 
 		if (currentIsPrimary) {
 			const value = JSON.stringify(entry.value, bufferReplacer)
 			setStatement.run(key, value, JSON.stringify(entry.metadata))
 		} else {
 			// fire-and-forget cache update
-			void updatePrimaryCacheValue({
-				key,
-				cacheValue: entry,
-			}).then((response) => {
-				if (!response.ok) {
-					console.error(
-						`Error updating cache value for key "${key}" on primary instance (${primaryInstance}): ${response.status} ${response.statusText}`,
-						{ entry },
-					)
-				}
-			})
+			// void updatePrimaryCacheValue({
+			// 	key,
+			// 	cacheValue: entry,
+			// }).then((response) => {
+			// 	if (!response.ok) {
+			// 		console.error(
+			// 			`Error updating cache value for key "${key}" on primary instance (${primaryInstance}): ${response.status} ${response.statusText}`,
+			// 			{ entry },
+			// 		)
+			// 	}
+			// })
 		}
 	},
 	async delete(key) {
-		const { currentIsPrimary, primaryInstance } = await getInstanceInfo()
+		const { currentIsPrimary, primaryInstance: ignoredPrimaryInstance } = await getInstanceInfo()
 
 		if (currentIsPrimary) {
 			deleteStatement.run(key)
 		} else {
 			// fire-and-forget cache update
-			void updatePrimaryCacheValue({
-				key,
-				cacheValue: undefined,
-			}).then((response) => {
-				if (!response.ok) {
-					console.error(
-						`Error deleting cache value for key "${key}" on primary instance (${primaryInstance}): ${response.status} ${response.statusText}`,
-					)
-				}
-			})
+			// void updatePrimaryCacheValue({
+			// 	key,
+			// 	cacheValue: undefined,
+			// }).then((response) => {
+			// 	if (!response.ok) {
+			// 		console.error(
+			// 			`Error deleting cache value for key "${key}" on primary instance (${primaryInstance}): ${response.status} ${response.statusText}`,
+			// 		)
+			// 	}
+			// })
 		}
 	},
 }
