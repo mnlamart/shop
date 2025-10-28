@@ -25,7 +25,7 @@ async function createCategory(name: string, parentId?: string, description?: str
 	})
 }
 
-async function createProduct(categoryId?: string) {
+async function createProduct(categoryId: string) {
 	const name = faker.commerce.productName()
 	const baseSlug = slugify(name)
 	const slug = `${baseSlug}-${faker.string.alphanumeric(4)}`

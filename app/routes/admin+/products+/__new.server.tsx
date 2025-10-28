@@ -167,8 +167,13 @@ export async function action({ request }: Route.ActionArgs) {
 	try {
 		const result = await prisma.$transaction(async (tx) => {
 			// Prepare product data
-			const { variants = [], tags, ...productDataWithoutVariants } = productData
-			const productCreateData: Prisma.ProductCreateInput = { ...productDataWithoutVariants }
+			const { variants = [], tags = [], categoryId, ...productDataWithoutVariantsAndCategory } = productData
+			const productCreateData: Prisma.ProductCreateInput = { 
+				...productDataWithoutVariantsAndCategory,
+				category: {
+					connect: { id: categoryId }
+				}
+			}
 
 			// Add images if they exist
 			if (newImages && newImages.length > 0) {
@@ -178,7 +183,7 @@ export async function action({ request }: Route.ActionArgs) {
 			}
 
 			// Add tags if they exist
-			if (tags) {
+			if (tags && tags.length > 0) {
 				productCreateData.tags = {
 					create: tags.map(tagName => ({
 						tag: {

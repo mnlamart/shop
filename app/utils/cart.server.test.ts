@@ -85,8 +85,8 @@ describe('cart.server', () => {
 		const updated = await addToCart(cart.id, product.id, null, 2)
 
 		expect(updated.items).toHaveLength(1)
-		expect(updated.items[0].productId).toBe(product.id)
-		expect(updated.items[0].quantity).toBe(2)
+		expect(updated.items[0]?.productId).toBe(product.id)
+		expect(updated.items[0]?.quantity).toBe(2)
 	})
 
 	test('addToCart should add item with variant', async () => {
@@ -121,7 +121,7 @@ describe('cart.server', () => {
 		const updated = await addToCart(cart.id, product.id, variant.id, 1)
 
 		expect(updated.items).toHaveLength(1)
-		expect(updated.items[0].variantId).toBe(variant.id)
+		expect(updated.items[0]?.variantId).toBe(variant.id)
 	})
 
 	test('addToCart should update existing item quantity', async () => {
@@ -152,7 +152,7 @@ describe('cart.server', () => {
 		const updated = await addToCart(cart.id, product.id, null, 3)
 
 		expect(updated.items).toHaveLength(1)
-		expect(updated.items[0].quantity).toBe(5) // 2 + 3
+		expect(updated.items[0]?.quantity).toBe(5) // 2 + 3
 	})
 
 	test('updateCartItemQuantity should update quantity', async () => {
@@ -177,7 +177,15 @@ describe('cart.server', () => {
 		const cart = await createCart({ sessionId: 'test-session-8' })
 		const cartWithItems = await addToCart(cart.id, product.id, null, 2)
 
+		if (!cartWithItems.items[0]) {
+			throw new Error('Cart item not found')
+		}
+
 		const updated = await updateCartItemQuantity(cartWithItems.items[0].id, 5)
+
+		if (!updated.items[0]) {
+			throw new Error('Cart item not found')
+		}
 
 		expect(updated.items[0].quantity).toBe(5)
 	})
@@ -218,9 +226,21 @@ describe('cart.server', () => {
 
 		expect(cartWithMore.items).toHaveLength(2)
 
-		const updated = await removeFromCart(cartWithMore.items[0].id)
+		const firstItem = cartWithMore.items[0]
+		if (!firstItem) {
+			throw new Error('Cart item not found')
+		}
+
+		const updated = await removeFromCart(firstItem.id)
+
+		if (!updated.items) {
+			throw new Error('Updated cart items missing')
+		}
 
 		expect(updated.items).toHaveLength(1)
+		if (!updated.items[0]) {
+			throw new Error('Cart item not found')
+		}
 		expect(updated.items[0].productId).toBe(product2.id)
 	})
 
