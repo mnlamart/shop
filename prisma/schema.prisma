@@ -27,6 +27,7 @@ model User {
   sessions    Session[]
   connections Connection[]
   passkey     Passkey[]
+  cart        Cart?
 }
 
 model Note {
@@ -201,10 +202,11 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  category Category? @relation(fields: [categoryId], references: [id])
+  category Category?  @relation(fields: [categoryId], references: [id])
   images   ProductImage[]
   variants ProductVariant[]
   tags     ProductToTag[]
+  cartItems CartItem[]
 
   @@index([categoryId])
   @@index([status])
@@ -240,6 +242,7 @@ model ProductVariant {
 
   product           Product                 @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   attributeValues   VariantAttributeValue[]
+  cartItems         CartItem[]
 
   @@index([productId])
   @@index([sku])
@@ -331,4 +334,38 @@ enum ProductStatus {
   DRAFT
   ACTIVE
   ARCHIVED
+}
+
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String?  @unique // Null for guest carts
+  sessionId String?  @unique // For guest carts
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user  User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+  
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  cartId    String
+  productId String
+  variantId String?
+  quantity  Int     @default(1)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  
+  @@unique([cartId, productId, variantId])
+  @@index([cartId])
+  @@index([productId])
 }
