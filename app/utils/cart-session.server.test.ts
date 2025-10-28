@@ -13,10 +13,12 @@ describe('cart-session.server', () => {
 	test('getCartSessionId should create a new session ID if none exists', async () => {
 		const request = new Request('http://example.com')
 
-		const sessionId = await getCartSessionId(request)
+		const result = await getCartSessionId(request)
 
-		expect(sessionId).toBeDefined()
-		expect(typeof sessionId).toBe('string')
+		expect(result.sessionId).toBeDefined()
+		expect(typeof result.sessionId).toBe('string')
+		expect(result.needsCommit).toBe(true)
+		expect(result.cookieHeader).toBeDefined()
 	})
 
 	test('getCartSessionId should return the same session ID on subsequent calls', async () => {
@@ -28,9 +30,10 @@ describe('cart-session.server', () => {
 			headers: { cookie },
 		})
 
-		const sessionId = await getCartSessionId(request)
+		const result = await getCartSessionId(request)
 
-		expect(sessionId).toBe(testSessionId)
+		expect(result.sessionId).toBe(testSessionId)
+		expect(result.needsCommit).toBe(false)
 	})
 
 	test('getCartSessionIdFromRequest should return existing session ID', async () => {

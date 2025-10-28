@@ -13,7 +13,6 @@ export type ProductData = {
 	description?: string
 	sku: string
 	price: number
-	currency?: string
 	status?: string
 	categoryId?: string
 	tags?: string[]
@@ -58,7 +57,6 @@ export function createProductData(): ProductData {
 		description: faker.commerce.productDescription(),
 		sku: createProductSku(),
 		price: parseFloat(faker.commerce.price({ min: 10, max: 1000, dec: 2 })),
-		currency: 'EUR',
 		status: 'DRAFT',
 		categoryId: UNCATEGORIZED_CATEGORY_ID,
 		tags: [],
@@ -99,9 +97,6 @@ export function createProductFormData(productData: ProductData, options?: {
 	formData.append('price', productData.price.toString())
 	
 	// Optional fields
-	if (productData.currency) {
-		formData.append('currency', productData.currency)
-	}
 	if (productData.status) {
 		formData.append('status', productData.status)
 	}

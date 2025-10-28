@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router'
 import { prisma } from '#app/utils/db.server.ts'
+import { formatPrice } from '#app/utils/price.ts'
+import { getStoreCurrency } from '#app/utils/settings.server.ts'
 import { type Route } from './+types/index.ts'
 
 export async function loader() {
@@ -26,7 +28,9 @@ export async function loader() {
 		orderBy: { name: 'asc' },
 	})
 
-	return { products, categories }
+	const currency = await getStoreCurrency()
+
+	return { products, categories, currency }
 }
 
 export const meta: Route.MetaFunction = () => [
@@ -35,7 +39,7 @@ export const meta: Route.MetaFunction = () => [
 ]
 
 export default function ProductsIndex({ loaderData }: Route.ComponentProps) {
-	const { products, categories } = loaderData
+	const { products, categories, currency } = loaderData
 
 	const [searchTerm, setSearchTerm] = useState('')
 	const [selectedCategory, setSelectedCategory] = useState('all')
@@ -125,7 +129,7 @@ export default function ProductsIndex({ loaderData }: Route.ComponentProps) {
 						<div className="p-4">
 							<h3 className="font-semibold mb-1">{product.name}</h3>
 							<p className="text-sm text-muted-foreground mb-2">{product.category.name}</p>
-							<p className="text-lg font-bold">${Number(product.price).toFixed(2)}</p>
+							<p className="text-lg font-bold">{formatPrice(product.price, currency)}</p>
 						</div>
 						</Link>
 					))}

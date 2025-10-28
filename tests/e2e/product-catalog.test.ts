@@ -41,7 +41,6 @@ test.describe('Product Catalog', () => {
 				description: productData.description,
 				sku: productData.sku,
 				price: productData.price,
-				currency: productData.currency || 'USD',
 				status: 'ACTIVE',
 				categoryId: category.id,
 			},
