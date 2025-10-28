@@ -59,7 +59,6 @@ async function createProduct(categoryId?: string) {
 				objectKey: randomImage.objectKey,
 				altText: `${name} - Image ${i + 1}`,
 				displayOrder: i,
-				isPrimary: i === 0,
 			},
 		})
 	}
