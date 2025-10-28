@@ -188,14 +188,40 @@ model Passkey {
 
 // E-commerce Product Models
 
+model Settings {
+  id        String   @id @default("settings")
+  currencyId String
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  currency Currency @relation(fields: [currencyId], references: [id], onDelete: Restrict)
+
+  @@index([currencyId])
+}
+
+model Currency {
+  id        String   @id @default(cuid())
+  code      String   @unique // e.g., "USD", "EUR", "GBP"
+  name      String   // e.g., "US Dollar"
+  symbol    String   // e.g., "$", "€", "£"
+  decimals  Int      @default(2) // Number of decimal places to display
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  settings Settings[]
+
+  @@index([code])
+}
+
 model Product {
   id          String   @id @default(cuid())
   name        String
   slug        String   @unique
   description String?
   sku         String   @unique
-  price       Decimal
-  currency    String   @default("USD")
+  price       Int      // price in cents
   status      ProductStatus @default(DRAFT)
   categoryId  String
   
@@ -234,7 +260,7 @@ model ProductVariant {
   id            String  @id @default(cuid())
   productId     String
   sku           String  @unique
-  price         Decimal?
+  price         Int?     // price in cents (if different from product base price)
   stockQuantity Int     @default(0)
 
   createdAt DateTime @default(now())

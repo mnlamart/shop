@@ -20,17 +20,20 @@ export const { getSession, commitSession, destroySession } = cartSessionStorage
 /**
  * Get or create a cart session ID for guest users
  * Returns the session ID from the cookie, or creates a new one
+ * Also returns whether a new session was created (for committing)
  */
-export async function getCartSessionId(request: Request): Promise<string> {
+export async function getCartSessionId(request: Request): Promise<{ sessionId: string, needsCommit: boolean, cookieHeader?: string }> {
 	const session = await getSession(request.headers.get('cookie'))
 	let sessionId = session.get(CART_SESSION_COOKIE) as string | undefined
 
 	if (!sessionId) {
 		sessionId = cuid()
 		session.set(CART_SESSION_COOKIE, sessionId)
+		const cookieHeader = await commitSession(session)
+		return { sessionId, needsCommit: true, cookieHeader }
 	}
 
-	return sessionId
+	return { sessionId, needsCommit: false }
 }
 
 /**

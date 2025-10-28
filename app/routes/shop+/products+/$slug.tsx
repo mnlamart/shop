@@ -1,9 +1,11 @@
 import { invariantResponse } from '@epic-web/invariant'
 import { Link, redirect } from 'react-router'
 import { Button } from '#app/components/ui/button.tsx'
-import { getCartSessionIdFromRequest, createCartSessionCookieHeader } from '#app/utils/cart-session.server.ts'
+import { getCartSessionId } from '#app/utils/cart-session.server.ts'
 import { addToCart, getOrCreateCart } from '#app/utils/cart.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
+import { formatPrice } from '#app/utils/price.ts'
+import { getStoreCurrency } from '#app/utils/settings.server.ts'
 import { type Route } from './+types/$slug.ts'
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -24,7 +26,9 @@ export async function loader({ params }: Route.LoaderArgs) {
 
 	invariantResponse(product, 'Product not found', { status: 404 })
 
-	return { product }
+	const currency = await getStoreCurrency()
+
+	return { product, currency }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -41,7 +45,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 		invariantResponse(product, 'Product not found', { status: 404 })
 
 		// Get or create cart session
-		const sessionId = await getCartSessionIdFromRequest(request)
+		const { sessionId, needsCommit, cookieHeader } = await getCartSessionId(request)
 		const cart = await getOrCreateCart({ sessionId })
 
 		// Add product to cart
@@ -50,10 +54,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 
 		await addToCart(cart.id, product.id, variantId, quantity)
 
-		// Create session cookie if needed
-		if (!sessionId) {
-			const newSessionId = crypto.randomUUID()
-			const cookieHeader = await createCartSessionCookieHeader(newSessionId)
+		// Return with cookie header if needed
+		if (needsCommit && cookieHeader) {
 			return redirect(`/shop/products/${params.slug}`, {
 				headers: { 'Set-Cookie': cookieHeader },
 			})
@@ -72,7 +74,7 @@ export const meta: Route.MetaFunction = ({ data }) => {
 }
 
 export default function ProductSlug({ loaderData }: Route.ComponentProps) {
-	const { product } = loaderData
+	const { product, currency } = loaderData
 
 	return (
 		<div className="container mx-auto px-4 py-8">
@@ -100,7 +102,7 @@ export default function ProductSlug({ loaderData }: Route.ComponentProps) {
 					</div>
 
 					<div>
-						<p className="text-3xl font-bold">${Number(product.price).toFixed(2)}</p>
+						<p className="text-3xl font-bold">{formatPrice(product.price, currency)}</p>
 					</div>
 
 					{product.description && (

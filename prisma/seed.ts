@@ -36,8 +36,7 @@ async function createProduct(categoryId: string) {
 			slug,
 			description: faker.commerce.productDescription() + '\n\n' + faker.lorem.paragraphs(2),
 			sku: faker.string.alphanumeric(8).toUpperCase(),
-			price: Number(faker.commerce.price({ min: 10, max: 500, dec: 2 })),
-			currency: 'USD',
+			price: Math.round(Number(faker.commerce.price({ min: 10, max: 500, dec: 2 })) * 100), // Convert to cents
 			status: faker.helpers.weightedArrayElement([
 				{ weight: 20, value: 'DRAFT' },
 				{ weight: 70, value: 'ACTIVE' },
@@ -92,11 +91,11 @@ async function createProduct(categoryId: string) {
 				data: {
 					productId: product.id,
 					sku: `${product.sku}-${combination}-${faker.string.alphanumeric(4)}`,
-					price: Number(faker.commerce.price({ 
-						min: Number(product.price) * 0.8, 
-						max: Number(product.price) * 1.2, 
-						dec: 2 
-					})),
+				price: Math.round(Number(faker.commerce.price({ 
+					min: product.price * 0.8 / 100, // Convert from cents to dollars for comparison
+					max: product.price * 1.2 / 100, 
+					dec: 2 
+				})) * 100), // Convert back to cents
 					stockQuantity: faker.number.int({ min: 0, max: 100 }),
 					attributeValues: {
 						create: [
@@ -113,6 +112,28 @@ async function createProduct(categoryId: string) {
 }
 
 async function seedProductData() {
+	// Create USD currency first
+	const usdCurrency = await prisma.currency.upsert({
+		where: { code: 'USD' },
+		create: {
+			code: 'USD',
+			name: 'US Dollar',
+			symbol: '$',
+			decimals: 2,
+		},
+		update: {},
+	})
+
+	// Create Settings with USD as default currency
+	await prisma.settings.upsert({
+		where: { id: 'settings' },
+		create: {
+			id: 'settings',
+			currencyId: usdCurrency.id,
+		},
+		update: {},
+	})
+
 	// Create Uncategorized category first with fixed ID
 	await prisma.category.upsert({
 		where: { id: UNCATEGORIZED_CATEGORY_ID },

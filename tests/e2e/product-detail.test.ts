@@ -28,7 +28,6 @@ test.describe('Product Detail', () => {
 				description: productData.description,
 				sku: productData.sku,
 				price: productData.price,
-				currency: productData.currency || 'USD',
 				status: 'ACTIVE',
 				categoryId: testCategory.id,
 			},
@@ -39,8 +38,8 @@ test.describe('Product Detail', () => {
 		// Check product name is visible
 		await expect(page.getByRole('heading', { name: product.name })).toBeVisible()
 
-		// Check product price is visible
-		await expect(page.getByText(`$${Number(product.price).toFixed(2)}`)).toBeVisible()
+		// Check product price is visible (price is now in cents)
+		await expect(page.getByText(`$${(product.price / 100).toFixed(2)}`)).toBeVisible()
 
 		// Check product description is visible
 		await expect(page.getByText(product.description!)).toBeVisible()
@@ -58,7 +57,6 @@ test.describe('Product Detail', () => {
 				description: productData.description,
 				sku: productData.sku,
 				price: productData.price,
-				currency: productData.currency || 'USD',
 				status: 'ACTIVE',
 				categoryId: testCategory.id,
 			},
