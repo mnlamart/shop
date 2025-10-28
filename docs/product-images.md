@@ -43,6 +43,9 @@ export async function getProductImages() {
 ```
 
 ### Seeding Integration
+
+**Note**: The product image system uses `displayOrder` to determine the primary image - the image with `displayOrder: 0` (the first/lowest) is considered the primary image by convention. The `isPrimary` boolean field has been removed in favor of this simpler approach.
+
 ```typescript
 // prisma/seed.ts
 const productImages = await getProductImages()
@@ -53,8 +56,7 @@ await prisma.productImage.create({
     productId: product.id,
     objectKey: randomImage.objectKey, // e.g., "products/15.jpg"
     altText: `${name} - Image ${i + 1}`,
-    displayOrder: i,
-    isPrimary: i === 0,
+    displayOrder: i, // First image (displayOrder: 0) is the primary image by convention
   },
 })
 ```

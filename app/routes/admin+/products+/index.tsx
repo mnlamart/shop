@@ -44,8 +44,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 				select: { id: true, name: true, slug: true },
 			},
 			images: {
-				where: { isPrimary: true },
 				select: { objectKey: true, altText: true },
+				orderBy: { displayOrder: 'asc' },
 				take: 1,
 			},
 			variants: {
@@ -145,7 +145,6 @@ function DeleteProductButton({ product }: { product: any }) {
 
 export default function ProductsList({ loaderData }: Route.ComponentProps) {
 	const { products, categories } = loaderData
-	const fetcher = useFetcher()
 	
 	// State for search and filtering
 	const [searchTerm, setSearchTerm] = useState('')
@@ -286,7 +285,7 @@ export default function ProductsList({ loaderData }: Route.ComponentProps) {
 											{primaryImage ? (
 												<div className="h-12 w-12 flex-shrink-0">
 													<img
-														src={`/resources/images?ij&objectKey=${encodeURIComponent(primaryImage.objectKey)}`}
+														src={`/resources/images?objectKey=${encodeURIComponent(primaryImage.objectKey)}`}
 														alt={primaryImage.altText || product.name}
 														className="h-12 w-12 rounded-lg object-cover"
 													/>

@@ -1,5 +1,5 @@
 import { useForm, getFormProps, getInputProps } from '@conform-to/react'
-import { parseWithZod, getZodConstraint } from '@conform-to/zod'
+import { parseWithZod, getZodConstraint } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import { parseFormData } from '@mjackson/form-data-parser'
 import { Form, Link } from 'react-router'
@@ -20,8 +20,10 @@ import { type Route } from './+types/$attributeId_.edit.ts'
 
 const AttributeEditSchema = z.object({
 	id: z.string(),
-	name: z.string().min(1, 'Name is required').max(50, 'Name must be less than 50 characters'),
-	values: z.string().min(1, 'At least one value is required'),
+	name: z.string().min(1, { error: 'Name is required' }).max(50, {
+		error: 'Name must be less than 50 characters',
+	}),
+	values: z.string().min(1, { error: 'At least one value is required' }),
 })
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -61,7 +63,7 @@ export async function action({ params: _params, request }: Route.ActionArgs) {
 			})
 			if (existingAttribute) {
 				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
+					code: 'custom',
 					message: 'Attribute name already exists',
 					path: ['name'],
 				})
@@ -71,7 +73,7 @@ export async function action({ params: _params, request }: Route.ActionArgs) {
 			const values = data.values.split(',').map(v => v.trim()).filter(Boolean)
 			if (values.length === 0) {
 				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
+					code: 'custom',
 					message: 'At least one value is required',
 					path: ['values'],
 				})

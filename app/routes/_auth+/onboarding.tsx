@@ -1,5 +1,5 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
-import { getZodConstraint, parseWithZod } from '@conform-to/zod'
+import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { data, redirect, Form, useSearchParams } from 'react-router'
 import { HoneypotInputs } from 'remix-utils/honeypot/react'
 import { safeRedirect } from 'remix-utils/safe-redirect'
@@ -33,8 +33,10 @@ const SignupFormSchema = z
 		username: UsernameSchema,
 		name: NameSchema,
 		agreeToTermsOfServiceAndPrivacyPolicy: z.boolean({
-			required_error:
-				'You must agree to the terms of service and privacy policy',
+			error: (issue) =>
+				issue.input === undefined
+					? 'You must agree to the terms of service and privacy policy'
+					: 'Must be a boolean',
 		}),
 		remember: z.boolean().optional(),
 		redirectTo: z.string().optional(),
@@ -72,7 +74,7 @@ export async function action({ request }: Route.ActionArgs) {
 				if (existingUser) {
 					ctx.addIssue({
 						path: ['username'],
-						code: z.ZodIssueCode.custom,
+						code: 'custom',
 						message: 'A user already exists with this username',
 					})
 					return

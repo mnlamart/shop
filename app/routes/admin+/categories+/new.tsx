@@ -1,5 +1,5 @@
 import { useForm, getFormProps, getInputProps, getTextareaProps, FormProvider, useInputControl } from '@conform-to/react'
-import { parseWithZod, getZodConstraint  } from '@conform-to/zod'
+import { parseWithZod, getZodConstraint  } from '@conform-to/zod/v4'
 import { parseFormData } from '@mjackson/form-data-parser'
 import { Form  } from 'react-router'
 import { z } from 'zod'
@@ -18,9 +18,17 @@ import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { type Route } from './+types/new.ts'
 
 const CategorySchema = z.object({
-	name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
-	slug: z.string().min(1, 'Slug is required').max(100, 'Slug must be less than 100 characters').regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers, and hyphens'),
-	description: z.string().max(500, 'Description must be less than 500 characters').optional(),
+	name: z.string().min(1, { error: 'Name is required' }).max(100, {
+		error: 'Name must be less than 100 characters',
+	}),
+	slug: z.string().min(1, { error: 'Slug is required' }).max(100, {
+		error: 'Slug must be less than 100 characters',
+	}).regex(/^[a-z0-9-]+$/, {
+		error: 'Slug can only contain lowercase letters, numbers, and hyphens',
+	}),
+	description: z.string().max(500, {
+		error: 'Description must be less than 500 characters',
+	}).optional(),
 	parentId: z.string(),
 })
 
@@ -36,7 +44,7 @@ export async function action({ request }: Route.ActionArgs) {
 			})
 			if (existingCategory) {
 				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
+					code: 'custom',
 					message: 'Slug already exists',
 					path: ['slug'],
 				})
@@ -49,7 +57,7 @@ export async function action({ request }: Route.ActionArgs) {
 				})
 				if (!parent) {
 					ctx.addIssue({
-						code: z.ZodIssueCode.custom,
+						code: 'custom',
 						message: 'Parent category not found',
 						path: ['parentId'],
 					})
@@ -184,7 +192,7 @@ function CategoryForm({ categories, actionData }: { categories: any[], actionDat
 
 				{/* Actions */}
 				<div className="flex items-center justify-end space-x-4">
-					<Button type="button" variant="outline" className="transition-all duration-200 hover:shadow-sm">
+					<Button variant="outline" className="transition-all duration-200 hover:shadow-sm">
 						Cancel
 					</Button>
 					<Button type="submit" disabled={isPending} className="transition-all duration-200 hover:shadow-md">

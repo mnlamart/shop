@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { invariantResponse } from '@epic-web/invariant'
 import { Link, useFetcher } from 'react-router'
 import {
@@ -26,13 +25,21 @@ import {
 } from '#app/components/ui/table.tsx'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
-import { type Route } from './+types/$productId.ts'
+import { type Route } from './+types/$productSlug.ts'
 
+/**
+ * Loads product details for display
+ * 
+ * @param params - Route parameters containing the product slug
+ * @param request - HTTP request object
+ * @returns Product data with all relations (images, variants, tags, category)
+ * @throws {invariantResponse} If product is not found (404)
+ */
 export async function loader({ params, request }: Route.LoaderArgs) {
 	await requireUserWithRole(request, 'admin')
 
 	const product = await prisma.product.findUnique({
-		where: { slug: params.productId },
+		where: { slug: params.productSlug },
 		include: {
 			category: {
 				select: { id: true, name: true, slug: true },
@@ -78,11 +85,23 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	}
 }
 
+/**
+ * Generates metadata for the product view page
+ * 
+ * @param data - Route data containing product information
+ * @returns Array of meta tags for the page
+ */
 export const meta: Route.MetaFunction = ({ data }: any) => [
 	{ title: `${data?.product.name} | Admin | Epic Shop` },
 	{ name: 'description', content: `View product: ${data?.product.name}` },
 ]
 
+/**
+ * StatusBadge component for displaying product status
+ * 
+ * @param status - Product status (ACTIVE, ARCHIVED, DRAFT)
+ * @returns Badge component with appropriate styling based on status
+ */
 function StatusBadge({ status }: { status: string }) {
 	if (status === 'ACTIVE') {
 		return <Badge variant="success">Active</Badge>
@@ -93,6 +112,12 @@ function StatusBadge({ status }: { status: string }) {
 	return <Badge variant="secondary">Draft</Badge>
 }
 
+/**
+ * StockBadge component for displaying stock quantity status
+ * 
+ * @param stockQuantity - Current stock quantity
+ * @returns Badge component with stock status (Out of Stock, Low Stock, In Stock)
+ */
 function StockBadge({ stockQuantity }: { stockQuantity: number }) {
 	if (stockQuantity === 0) {
 		return <Badge variant="destructive">Out of Stock</Badge>
@@ -103,6 +128,12 @@ function StockBadge({ stockQuantity }: { stockQuantity: number }) {
 	return <Badge variant="success">In Stock ({stockQuantity})</Badge>
 }
 
+/**
+ * DeleteProductButton component with confirmation dialog
+ * 
+ * @param product - Product data to delete
+ * @returns Alert dialog button for deleting the product
+ */
 function DeleteProductButton({ product }: { product: any }) {
 	const fetcher = useFetcher()
 
@@ -149,10 +180,16 @@ function DeleteProductButton({ product }: { product: any }) {
 	)
 }
 
+/**
+ * ProductView component for displaying product details
+ * 
+ * @param loaderData - Product data loaded from the loader function
+ * @returns React component with product information, images, variants, and metadata
+ */
 export default function ProductView({ loaderData }: Route.ComponentProps) {
 	const { product } = loaderData
 	const totalStock = product.variants.reduce((sum: number, variant: any) => sum + variant.stockQuantity, 0)
-	const primaryImage = product.images.find((img: any) => img.isPrimary) || product.images[0]
+	const primaryImage = product.images[0] // Already ordered by displayOrder in loader
 
 	return (
 		<div className="space-y-8 animate-slide-top">

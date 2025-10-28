@@ -1,6 +1,7 @@
 import { getFormProps, getInputProps, getTextareaProps, useForm, getFieldsetProps, type FieldMetadata } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
-import { useRef, useState, useCallback } from 'react'
+import { invariantResponse } from '@epic-web/invariant'
+import { useRef, useState } from 'react'
 import { Form, Link } from 'react-router'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
@@ -17,18 +18,48 @@ import { productSchema, type ImageFieldset, type VariantFieldset } from '#app/sc
 import { prisma } from '#app/utils/db.server.ts'
 import { useIsPending, cn, getProductImgSrc } from '#app/utils/misc.tsx'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
-import { type Route } from './+types/new.ts'
+import { type Route } from './+types/$productSlug_.edit.ts'
 
-export { action } from './__new.server.tsx'
+export { action } from './__edit.server.tsx'
 
 /**
- * Loads categories and attributes for the new product form
+ * Loads product data for editing
  * 
+ * @param params - Route parameters containing the product slug
  * @param request - HTTP request object
- * @returns Categories and attributes data for form dropdowns
+ * @returns Product data with all relations (images, variants, tags), categories, and attributes
+ * @throws {invariantResponse} If product is not found (404)
  */
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ params, request }: Route.LoaderArgs) {
 	await requireUserWithRole(request, 'admin')
+
+	// Get existing product with all relations
+	const product = await prisma.product.findUnique({
+		where: { slug: params.productSlug },
+		include: {
+			images: {
+				orderBy: { displayOrder: 'asc' },
+			},
+			variants: {
+				include: {
+					attributeValues: {
+						include: {
+							attributeValue: {
+								include: { attribute: true },
+							},
+						},
+					},
+				},
+			},
+			tags: {
+				include: {
+					tag: true,
+				},
+			},
+		},
+	})
+
+	invariantResponse(product, 'Product not found', { status: 404 })
 
 	// Get categories and attributes for the form
 	const [categories, attributes] = await Promise.all([
@@ -47,6 +78,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 	])
 
 	return {
+		product: {
+			...product,
+			price: Number(product.price),
+			variants: product.variants.map(variant => ({
+				...variant,
+				price: variant.price ? Number(variant.price) : null,
+				attributeValueIds: variant.attributeValues.map(av => av.attributeValueId),
+			})),
+		},
 		categories,
 		attributes: attributes.map(attr => ({
 			id: attr.id,
@@ -60,77 +100,72 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 /**
- * Generates metadata for the new product page
+ * Generates metadata for the edit product page
  * 
+ * @param data - Route data containing product information
  * @returns Array of meta tags for the page
  */
-export const meta: Route.MetaFunction = () => [
-	{ title: 'New Product | Admin | Epic Shop' },
-	{ name: 'description', content: 'Create a new product' },
+export const meta: Route.MetaFunction = ({ data }: any) => [
+	{ title: `Edit ${data?.product.name} | Admin | Epic Shop` },
+	{ name: 'description', content: `Edit product: ${data?.product.name}` },
 ]
 
-const productWithoutIdSchema = productSchema.omit({ id: true })
-
 /**
- * NewProduct component for creating a new product
+ * EditProduct component for editing product information
  * 
- * @param loaderData - Categories and attributes data loaded from the loader function
+ * @param loaderData - Product data loaded from the loader function
  * @param actionData - Result data from form submissions
- * @returns React component with product creation form
+ * @returns React component with product edit form
  */
-export default function NewProduct({ loaderData, actionData }: Route.ComponentProps) {
+export default function EditProduct({ loaderData, actionData }: Route.ComponentProps) {
+	const { product, categories, attributes } = loaderData
 	const isPending = useIsPending()
 
 	const [form, fields] = useForm({
-		id: 'product-form',
-		constraint: getZodConstraint(productWithoutIdSchema),
+		id: 'product-edit-form',
+		constraint: getZodConstraint(productSchema),
 		lastResult: actionData?.result,
 		onValidate({ formData }) {
-			return parseWithZod(formData, { schema: productWithoutIdSchema })
+			return parseWithZod(formData, { schema: productSchema })
 		},
 		shouldValidate: 'onBlur',
 		shouldRevalidate: 'onInput',
 		defaultValue: {
-			images: [{}],
+			id: product.id,
+			name: product.name,
+			slug: product.slug,
+			description: product.description || '',
+			sku: product.sku,
+			price: product.price,
+			currency: product.currency,
+			status: product.status,
+			categoryId: product.categoryId,
+			tags: product.tags.map(pt => pt.tag.name),
+			images: product.images.map(img => ({
+				id: img.id,
+				altText: img.altText,
+			})),
+			variants: product.variants.map(variant => ({
+				id: variant.id,
+				sku: variant.sku,
+				price: variant.price,
+				stockQuantity: variant.stockQuantity,
+				attributeValueIds: variant.attributeValueIds,
+			})),
 		},
 	})
 
-
 	const newTagInputRef = useRef<HTMLInputElement>(null)
-
 	const tags = fields.tags.getFieldList()
 	const imageList = fields.images.getFieldList()
 	const variantList = fields.variants.getFieldList()
 
-	const handleTagKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-		if (e.key === 'Enter') {
-			e.preventDefault()
-			if (e.currentTarget.value.trim()) {
-				form.insert({
-					name: fields.tags.name,
-					defaultValue: e.currentTarget.value.trim(),
-				})
-				e.currentTarget.value = ''
-			}
-		}
-	}, [form, fields.tags.name])
-
-	const handleAddTag = useCallback(() => {
-		if (newTagInputRef.current?.value.trim()) {
-			form.insert({
-				name: fields.tags.name,
-				defaultValue: newTagInputRef.current.value.trim(),
-			})
-			newTagInputRef.current.value = ''
-		}
-	}, [form, fields.tags.name])
-
 	return (
 		<div className="space-y-8 animate-slide-top">
 			<div>
-				<h1 className="text-3xl font-bold tracking-tight">Create New Product</h1>
+				<h1 className="text-3xl font-bold tracking-tight">Edit Product</h1>
 				<p className="text-muted-foreground">
-					Add a new product to your catalog
+					Update product: {product.name}
 				</p>
 			</div>
 			<Form
@@ -139,187 +174,179 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				encType="multipart/form-data"
 				className="space-y-6"
 			>
-				{/*
-					This hidden submit button is here to ensure that when the user hits
-					"enter" on an input field, the primary form function is submitted
-					rather than the first button in the form (which is delete/add image or tags).
-				*/}
 				<button type="submit" className="hidden" />
-				{/* Basic Information Card */}
+				<input type="hidden" name="id" value={product.id} />
+				
+				{/* Basic Information, Organization & Pricing Card */}
 				<Card>
 					<CardHeader>
-						<CardTitle>Basic Information</CardTitle>
-						<CardDescription>Product name, slug, and description</CardDescription>
+						<CardTitle>Basic Information, Organization & Pricing</CardTitle>
+						<CardDescription>Product details, status, categorization, and pricing information</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
-						<div className="grid gap-4 md:grid-cols-2">
-							<div className="space-y-2">
-								<Label htmlFor={fields.name.id}>Name *</Label>
-								<Input
-									{...getInputProps(fields.name, { type: 'text' })}
-									placeholder="Enter product name"
-									className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-								/>
-								<ErrorList errors={fields.name.errors} />
-							</div>
-							<div className="space-y-2">
-								<Label htmlFor={fields.slug.id}>Slug *</Label>
-								<Input
-									{...getInputProps(fields.slug, { type: 'text' })}
-									placeholder="product-slug"
-									className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-								/>
-								<ErrorList errors={fields.slug.errors} />
-							</div>
-						</div>
-						<div className="space-y-2">
-							<Label htmlFor={fields.description.id}>Description</Label>
-							<Textarea
-								{...getTextareaProps(fields.description)}
-								placeholder="Enter product description"
-								rows={4}
-								className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-							/>
-							<ErrorList errors={fields.description.errors} />
-						</div>
-						<div className="space-y-2">
-							<Label>Tags</Label>
-							<div className="space-y-3">
-								{/* Display existing tags */}
-								{tags.length > 0 && (
-									<div className="flex flex-wrap gap-2">
-										{tags.map((tag, index) => (
-											<div key={tag.key} className="flex items-center">
-												
-												<ProductTag
-													tag={tag}
-													variant={tag.errors ? "destructive" : "secondary"}
-													hasError={!!tag.errors}
-													errorMessage={tag.errors?.join(', ')}
-													removeButtonProps={form.remove.getButtonProps({
-														name: fields.tags.name,
-														index,
-													})}
-												/>
-											</div>
-										))}
-									</div>
-								)}
-
-								{/* Add new tag input */}
-								<div className="flex gap-2">
+							<div className="grid gap-4 md:grid-cols-2">
+								<div className="space-y-2">
+									<Label htmlFor={fields.name.id}>Name *</Label>
 									<Input
-										ref={newTagInputRef}
-										placeholder="Enter tag name"
-										className="flex-1"
-										onKeyDown={handleTagKeyDown}
+										{...getInputProps(fields.name, { type: 'text' })}
+										placeholder="Enter product name"
+										className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
 									/>
-									<Button
-										type="button"
-										variant="outline"
-										onClick={handleAddTag}
-									>
-										Add Tag
-									</Button>
+									<ErrorList errors={fields.name.errors} />
 								</div>
-								<ErrorList errors={fields.tags.errors} />
+								<div className="space-y-2">
+									<Label htmlFor={fields.slug.id}>Slug *</Label>
+									<Input
+										{...getInputProps(fields.slug, { type: 'text' })}
+										placeholder="product-slug"
+										className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+									/>
+									<ErrorList errors={fields.slug.errors} />
+								</div>
 							</div>
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* Pricing & Stock Card */}
-				<Card>
-					<CardHeader>
-						<CardTitle>Pricing & Stock</CardTitle>
-						<CardDescription>SKU, pricing, and currency information</CardDescription>
-					</CardHeader>
-					<CardContent className="space-y-6">
-						<div className="grid gap-4 md:grid-cols-3">
 							<div className="space-y-2">
-								<Label htmlFor={fields.sku.id}>SKU *</Label>
-								<Input
-									{...getInputProps(fields.sku, { type: 'text' })}
-									placeholder="PRODUCT-001"
+								<Label htmlFor={fields.description.id}>Description</Label>
+								<Textarea
+									{...getTextareaProps(fields.description)}
+									placeholder="Enter product description"
+									rows={4}
 									className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
 								/>
-								<ErrorList errors={fields.sku.errors} />
+								<ErrorList errors={fields.description.errors} />
+							</div>
+							<div className="grid gap-4 md:grid-cols-2">
+								<div className="space-y-2">
+									<Label htmlFor={fields.status.id}>Status</Label>
+									<Select {...getInputProps(fields.status, { type: 'text' })}>
+										<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+											<SelectValue placeholder="Select status" />
+										</SelectTrigger>
+										<SelectContent>
+											{PRODUCT_STATUSES.map((status) => (
+												<SelectItem key={status} value={status}>
+													{status.charAt(0) + status.slice(1).toLowerCase()}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<ErrorList errors={fields.status.errors} />
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor={fields.categoryId.id}>Category</Label>
+									<Select {...getInputProps(fields.categoryId, { type: 'text' })}>
+										<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+											<SelectValue placeholder="Select category" />
+										</SelectTrigger>
+										<SelectContent>
+											{categories.map((category) => (
+												<SelectItem key={category.id} value={category.id}>
+													{category.name}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<ErrorList errors={fields.categoryId.errors} />
+								</div>
 							</div>
 							<div className="space-y-2">
-								<Label htmlFor={fields.price.id}>Price *</Label>
-								<Input
-									{...getInputProps(fields.price, { type: 'number' })}
-									step="0.01"
-									placeholder="0.00"
-									className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-								/>
-								<ErrorList errors={fields.price.errors} />
+								<Label>Tags</Label>
+								<div className="space-y-3">
+									{tags.length > 0 && (
+										<div className="flex flex-wrap gap-2">
+											{tags.map((tag, index) => (
+												<div key={tag.key} className="flex items-center">
+													<ProductTag
+														tag={tag}
+														variant={tag.errors ? "destructive" : "secondary"}
+														hasError={!!tag.errors}
+														errorMessage={tag.errors?.join(', ')}
+														removeButtonProps={form.remove.getButtonProps({
+															name: fields.tags.name,
+															index,
+														})}
+													/>
+												</div>
+											))}
+										</div>
+									)}
+									<div className="flex gap-2">
+										<Input
+											ref={newTagInputRef}
+											placeholder="Enter tag name"
+											className="flex-1"
+											onKeyDown={(e) => {
+												if (e.key === 'Enter') {
+													e.preventDefault()
+													if (e.currentTarget.value.trim()) {
+														form.insert({
+															name: fields.tags.name,
+															defaultValue: e.currentTarget.value.trim(),
+														})
+														e.currentTarget.value = ''
+													}
+												}
+											}}
+										/>
+										<Button
+											type="button"
+											variant="outline"
+											onClick={() => {
+												if (newTagInputRef.current?.value.trim()) {
+													form.insert({
+														name: fields.tags.name,
+														defaultValue: newTagInputRef.current.value.trim(),
+													})
+													newTagInputRef.current.value = ''
+												}
+											}}
+										>
+											Add Tag
+										</Button>
+									</div>
+									<ErrorList errors={fields.tags.errors} />
+								</div>
 							</div>
-							<div className="space-y-2">
-								<Label htmlFor={fields.currency.id}>Currency</Label>
-								<Select {...getInputProps(fields.currency, { type: 'text' })}>
-									<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
-										<SelectValue placeholder="Select currency" />
-									</SelectTrigger>
-									<SelectContent>
-										{CURRENCIES.map((currency) => (
-											<SelectItem key={currency} value={currency}>
-												{currency}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-								<ErrorList errors={fields.currency.errors} />
+							<div className="grid gap-4 md:grid-cols-3">
+								<div className="space-y-2">
+									<Label htmlFor={fields.sku.id}>SKU *</Label>
+									<Input
+										{...getInputProps(fields.sku, { type: 'text' })}
+										placeholder="PRODUCT-001"
+										className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+									/>
+									<ErrorList errors={fields.sku.errors} />
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor={fields.price.id}>Price *</Label>
+									<Input
+										{...getInputProps(fields.price, { type: 'number' })}
+										step="0.01"
+										placeholder="0.00"
+										className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+									/>
+									<ErrorList errors={fields.price.errors} />
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor={fields.currency.id}>Currency</Label>
+									<Select {...getInputProps(fields.currency, { type: 'text' })}>
+										<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+											<SelectValue placeholder="Select currency" />
+										</SelectTrigger>
+										<SelectContent>
+											{CURRENCIES.map((currency) => (
+												<SelectItem key={currency} value={currency}>
+													{currency}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<ErrorList errors={fields.currency.errors} />
+								</div>
 							</div>
-						</div>
-					</CardContent>
-				</Card>
+						</CardContent>
+					</Card>
 
-				{/* Organization Card */}
-				<Card>
-					<CardHeader>
-						<CardTitle>Organization</CardTitle>
-						<CardDescription>Status, category, and tags</CardDescription>
-					</CardHeader>
-					<CardContent className="space-y-6">
-						<div className="grid gap-4 md:grid-cols-2">
-							<div className="space-y-2">
-								<Label htmlFor={fields.status.id}>Status</Label>
-								<Select {...getInputProps(fields.status, { type: 'text' })}>
-									<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
-										<SelectValue placeholder="Select status" />
-									</SelectTrigger>
-									<SelectContent>
-										{PRODUCT_STATUSES.map((status) => (
-											<SelectItem key={status} value={status}>
-												{status.charAt(0) + status.slice(1).toLowerCase()}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-								<ErrorList errors={fields.status.errors} />
-							</div>
-							<div className="space-y-2">
-								<Label htmlFor={fields.categoryId.id}>Category</Label>
-								<Select {...getInputProps(fields.categoryId, { type: 'text' })}>
-									<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
-										<SelectValue placeholder="Select category" />
-									</SelectTrigger>
-									<SelectContent>
-										{loaderData.categories.map((category) => (
-											<SelectItem key={category.id} value={category.id}>
-												{category.name}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-								<ErrorList errors={fields.categoryId.errors} />
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* Images Card */}
+				{/* Product Images Card */}
 				<Card>
 					<CardHeader>
 						<CardTitle>Product Images</CardTitle>
@@ -329,7 +356,12 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 						<div className="space-y-3">
 							<Label>Images</Label>
 							<ul className="flex flex-col gap-4">
-								{fields.images.getFieldList().map((imageMeta, index) => {
+								{imageList.map((imageMeta, index) => {
+									const image = imageMeta.getFieldset()
+									const imageId = image.id.value
+									const imageObj = product.images.find(img => img.id === imageId)
+									const objectKey = imageObj?.objectKey
+									
 									return (
 										<li
 											key={imageMeta.key}
@@ -351,7 +383,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 											</button>
 											<ImageChooser
 												meta={imageMeta as FieldMetadata<ImageFieldset>}
-												objectKey={undefined}
+												objectKey={objectKey}
 											/>
 										</li>
 									)
@@ -362,10 +394,8 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 							variant="outline"
 							{...form.insert.getButtonProps({ name: fields.images.name })}
 						>
-							<span aria-hidden>
-								<Icon name="plus">Image</Icon>
-							</span>{' '}
-							<span className="sr-only">Add image</span>
+							<Icon name="plus" className="mr-2 h-4 w-4" />
+							Add Image
 						</Button>
 						<ErrorList errors={fields.images.errors} />
 					</CardContent>
@@ -392,7 +422,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 											Remove variant {index + 1}
 										</span>
 									</button>
-									<VariantRow meta={variantMeta} attributes={loaderData.attributes} />
+									<VariantRow meta={variantMeta} attributes={attributes} />
 								</div>
 							))}
 						</div>
@@ -421,7 +451,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				{/* Form Actions */}
 				<div className="flex items-center justify-end space-x-4 pt-6">
 					<Button asChild variant="outline" className="transition-all duration-200 hover:shadow-sm">
-						<Link to="/admin/products">Cancel</Link>
+						<Link to={`/admin/products/${product.slug}`}>Cancel</Link>
 					</Button>
 					<StatusButton
 						form={form.id}
@@ -430,7 +460,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 						status={isPending ? 'pending' : 'idle'}
 						className="transition-all duration-200 hover:shadow-sm"
 					>
-						Create Product
+						Update Product
 					</StatusButton>
 				</div>
 			</Form>
@@ -646,3 +676,4 @@ function VariantRow({ meta, attributes }: VariantRowProps) {
 		</fieldset>
 	)
 }
+

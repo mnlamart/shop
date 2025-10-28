@@ -1,5 +1,5 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
-import { getZodConstraint, parseWithZod } from '@conform-to/zod'
+import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import * as QRCode from 'qrcode'
 import { data, redirect, Form, useNavigation } from 'react-router'
@@ -82,7 +82,7 @@ export async function action({ request }: Route.ActionArgs) {
 				if (!codeIsValid) {
 					ctx.addIssue({
 						path: ['code'],
-						code: z.ZodIssueCode.custom,
+						code: 'custom',
 						message: `Invalid code`,
 					})
 					return z.NEVER

@@ -1,5 +1,5 @@
 import { useForm, getFormProps, getInputProps, FormProvider } from '@conform-to/react'
-import { parseWithZod, getZodConstraint  } from '@conform-to/zod'
+import { parseWithZod, getZodConstraint  } from '@conform-to/zod/v4'
 import { parseFormData } from '@mjackson/form-data-parser'
 import { Form, Link } from 'react-router'
 import { z } from 'zod'
@@ -17,8 +17,10 @@ import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { type Route } from './+types/new.ts'
 
 const VariantAttributeSchema = z.object({
-	name: z.string().min(1, 'Name is required').max(50, 'Name must be less than 50 characters'),
-	values: z.string().min(1, 'At least one value is required'),
+	name: z.string().min(1, { error: 'Name is required' }).max(50, {
+		error: 'Name must be less than 50 characters',
+	}),
+	values: z.string().min(1, { error: 'At least one value is required' }),
 })
 
 export async function action({ request }: Route.ActionArgs) {
@@ -33,7 +35,7 @@ export async function action({ request }: Route.ActionArgs) {
 			})
 			if (existingAttribute) {
 				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
+					code: 'custom',
 					message: 'Attribute name already exists',
 					path: ['name'],
 				})
@@ -43,7 +45,7 @@ export async function action({ request }: Route.ActionArgs) {
 			const values = data.values.split(',').map(v => v.trim()).filter(Boolean)
 			if (values.length === 0) {
 				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
+					code: 'custom',
 					message: 'At least one value is required',
 					path: ['values'],
 				})

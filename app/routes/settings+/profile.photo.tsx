@@ -1,5 +1,5 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
-import { getZodConstraint, parseWithZod } from '@conform-to/zod'
+import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import { parseFormData } from '@mjackson/form-data-parser'
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
@@ -34,12 +34,11 @@ const DeleteImageSchema = z.object({
 
 const NewImageSchema = z.object({
 	intent: z.literal('submit'),
-	photoFile: z
-		.instanceof(File)
-		.refine((file) => file.size > 0, 'Image is required')
+	photoFile: z.instanceof(File)
+		.refine((file) => file.size > 0, { error: 'Image is required' })
 		.refine(
 			(file) => file.size <= MAX_SIZE,
-			'Image size must be less than 3MB',
+			{ error: 'Image size must be less than 3MB' },
 		),
 })
 

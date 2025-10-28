@@ -1,5 +1,5 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
-import { getZodConstraint, parseWithZod } from '@conform-to/zod'
+import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { Img } from 'openimg/react'
@@ -190,7 +190,7 @@ async function profileUpdateAction({ userId, formData }: ProfileActionArgs) {
 			if (existingUsername && existingUsername.id !== userId) {
 				ctx.addIssue({
 					path: ['username'],
-					code: z.ZodIssueCode.custom,
+					code: 'custom',
 					message: 'A user already exists with this username',
 				})
 			}

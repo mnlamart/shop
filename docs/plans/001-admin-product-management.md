@@ -11,11 +11,14 @@ implementation_notes: |
   - Added comprehensive ARIA compliance and accessibility features
   - Integrated auto-slug generation without useEffect following Epic Stack patterns
   - Simplified image route to focus on production storage patterns
+  - Routes use `$productSlug` instead of `$productId` for SEO-friendly URLs
 dependencies: []
 related_plans: []
 ---
 
 # Admin Product Management Dashboard
+
+> **Note**: This is a historical implementation plan. The final implementation uses `$productSlug` instead of `$productId` for SEO-friendly URLs. See `implementation_notes` above for details.
 
 ## Overview
 
@@ -47,10 +50,10 @@ Multiple images per product:
 - `id`, `productId` (foreign key)
 - `objectKey` (String) - S3 storage reference
 - `altText` (String, optional)
-- `displayOrder` (Int) - For sorting
-- `isPrimary` (Boolean) - One primary image per product
+- `displayOrder` (Int) - For sorting and primary image determination (first image with lowest displayOrder)
 - Timestamps: `createdAt`, `updatedAt`
 - **Cascade delete**: When product is deleted, all images are deleted
+- **Note**: The `isPrimary` field was removed in favor of using `displayOrder` - the image with the lowest displayOrder (0) serves as the primary image
 
 ### ProductVariant
 
@@ -238,7 +241,7 @@ Create `app/routes/admin+/products/__product-editor.tsx` (server) and `__product
   file: z.instanceof(File).optional(),
   altText: z.string().max(500).optional(),
   displayOrder: z.number().int(),
-  isPrimary: z.boolean(),
+  // Note: isPrimary removed - first image (lowest displayOrder) is primary
 }
 ```
 
@@ -497,7 +500,7 @@ price: base price ± 20% randomly
 objectKey: `products/${productId}/images/${timestamp}-${fileId}.jpg`
 altText: `${productName} - Image ${index + 1}`
 displayOrder: index
-isPrimary: index === 0
+// Note: First image (index === 0) is the primary image by convention
 ```
 
 ### Tags (15-20 common tags)
@@ -513,7 +516,7 @@ isPrimary: index === 0
 createCategory(name, parentId?, depth = 0)
 createProduct(categoryId)
 createProductVariant(productId, attributes)
-createProductImage(productId, isPrimary, order)
+createProductImage(productId, displayOrder)
 ```
 
 ## Testing Strategy
@@ -557,9 +560,9 @@ export function createProductVariant(productId: string, attributes: Record<strin
 
 export async function getProductImages() {
   return [
-    { altText: 'Product image 1', objectKey: 'products/test-1.png', displayOrder: 0, isPrimary: true },
-    { altText: 'Product image 2', objectKey: 'products/test-2.png', displayOrder: 1, isPrimary: false },
-    { altText: 'Product image 3', objectKey: 'products/test-3.png', displayOrder: 2, isPrimary: false },
+    { altText: 'Product image 1', objectKey: 'products/test-1.png', displayOrder: 0 }, // Primary image
+    { altText: 'Product image 2', objectKey: 'products/test-2.png', displayOrder: 1 },
+    { altText: 'Product image 3', objectKey: 'products/test-3.png', displayOrder: 2 },
   ]
 }
 ```

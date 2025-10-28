@@ -436,6 +436,11 @@ function DeleteButton({ item }: { item: any }) {
 
 ### 2. Detail/View Page (`$slug.tsx` or `$id.tsx`)
 
+**Note**: The examples use generic parameter names like `$slug` or `$id`. In the actual implementation:
+- Products use `$productSlug.tsx`
+- Categories use `$categorySlug.tsx`
+- Attributes use `$attributeId.tsx`
+
 The detail page provides comprehensive information about a specific item.
 
 #### Structure
@@ -611,6 +616,11 @@ export default function ItemView({ loaderData }: Route.ComponentProps) {
 
 ### 3. Edit Page (`$slug_.edit.tsx` or `$id_.edit.tsx`)
 
+**Note**: The examples use generic parameter names. In the actual implementation:
+- Products use `$productSlug_.edit.tsx` (note the underscore before `.edit`)
+- Categories use `$categorySlug_.edit.tsx`
+- Attributes use `$attributeId_.edit.tsx`
+
 The edit page provides a form interface for modifying item properties.
 
 #### Form Schema
@@ -644,7 +654,7 @@ export async function action({ params, request }: Route.ActionArgs) {
       })
       if (existingItem) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: 'Slug already exists',
           path: ['slug'],
         })
@@ -657,7 +667,7 @@ export async function action({ params, request }: Route.ActionArgs) {
         })
         if (!parent) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message: 'Parent item not found',
             path: ['parentId'],
           })
@@ -665,7 +675,7 @@ export async function action({ params, request }: Route.ActionArgs) {
         // Prevent setting self as parent
         if (data.parentId === data.id) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message: 'Cannot set item as its own parent',
             path: ['parentId'],
           })
@@ -866,6 +876,11 @@ export default function ItemEdit({ loaderData }: Route.ComponentProps) {
 ```
 
 ### 4. Delete Action (`$slug.delete.ts` or `$id.delete.ts`)
+
+**Note**: The examples use generic parameter names. In the actual implementation:
+- Products use `$productSlug.delete.ts`
+- Categories use `$categorySlug.delete.ts`
+- Attributes use `$attributeId.delete.ts`
 
 The delete action handles safe deletion with proper validation and error handling.
 
@@ -1124,7 +1139,7 @@ When displaying products in detail pages, use proper image resource URLs:
 {product.images[0] ? (
   <div className="h-10 w-10 flex-shrink-0">
     <img 
-      src={`/resources/images?ij&objectKey=${encodeURIComponent(product.images[0].objectKey)}`} 
+      src={`/resources/images?objectKey=${encodeURIComponent(product.images[0].objectKey)}`} 
       alt={product.images[0].altText || product.name}
       className="h-10 w-10 rounded object-cover"
     />

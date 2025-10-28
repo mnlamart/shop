@@ -1,4 +1,4 @@
-import { parseWithZod } from '@conform-to/zod'
+import { parseWithZod } from '@conform-to/zod/v4'
 import { parseFormData } from '@mjackson/form-data-parser'
 import { createId as cuid } from '@paralleldrive/cuid2'
 import { data, redirect, type ActionFunctionArgs } from 'react-router'
@@ -41,7 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
 			})
 			if (!note) {
 				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
+					code: 'custom',
 					message: 'Note not found',
 				})
 			}

@@ -196,12 +196,12 @@ model Product {
   price       Decimal
   currency    String   @default("USD")
   status      ProductStatus @default(DRAFT)
-  categoryId  String?
+  categoryId  String
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  category Category? @relation(fields: [categoryId], references: [id])
   images   ProductImage[]
   variants ProductVariant[]
   tags     ProductToTag[]
@@ -218,7 +218,6 @@ model ProductImage {
   objectKey    String
   altText      String?
   displayOrder Int     @default(0)
-  isPrimary    Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

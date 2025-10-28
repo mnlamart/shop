@@ -1,5 +1,5 @@
 import { type Submission } from '@conform-to/react'
-import { parseWithZod } from '@conform-to/zod'
+import { parseWithZod } from '@conform-to/zod/v4'
 import { data } from 'react-router'
 import { z } from 'zod'
 import { handleVerification as handleChangeEmailVerification } from '#app/routes/settings+/profile.change-email.server.tsx'
@@ -151,7 +151,7 @@ export async function validateRequest(
 			if (!codeIsValid) {
 				ctx.addIssue({
 					path: ['code'],
-					code: z.ZodIssueCode.custom,
+					code: 'custom',
 					message: `Invalid code`,
 				})
 				return
