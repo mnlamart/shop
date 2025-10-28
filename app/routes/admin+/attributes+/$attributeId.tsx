@@ -53,8 +53,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 			price: true,
 			status: true,
 			images: {
-				where: { isPrimary: true },
 				select: { objectKey: true },
+				orderBy: { displayOrder: 'asc' },
 				take: 1,
 			},
 		},
@@ -198,7 +198,7 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 										{product.images[0] ? (
 											<div className="h-10 w-10 flex-shrink-0">
 												<img 
-													src={`/resources/images?ij&objectKey=${encodeURIComponent(product.images[0].objectKey)}`} 
+													src={`/resources/images?objectKey=${encodeURIComponent(product.images[0].objectKey)}`} 
 													alt={product.images[0].altText || product.name}
 													className="h-10 w-10 rounded object-cover"
 												/>

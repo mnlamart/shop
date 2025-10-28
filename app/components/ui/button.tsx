@@ -4,8 +4,11 @@ import * as React from 'react'
 
 import { cn } from '#app/utils/misc.tsx'
 
+/**
+ * Button variant styles using class-variance-authority
+ */
 const buttonVariants = cva(
-	'ring-ring ring-offset-background inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-2 outline-hidden transition-colors focus-within:ring-2 focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50',
+	'ring-ring ring-offset-background inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-2 outline-hidden transition-colors focus-within:ring-2 focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 shrink-0',
 	{
 		variants: {
 			variant: {
@@ -26,6 +29,7 @@ const buttonVariants = cva(
 				lg: 'h-11 rounded-md px-8',
 				pill: 'px-12 py-3 leading-3',
 				icon: 'size-10',
+				iconSmall: 'size-5'
 			},
 		},
 		defaultVariants: {
@@ -35,8 +39,21 @@ const buttonVariants = cva(
 	},
 )
 
+/**
+ * Type for button variant props
+ */
 export type ButtonVariant = VariantProps<typeof buttonVariants>
 
+/**
+ * Button component with multiple variants and sizes
+ * 
+ * @param props - Button props including React button props and variant props
+ * @param props.asChild - If true, renders as a Slot (polymorphic component)
+ * @param props.variant - Button style variant (default, destructive, outline, etc.)
+ * @param props.size - Button size (default, wide, sm, lg, pill, icon, iconSmall)
+ * @param props.className - Additional CSS classes
+ * @returns A button element with applied variant styles
+ */
 const Button = ({
 	className,
 	variant,

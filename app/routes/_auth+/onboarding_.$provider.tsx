@@ -4,7 +4,7 @@ import {
 	useForm,
 	type SubmissionResult,
 } from '@conform-to/react'
-import { getZodConstraint, parseWithZod } from '@conform-to/zod'
+import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import {
 	redirect,
 	data,
@@ -40,7 +40,10 @@ const SignupFormSchema = z.object({
 	username: UsernameSchema,
 	name: NameSchema,
 	agreeToTermsOfServiceAndPrivacyPolicy: z.boolean({
-		required_error: 'You must agree to the terms of service and privacy policy',
+		error: (issue) =>
+			issue.input === undefined
+				? 'You must agree to the terms of service and privacy policy'
+				: 'Must be a boolean',
 	}),
 	remember: z.boolean().optional(),
 	redirectTo: z.string().optional(),
@@ -110,7 +113,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 			if (existingUser) {
 				ctx.addIssue({
 					path: ['username'],
-					code: z.ZodIssueCode.custom,
+					code: 'custom',
 					message: 'A user already exists with this username',
 				})
 				return

@@ -47,8 +47,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 			price: true,
 			status: true,
 			images: {
-				where: { isPrimary: true },
 				select: { objectKey: true },
+				orderBy: { displayOrder: 'asc' },
 				take: 1,
 			},
 		},

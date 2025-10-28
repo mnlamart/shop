@@ -3,14 +3,22 @@ import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { deleteProductImages } from '#app/utils/storage.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
-import { type Route } from './+types/$productId.delete.ts'
+import { type Route } from './+types/$productSlug.delete.ts'
 
+/**
+ * Handles product deletion including cleanup of images from storage
+ * 
+ * @param params - Route parameters containing the product slug
+ * @param request - HTTP request object
+ * @returns Redirect to products list with success message
+ * @throws {invariantResponse} If product is not found (404)
+ */
 export async function action({ params, request }: Route.ActionArgs) {
 	await requireUserWithRole(request, 'admin')
 
 	// Get product with images for cleanup
 	const product = await prisma.product.findUnique({
-		where: { slug: params.productId },
+		where: { slug: params.productSlug },
 		include: {
 			images: {
 				select: { objectKey: true },

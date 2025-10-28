@@ -1,5 +1,5 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
-import { getZodConstraint, parseWithZod } from '@conform-to/zod'
+import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import * as E from '@react-email/components'
 import { data, redirect, Link, useFetcher } from 'react-router'
@@ -40,7 +40,7 @@ export async function action({ request }: Route.ActionArgs) {
 			if (!user) {
 				ctx.addIssue({
 					path: ['usernameOrEmail'],
-					code: z.ZodIssueCode.custom,
+					code: 'custom',
 					message: 'No user exists with this username or email',
 				})
 				return

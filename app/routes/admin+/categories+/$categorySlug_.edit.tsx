@@ -1,9 +1,8 @@
 import { useForm, getFormProps, getInputProps, getTextareaProps, FormProvider, useInputControl } from '@conform-to/react'
-import { parseWithZod, getZodConstraint } from '@conform-to/zod'
+import { parseWithZod, getZodConstraint } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import { parseFormData } from '@mjackson/form-data-parser'
 import { Form, Link, data } from 'react-router'
-import { z } from 'zod'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
@@ -12,6 +11,7 @@ import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#app/components/ui/select.tsx'
 import { Textarea } from '#app/components/ui/textarea.tsx'
+import { CategorySchema } from '#app/schemas/category.ts'
 import { UNCATEGORIZED_CATEGORY_ID } from '#app/utils/category.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { useIsPending } from '#app/utils/misc.tsx'
@@ -19,14 +19,6 @@ import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { slugify } from '#app/utils/slug.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { type Route } from './+types/$categorySlug_.edit.ts'
-
-const CategoryEditSchema = z.object({
-	id: z.string(),
-	name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
-	slug: z.string().min(1, 'Slug is required').max(100, 'Slug must be less than 100 characters').regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers, and hyphens'),
-	description: z.string().max(500, 'Description must be less than 500 characters').optional(),
-	parentId: z.string().optional(),
-})
 
 export async function loader({ params, request }: Route.LoaderArgs) {
 	await requireUserWithRole(request, 'admin')
@@ -59,7 +51,7 @@ export async function action({ params: _params, request }: Route.ActionArgs) {
 
 	const formData = await parseFormData(request)
 	const submission = await parseWithZod(formData, {
-		schema: CategoryEditSchema.superRefine(async (data, ctx) => {
+		schema: CategorySchema.superRefine(async (data, ctx) => {
 			// Check slug uniqueness (excluding current category)
 			const existingCategory = await prisma.category.findFirst({
 				where: {
@@ -69,7 +61,7 @@ export async function action({ params: _params, request }: Route.ActionArgs) {
 			})
 			if (existingCategory) {
 				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
+					code: 'custom',
 					message: 'Slug already exists',
 					path: ['slug'],
 				})
@@ -82,7 +74,7 @@ export async function action({ params: _params, request }: Route.ActionArgs) {
 				})
 				if (!parent) {
 					ctx.addIssue({
-						code: z.ZodIssueCode.custom,
+						code: 'custom',
 						message: 'Parent category not found',
 						path: ['parentId'],
 					})
@@ -90,7 +82,7 @@ export async function action({ params: _params, request }: Route.ActionArgs) {
 				// Prevent setting self as parent
 				if (data.parentId === data.id) {
 					ctx.addIssue({
-						code: z.ZodIssueCode.custom,
+						code: 'custom',
 						message: 'Cannot set category as its own parent',
 						path: ['parentId'],
 					})
@@ -142,10 +134,10 @@ export default function EditCategory({ loaderData, actionData }: Route.Component
 
 	const [form, fields] = useForm({
 		id: 'category-edit-form',
-		constraint: getZodConstraint(CategoryEditSchema),
+		constraint: getZodConstraint(CategorySchema),
 		lastResult: actionData?.result,
 		onValidate({ formData }) {
-			return parseWithZod(formData, { schema: CategoryEditSchema })
+			return parseWithZod(formData, { schema: CategorySchema })
 		},
 		defaultValue: {
 			id: category.id,

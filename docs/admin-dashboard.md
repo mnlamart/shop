@@ -19,9 +19,9 @@ The admin dashboard provides a comprehensive interface for managing e-commerce p
 - **Routes**:
   - `index.tsx` - Product list with search, filtering, and pagination
   - `new.tsx` - Create new product with variants and images
-  - `$productId.tsx` - View product details (read-only)
-  - `$productId.edit.tsx` - Edit existing product
-  - `$productId.delete.ts` - Delete product action
+  - `$productSlug.tsx` - View product details (read-only)
+  - `$productSlug_.edit.tsx` - Edit existing product
+  - `$productSlug.delete.ts` - Delete product action
 - **Features**:
   - CRUD operations for products
   - Multi-image upload with drag-to-reorder
@@ -86,37 +86,19 @@ export async function action({ request }: Route.ActionArgs) {
 
 ### Key Components
 
-#### ProductImageUploader
-```typescript
-// Multi-image upload with advanced features
-<ProductImageUploader
-  images={product.images}
-  onImagesChange={setImages}
-  maxImages={10}
-  acceptedFormats={['jpg', 'jpeg', 'png', 'webp']}
-  maxFileSize={5 * 1024 * 1024} // 5MB
-/>
-```
-**Features**:
-- Drag-to-reorder functionality
-- Primary image selection
-- Progress indicators during upload
+#### Product Image Upload (Inline Implementation)
+The product image upload functionality is implemented inline within the product editor pages (`__new.server.tsx`, `__edit.server.tsx`) rather than as a standalone component. It provides:
+- Drag-to-reorder functionality for multiple images
+- Image upload with progress tracking
+- Display order management using the `displayOrder` field
 - Preview grid with thumbnails
 - ARIA-compliant keyboard navigation
 
-#### VariantManager
-```typescript
-// Dynamic variant creation with relational attributes
-<VariantManager
-  variants={product.variants}
-  attributes={availableAttributes}
-  onVariantsChange={setVariants}
-/>
-```
-**Features**:
-- Dynamic add/remove variant rows
-- Attribute value selectors
-- Stock quantity management
+#### Variant Management (Inline Implementation)
+The variant management functionality is implemented inline within the product editor pages. It provides:
+- Dynamic add/remove variant rows using Conform's field list API
+- Attribute value selection with relational attributes
+- Stock quantity management per variant
 - Price override capabilities
 - Form validation and error handling
 
@@ -281,11 +263,11 @@ app/routes/admin+/
 │   ├── _layout.tsx             # Products layout
 │   ├── index.tsx               # Product list
 │   ├── new.tsx                 # Create product
-│   ├── $productId.tsx          # View product
-│   ├── $productId.edit.tsx     # Edit product
-│   ├── $productId.delete.ts    # Delete action
-│   ├── __product-editor.server.tsx  # Server actions
-│   └── __product-editor.client.tsx  # UI components
+│   ├── $productSlug.tsx        # View product
+│   ├── $productSlug_.edit.tsx  # Edit product
+│   ├── $productSlug.delete.ts  # Delete action
+│   ├── __new.server.tsx        # New product server logic
+│   └── __edit.server.tsx       # Edit product server logic
 ├── categories/
 │   ├── index.tsx               # Category list
 │   ├── new.tsx                 # Create category
