@@ -28,6 +28,7 @@ model User {
   connections Connection[]
   passkey     Passkey[]
   cart        Cart?
+  orders      Order[]
 }
 
 model Note {
@@ -223,6 +224,7 @@ model Product {
   sku         String   @unique
   price       Int      // price in cents
   status      ProductStatus @default(DRAFT)
+  stockQuantity Int?   // stock quantity for products without variants (nullable)
   categoryId  String
   
   createdAt DateTime @default(now())
@@ -233,6 +235,7 @@ model Product {
   variants ProductVariant[]
   tags     ProductToTag[]
   cartItems CartItem[]
+  orderItems OrderItem[]
 
   @@index([categoryId])
   @@index([status])
@@ -269,6 +272,7 @@ model ProductVariant {
   product           Product                 @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   attributeValues   VariantAttributeValue[]
   cartItems         CartItem[]
+  orderItems        OrderItem[]
 
   @@index([productId])
   @@index([sku])
@@ -394,4 +398,73 @@ model CartItem {
   @@unique([cartId, productId, variantId])
   @@index([cartId])
   @@index([productId])
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  orderNumber String   @unique // Human-readable: "ORD-001234"
+  userId      String?  // Null for guest orders
+  email       String   // Required for guest orders, copied from user for auth users
+  
+  // Price snapshots (stored in cents)
+  subtotal    Int      // Sum of item prices
+  total       Int      // Subtotal + shipping + tax (future)
+  
+  // Shipping information
+  shippingName     String
+  shippingStreet   String
+  shippingCity     String
+  shippingState    String?
+  shippingPostal   String
+  shippingCountry  String
+  
+  // Payment information (Stripe)
+  stripeCheckoutSessionId String @unique // Stripe Checkout Session ID
+  stripePaymentIntentId   String?        // Stripe PaymentIntent ID (from webhook)
+  stripeChargeId          String?        // Stripe Charge ID (from webhook)
+  
+  // Status tracking
+  status      OrderStatus @default(CONFIRMED) // Auto-confirmed on successful payment
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items       OrderItem[]
+  
+  @@index([userId])
+  @@index([orderNumber])
+  @@index([status])
+  @@index([email])
+  @@index([createdAt])
+  @@index([stripeCheckoutSessionId])
+  @@index([stripePaymentIntentId])
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  productId   String
+  variantId   String?
+  
+  // Price snapshots (in cents) - captured at order time
+  price       Int     // Price per unit at time of order
+  quantity    Int     @default(1)
+  
+  createdAt   DateTime @default(now())
+  
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant     ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  
+  @@index([orderId])
+  @@index([productId])
+}
+
+enum OrderStatus {
+  PENDING      // Order created, awaiting confirmation
+  CONFIRMED    // Order confirmed, processing
+  SHIPPED      // Order shipped
+  DELIVERED    // Order delivered
+  CANCELLED    // Order cancelled
 }
