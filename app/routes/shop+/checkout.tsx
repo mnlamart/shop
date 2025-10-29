@@ -1,24 +1,51 @@
-import { invariantResponse } from '@epic-web/invariant'
 import { parseWithZod } from '@conform-to/zod/v4'
+import { invariantResponse } from '@epic-web/invariant'
 import { redirect } from 'react-router'
 import { z } from 'zod'
+import { getUserId } from '#app/utils/auth.server.ts'
 import { getOrCreateCartFromRequest } from '#app/utils/cart.server.ts'
-import { validateStockAvailability } from '#app/utils/order.server.ts'
+import { prisma } from '#app/utils/db.server.ts'
 import { getDomainUrl } from '#app/utils/misc.tsx'
+import { validateStockAvailability } from '#app/utils/order.server.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
 import { stripe } from '#app/utils/stripe.server.ts'
-import { getUserId } from '#app/utils/auth.server.ts'
-import { prisma } from '#app/utils/db.server.ts'
 import { type Route } from './+types/checkout.ts'
 
 const ShippingFormSchema = z.object({
-	name: z.string().min(1, 'Name is required'),
-	email: z.string().email('Invalid email address'),
-	street: z.string().min(1, 'Street address is required'),
-	city: z.string().min(1, 'City is required'),
-	state: z.string().optional(),
-	postal: z.string().min(1, 'Postal code is required'),
-	country: z.string().min(1, 'Country is required'),
+	name: z
+		.string()
+		.min(1, 'Name is required')
+		.max(100, 'Name must be less than 100 characters')
+		.trim(),
+	email: z
+		.string()
+		.trim()
+		.toLowerCase()
+		.pipe(z.email({ error: 'Invalid email address' })),
+	street: z
+		.string()
+		.min(1, 'Street address is required')
+		.max(200, 'Street address must be less than 200 characters')
+		.trim(),
+	city: z
+		.string()
+		.min(1, 'City is required')
+		.max(100, 'City must be less than 100 characters')
+		.trim(),
+	state: z
+		.string()
+		.max(100, 'State must be less than 100 characters')
+		.trim()
+		.optional(),
+	postal: z
+		.string()
+		.min(1, 'Postal code is required')
+		.max(20, 'Postal code must be less than 20 characters')
+		.trim(),
+	country: z
+		.string()
+		.length(2, 'Country must be a 2-letter ISO code (e.g., US, GB)')
+		.toUpperCase(),
 })
 
 export async function loader({ request }: Route.LoaderArgs) {
