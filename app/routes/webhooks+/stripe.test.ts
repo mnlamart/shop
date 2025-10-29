@@ -1,10 +1,13 @@
+import { invariant } from '@epic-web/invariant'
 import { type Stripe } from 'stripe'
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
 import { UNCATEGORIZED_CATEGORY_ID } from '#app/utils/category.ts'
 import { prisma } from '#app/utils/db.server.ts'
+import { sendEmail } from '#app/utils/email.server.ts'
 import { generateOrderNumber } from '#app/utils/order-number.server.ts'
 import { stripe } from '#app/utils/stripe.server.ts'
 import { createProductData, createVariantData } from '#tests/product-utils.ts'
+import { consoleError } from '#tests/setup/setup-test-env.ts'
 import { action } from './stripe.tsx'
 
 type WebhookResponse = {
@@ -33,7 +36,10 @@ vi.mock('#app/utils/stripe.server.ts', async () => {
 
 // Mock email service
 vi.mock('#app/utils/email.server.ts', () => ({
-	sendEmail: vi.fn().mockResolvedValue({ status: 'success' as const }),
+	sendEmail: vi.fn().mockResolvedValue({
+		status: 'success' as const,
+		data: { id: 'email-123' },
+	}),
 }))
 
 // Mock order number generation
@@ -384,6 +390,172 @@ describe('Stripe Webhook - Handler Logic', () => {
 			where: { id: cart.id },
 		})
 		expect(deletedCart).toBeNull()
+
+		// Verify email was sent
+		expect(sendEmail).toHaveBeenCalledTimes(1)
+		const emailCall = vi.mocked(sendEmail).mock.calls[0]?.[0]
+		invariant(order, 'Order should exist')
+		expect(emailCall?.to).toBe(session.customer_email || order.email)
+		expect(emailCall?.subject).toBe(`Order Confirmation - ${order.orderNumber}`)
+		expect(emailCall?.html).toContain(order.orderNumber)
+		expect(emailCall?.text).toContain(order.orderNumber)
+	})
+
+	test('should send order confirmation email with correct details', async () => {
+		const session = createMockCheckoutSession({
+			customer_email: 'customer@example.com',
+			amount_total: 20000, // $200.00
+		})
+		const event = createMockEvent(session)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+		vi.mocked(generateOrderNumber).mockResolvedValue('ORD-000002')
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		expect(response.status).toBe(200)
+		expect(data.orderId).toBeDefined()
+
+		// Get the created order
+		const order = await prisma.order.findUnique({
+			where: { id: data.orderId },
+		})
+		invariant(order, 'Order should be created')
+
+		// Verify email was sent with correct details
+		expect(sendEmail).toHaveBeenCalledTimes(1)
+		const emailCall = vi.mocked(sendEmail).mock.calls[0]?.[0]
+		expect(emailCall?.to).toBe('customer@example.com')
+		expect(emailCall?.subject).toBe('Order Confirmation - ORD-000002')
+		expect(emailCall?.html).toContain('Order Confirmation')
+		expect(emailCall?.html).toContain('ORD-000002')
+		expect(emailCall?.html).toContain('$200.00')
+		expect(emailCall?.html).toContain('/shop/orders/ORD-000002')
+
+		expect(emailCall?.text).toContain('Order Confirmation')
+		expect(emailCall?.text).toContain('ORD-000002')
+		expect(emailCall?.text).toContain('$200.00')
+		expect(emailCall?.text).toContain('/shop/orders/ORD-000002')
+
+		// Cleanup
+		await prisma.orderItem.deleteMany({
+			where: { order: { stripeCheckoutSessionId: session.id } },
+		})
+		await prisma.order.deleteMany({
+			where: { stripeCheckoutSessionId: session.id },
+		})
+	})
+
+	test('should use order email if customer_email not available', async () => {
+		const session = createMockCheckoutSession({
+			customer_email: undefined,
+			metadata: {
+				cartId: cart.id,
+				userId: '',
+				email: 'fallback@example.com',
+				shippingName: 'Test User',
+				shippingStreet: '123 Test St',
+				shippingCity: 'Test City',
+				shippingPostal: '12345',
+				shippingCountry: 'US',
+			},
+		})
+		const event = createMockEvent(session)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+		vi.mocked(generateOrderNumber).mockResolvedValue('ORD-000003')
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		expect(response.status).toBe(200)
+		expect(data.orderId).toBeDefined()
+
+		// Get the created order
+		const order = await prisma.order.findUnique({
+			where: { id: data.orderId },
+		})
+		invariant(order, 'Order should be created')
+
+		// Verify email was sent to order email (from metadata)
+		expect(sendEmail).toHaveBeenCalledTimes(1)
+		const emailCall = vi.mocked(sendEmail).mock.calls[0]?.[0]
+		expect(emailCall?.to).toBe(order.email)
+
+		// Cleanup
+		await prisma.orderItem.deleteMany({
+			where: { order: { stripeCheckoutSessionId: session.id } },
+		})
+		await prisma.order.deleteMany({
+			where: { stripeCheckoutSessionId: session.id },
+		})
+	})
+
+	test('should handle email sending failure gracefully', async () => {
+		consoleError.mockImplementation(() => {})
+
+		// Mock email sending to fail
+		vi.mocked(sendEmail).mockRejectedValueOnce(
+			new Error('Email service unavailable'),
+		)
+
+		const session = createMockCheckoutSession()
+		const event = createMockEvent(session)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+		vi.mocked(generateOrderNumber).mockResolvedValue('ORD-000004')
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		// Should not throw, order should still be created
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		expect(response.status).toBe(200)
+		expect(data.orderId).toBeDefined()
+
+		// Verify order was created despite email failure
+		const order = await prisma.order.findUnique({
+			where: { id: data.orderId },
+		})
+		expect(order).toBeDefined()
+
+		// Email was attempted
+		expect(sendEmail).toHaveBeenCalled()
+
+		// Verify error was logged
+		expect(consoleError).toHaveBeenCalledTimes(1)
+
+		// Cleanup
+		await prisma.orderItem.deleteMany({
+			where: { order: { stripeCheckoutSessionId: session.id } },
+		})
+		await prisma.order.deleteMany({
+			where: { stripeCheckoutSessionId: session.id },
+		})
 	})
 
 	test('should throw error when cartId is missing in metadata', async () => {
@@ -476,8 +648,7 @@ describe('Stripe Webhook - Handler Logic', () => {
 	})
 
 	test('should handle stock unavailable error and rollback transaction', async () => {
-		// Mock console.error to prevent test failure
-		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+		consoleError.mockImplementation(() => {})
 
 		// Set stock to 0
 		await prisma.productVariant.update({
@@ -501,9 +672,6 @@ describe('Stripe Webhook - Handler Logic', () => {
 		const response = await action({ request, params: {}, context: {} })
 		const data = await response.json() as WebhookResponse
 
-		// Restore console.error
-		consoleErrorSpy.mockRestore()
-
 		expect(response.status).toBe(500)
 		expect(data.received).toBe(true)
 		expect(data.error).toBe('Stock unavailable')
@@ -522,8 +690,7 @@ describe('Stripe Webhook - Handler Logic', () => {
 	})
 
 	test('should create refund when stock is unavailable after payment', async () => {
-		// Mock console.error to prevent test failure
-		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+		consoleError.mockImplementation(() => {})
 
 		// Set stock to 0 to trigger stock unavailable error
 		await prisma.productVariant.update({
@@ -558,9 +725,6 @@ describe('Stripe Webhook - Handler Logic', () => {
 		const response = await action({ request, params: {}, context: {} })
 		const data = await response.json() as WebhookResponse
 
-		// Restore console.error
-		consoleErrorSpy.mockRestore()
-
 		expect(response.status).toBe(500)
 		expect(data.received).toBe(true)
 		expect(data.error).toBe('Stock unavailable')
@@ -583,8 +747,7 @@ describe('Stripe Webhook - Handler Logic', () => {
 	})
 
 	test('should handle refund creation failure gracefully', async () => {
-		// Mock console.error to prevent test failure
-		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+		consoleError.mockImplementation(() => {})
 
 		// Set stock to 0 to trigger stock unavailable error
 		await prisma.productVariant.update({
@@ -613,15 +776,15 @@ describe('Stripe Webhook - Handler Logic', () => {
 		const response = await action({ request, params: {}, context: {} })
 		const data = await response.json() as WebhookResponse
 
-		// Restore console.error
-		consoleErrorSpy.mockRestore()
-
 		expect(response.status).toBe(500)
 		expect(data.received).toBe(true)
 		expect(data.error).toBe('Stock unavailable')
 
 		// Verify refund was attempted
 		expect(stripe.refunds.create).toHaveBeenCalled()
+		
+		// Verify error was logged (refund failure is logged)
+		expect(consoleError).toHaveBeenCalledTimes(1)
 	})
 
 	test('should handle unknown event types gracefully', async () => {
