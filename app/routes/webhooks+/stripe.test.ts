@@ -1,6 +1,18 @@
 import { type Stripe } from 'stripe'
-import { describe, expect, test, beforeEach, vi } from 'vitest'
+import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
+import { UNCATEGORIZED_CATEGORY_ID } from '#app/utils/category.ts'
+import { prisma } from '#app/utils/db.server.ts'
+import { generateOrderNumber } from '#app/utils/order-number.server.ts'
 import { stripe } from '#app/utils/stripe.server.ts'
+import { createProductData, createVariantData } from '#tests/product-utils.ts'
+import { action } from './stripe.tsx'
+
+type WebhookResponse = {
+	received: boolean
+	orderId?: string
+	error?: string
+	message?: string
+}
 
 // Mock Stripe webhook utilities
 vi.mock('#app/utils/stripe.server.ts', async () => {
@@ -15,6 +27,16 @@ vi.mock('#app/utils/stripe.server.ts', async () => {
 		handleStripeError: actual.handleStripeError,
 	}
 })
+
+// Mock email service
+vi.mock('#app/utils/email.server.ts', () => ({
+	sendEmail: vi.fn().mockResolvedValue({ status: 'success' as const }),
+}))
+
+// Mock order number generation
+vi.mock('#app/utils/order-number.server.ts', () => ({
+	generateOrderNumber: vi.fn().mockResolvedValue('ORD-000001'),
+}))
 
 describe('Stripe Webhook - Signature Verification', () => {
 	const mockWebhookSecret = 'whsec_test_secret'
@@ -151,36 +173,377 @@ describe('Stripe Webhook - Signature Verification', () => {
 })
 
 describe('Stripe Webhook - Handler Logic', () => {
-	// These tests will verify the webhook handler implementation
-	// They will be written after the handler is implemented
-	test('should handle idempotency - return existing order if session already processed', () => {
-		// TODO: Implement after webhook handler is created
-		expect(true).toBe(true)
+	const mockWebhookSecret = 'whsec_test_secret'
+	let category: { id: string }
+	let product: { id: string; price: number; name: string }
+	let variant: { id: string; price: number | null; stockQuantity: number }
+	let cart: { id: string }
+	let cartItem: { id: string }
+	let checkoutSessionId: string
+
+	beforeEach(async () => {
+		process.env.STRIPE_WEBHOOK_SECRET = mockWebhookSecret
+
+		// Create test category
+		await prisma.category.upsert({
+			where: { id: UNCATEGORIZED_CATEGORY_ID },
+			create: {
+				id: UNCATEGORIZED_CATEGORY_ID,
+				name: 'Uncategorized',
+				slug: 'uncategorized',
+			},
+			update: {},
+		})
+		category = { id: UNCATEGORIZED_CATEGORY_ID }
+
+		// Create test product
+		const productData = createProductData()
+		product = await prisma.product.create({
+			data: {
+				name: productData.name,
+				slug: productData.slug,
+				description: productData.description,
+				sku: productData.sku,
+				price: Math.round(productData.price * 100), // Convert to cents
+				status: 'ACTIVE' as const,
+				categoryId: category.id,
+			},
+		})
+
+		// Create test variant
+		const variantData = createVariantData(productData.sku)
+		variant = await prisma.productVariant.create({
+			data: {
+				productId: product.id,
+				sku: variantData.sku,
+				price: variantData.price
+					? Math.round(variantData.price * 100)
+					: null,
+				stockQuantity: 10,
+			},
+		})
+
+		// Create test cart
+		cart = await prisma.cart.create({
+			data: {
+				sessionId: 'test-session-id',
+			},
+		})
+
+		// Add item to cart
+		cartItem = await prisma.cartItem.create({
+			data: {
+				cartId: cart.id,
+				productId: product.id,
+				variantId: variant.id,
+				quantity: 2,
+			},
+		})
+
+		checkoutSessionId = 'cs_test_123'
 	})
 
-	test('should create order successfully from checkout.session.completed event', () => {
-		// TODO: Implement after webhook handler is created
-		expect(true).toBe(true)
+	afterEach(async () => {
+		// Cleanup
+		await prisma.orderItem.deleteMany({
+			where: { order: { stripeCheckoutSessionId: checkoutSessionId } },
+		})
+		await prisma.order.deleteMany({
+			where: { stripeCheckoutSessionId: checkoutSessionId },
+		})
+		await prisma.cartItem.deleteMany({ where: { cartId: cart.id } })
+		await prisma.cart.deleteMany({ where: { id: cart.id } })
+		await prisma.productVariant.deleteMany({ where: { productId: product.id } })
+		await prisma.product.deleteMany({ where: { id: product.id } })
+		vi.clearAllMocks()
 	})
 
-	test('should throw error when cartId is missing in metadata', () => {
-		// TODO: Implement after webhook handler is created
-		expect(true).toBe(true)
+	function createMockCheckoutSession(
+		overrides?: Partial<Stripe.Checkout.Session>,
+	): Stripe.Checkout.Session {
+		return {
+			id: checkoutSessionId,
+			object: 'checkout.session',
+			status: 'complete',
+			customer_email: 'test@example.com',
+			amount_subtotal: (variant.price ?? product.price) * 2,
+			amount_total: (variant.price ?? product.price) * 2,
+			payment_intent: 'pi_test_123',
+			metadata: {
+				cartId: cart.id,
+				userId: '',
+				shippingName: 'Test User',
+				shippingStreet: '123 Test St',
+				shippingCity: 'Test City',
+				shippingState: 'TS',
+				shippingPostal: '12345',
+				shippingCountry: 'US',
+			},
+			...overrides,
+		} as Stripe.Checkout.Session
+	}
+
+	function createMockEvent(
+		session: Stripe.Checkout.Session,
+	): Stripe.Event {
+		return {
+			id: 'evt_test_123',
+			object: 'event',
+			type: 'checkout.session.completed',
+			data: {
+				object: session,
+			},
+		} as Stripe.Event
+	}
+
+	test('should handle idempotency - return existing order if session already processed', async () => {
+		const session = createMockCheckoutSession()
+		const event = createMockEvent(session)
+
+		// Create existing order
+		const existingOrder = await prisma.order.create({
+			data: {
+				orderNumber: 'ORD-000001',
+				email: session.customer_email!,
+				subtotal: session.amount_subtotal!,
+				total: session.amount_total!,
+				shippingName: session.metadata!.shippingName!,
+				shippingStreet: session.metadata!.shippingStreet!,
+				shippingCity: session.metadata!.shippingCity!,
+				shippingState: session.metadata!.shippingState!,
+				shippingPostal: session.metadata!.shippingPostal!,
+				shippingCountry: session.metadata!.shippingCountry!,
+				stripeCheckoutSessionId: session.id,
+				status: 'CONFIRMED',
+			},
+		})
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		expect(response.status).toBe(200)
+		expect(data.received).toBe(true)
+		expect(data.orderId).toBe(existingOrder.id)
 	})
 
-	test('should throw error when cart is not found or empty', () => {
-		// TODO: Implement after webhook handler is created
-		expect(true).toBe(true)
+	test('should create order successfully from checkout.session.completed event', async () => {
+		const session = createMockCheckoutSession()
+		const event = createMockEvent(session)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+		vi.mocked(generateOrderNumber).mockResolvedValue('ORD-000001')
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		expect(response.status).toBe(200)
+		expect(data.received).toBe(true)
+		expect(data.orderId).toBeDefined()
+
+		// Verify order was created
+		const order = await prisma.order.findUnique({
+			where: { id: data.orderId },
+			include: { items: true },
+		})
+
+		expect(order).toBeDefined()
+		expect(order?.stripeCheckoutSessionId).toBe(session.id)
+		expect(order?.status).toBe('CONFIRMED')
+		expect(order?.items).toHaveLength(1)
+		expect(order?.items[0]?.quantity).toBe(2)
+
+		// Verify stock was reduced
+		const updatedVariant = await prisma.productVariant.findUnique({
+			where: { id: variant.id },
+		})
+		expect(updatedVariant?.stockQuantity).toBe(8) // 10 - 2 = 8
+
+		// Verify cart was deleted
+		const deletedCart = await prisma.cart.findUnique({
+			where: { id: cart.id },
+		})
+		expect(deletedCart).toBeNull()
 	})
 
-	test('should handle stock unavailable error and rollback transaction', () => {
-		// TODO: Implement after webhook handler is created
-		expect(true).toBe(true)
+	test('should throw error when cartId is missing in metadata', async () => {
+		const session = createMockCheckoutSession({
+			metadata: {},
+		})
+		const event = createMockEvent(session)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		await expect(
+			action({ request, params: {}, context: {} }),
+		).rejects.toThrow('Missing cartId in session metadata')
 	})
 
-	test('should handle unknown event types gracefully', () => {
-		// TODO: Implement after webhook handler is created
-		expect(true).toBe(true)
+	test('should throw error when cart is not found or empty', async () => {
+		const nonExistentCartId = 'non-existent-cart-id'
+		const session = createMockCheckoutSession({
+			metadata: {
+				cartId: nonExistentCartId,
+				userId: '',
+				shippingName: 'Test User',
+				shippingStreet: '123 Test St',
+				shippingCity: 'Test City',
+				shippingPostal: '12345',
+				shippingCountry: 'US',
+			},
+		})
+		const event = createMockEvent(session)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		await expect(
+			action({ request, params: {}, context: {} }),
+		).rejects.toThrow('Cart not found')
+
+		// Test empty cart
+		const emptyCart = await prisma.cart.create({
+			data: { sessionId: 'empty-cart-session' },
+		})
+		const sessionWithEmptyCart = createMockCheckoutSession({
+			metadata: {
+				cartId: emptyCart.id,
+				userId: '',
+				shippingName: 'Test User',
+				shippingStreet: '123 Test St',
+				shippingCity: 'Test City',
+				shippingPostal: '12345',
+				shippingCountry: 'US',
+			},
+		})
+		const eventWithEmptyCart = createMockEvent(sessionWithEmptyCart)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(
+			eventWithEmptyCart,
+		)
+
+		const requestWithEmptyCart = new Request(
+			'http://localhost/webhooks/stripe',
+			{
+				method: 'POST',
+				headers: {
+					'stripe-signature': 't=1234567890,v1=signature',
+				},
+				body: JSON.stringify(eventWithEmptyCart),
+			},
+		)
+
+		await expect(
+			action({ request: requestWithEmptyCart, params: {}, context: {} }),
+		).rejects.toThrow('Cart is empty')
+
+		await prisma.cart.delete({ where: { id: emptyCart.id } })
+	})
+
+	test('should handle stock unavailable error and rollback transaction', async () => {
+		// Mock console.error to prevent test failure
+		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+		// Set stock to 0
+		await prisma.productVariant.update({
+			where: { id: variant.id },
+			data: { stockQuantity: 0 },
+		})
+
+		const session = createMockCheckoutSession()
+		const event = createMockEvent(session)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		// Restore console.error
+		consoleErrorSpy.mockRestore()
+
+		expect(response.status).toBe(500)
+		expect(data.received).toBe(true)
+		expect(data.error).toBe('Stock unavailable')
+
+		// Verify order was NOT created
+		const order = await prisma.order.findUnique({
+			where: { stripeCheckoutSessionId: session.id },
+		})
+		expect(order).toBeNull()
+
+		// Verify stock was NOT reduced (transaction rolled back)
+		const unchangedVariant = await prisma.productVariant.findUnique({
+			where: { id: variant.id },
+		})
+		expect(unchangedVariant?.stockQuantity).toBe(0)
+	})
+
+	test('should handle unknown event types gracefully', async () => {
+		const event = {
+			id: 'evt_test_123',
+			object: 'event',
+			type: 'payment_intent.succeeded' as const,
+			data: {
+				object: {},
+			},
+		} as Stripe.Event
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		expect(response.status).toBe(200)
+		expect(data.received).toBe(true)
+		expect(data.orderId).toBeUndefined()
 	})
 })
 
