@@ -1,11 +1,12 @@
 import { invariant } from '@epic-web/invariant'
 import Stripe from 'stripe'
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
-import { UNCATEGORIZED_CATEGORY_ID } from '#app/utils/category.ts'
 import { createCartSessionCookieHeader } from '#app/utils/cart-session.server.ts'
+import { UNCATEGORIZED_CATEGORY_ID } from '#app/utils/category.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { stripe } from '#app/utils/stripe.server.ts'
 import { createProductData, createVariantData } from '#tests/product-utils.ts'
+import { consoleError } from '#tests/setup/setup-test-env.ts'
 
 // Mock Stripe checkout sessions
 vi.mock('#app/utils/stripe.server.ts', async () => {
@@ -477,8 +478,7 @@ describe('Checkout - Stripe Error Handling', () => {
 	})
 
 	test('should handle Stripe card error when creating checkout session', async () => {
-		// Mock console.error to prevent test failure
-		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+		consoleError.mockImplementation(() => {})
 
 		const cardError = new Stripe.errors.StripeCardError({
 			message: 'Your card was declined.',
@@ -543,11 +543,13 @@ describe('Checkout - Stripe Error Handling', () => {
 		expect(resultData.error[''].length).toBeGreaterThan(0)
 		// Verify error message contains payment processing error
 		expect(resultData.error[''][0]).toContain('Payment processing error')
+		
+		// Verify error was logged
+		expect(consoleError).toHaveBeenCalledTimes(1)
 	})
 
 	test('should handle Stripe invalid request error', async () => {
-		// Mock console.error to prevent test failure
-		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+		consoleError.mockImplementation(() => {})
 
 		const invalidRequestError = new Stripe.errors.StripeInvalidRequestError(
 			{
@@ -591,14 +593,13 @@ describe('Checkout - Stripe Error Handling', () => {
 			result instanceof Response ? await result.json() : result
 		// Verify error handling works (may return generic message if error not recognized)
 		expect(resultData.error[''][0]).toContain('Payment processing error')
-
-		// Restore console.error
-		consoleErrorSpy.mockRestore()
+		
+		// Verify error was logged
+		expect(consoleError).toHaveBeenCalledTimes(1)
 	})
 
 	test('should handle Stripe API error', async () => {
-		// Mock console.error to prevent test failure
-		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+		consoleError.mockImplementation(() => {})
 
 		const apiError = new Stripe.errors.StripeAPIError({
 			message: 'An error occurred with Stripe API',
@@ -637,14 +638,13 @@ describe('Checkout - Stripe Error Handling', () => {
 			result instanceof Response ? await result.json() : result
 		// Verify error handling works (may return generic message if error not recognized)
 		expect(resultData.error[''][0]).toContain('Payment processing error')
-
-		// Restore console.error
-		consoleErrorSpy.mockRestore()
+		
+		// Verify error was logged
+		expect(consoleError).toHaveBeenCalledTimes(1)
 	})
 
 	test('should handle Stripe connection error', async () => {
-		// Mock console.error to prevent test failure
-		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+		consoleError.mockImplementation(() => {})
 
 		const connectionError = new Stripe.errors.StripeConnectionError({
 			message: 'Connection to Stripe failed',
@@ -685,8 +685,8 @@ describe('Checkout - Stripe Error Handling', () => {
 			result instanceof Response ? await result.json() : result
 		// Verify error handling works (may return generic message if error not recognized)
 		expect(resultData.error[''][0]).toContain('Payment processing error')
-
-		// Restore console.error
-		consoleErrorSpy.mockRestore()
+		
+		// Verify error was logged
+		expect(consoleError).toHaveBeenCalledTimes(1)
 	})
 })

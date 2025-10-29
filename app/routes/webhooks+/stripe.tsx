@@ -197,19 +197,20 @@ export async function action({ request }: ActionFunctionArgs) {
 				},
 			)
 
-			// Send confirmation email
-			const domainUrl = getDomainUrl(request)
-			await sendEmail({
-				to: order.email,
-				subject: `Order Confirmation - ${order.orderNumber}`,
-				html: `
-					<h1>Order Confirmation</h1>
-					<p>Thank you for your order!</p>
-					<p><strong>Order Number:</strong> ${order.orderNumber}</p>
-					<p><strong>Total:</strong> $${(order.total / 100).toFixed(2)}</p>
-					<p><a href="${domainUrl}/shop/orders/${order.orderNumber}">View Order Details</a></p>
-				`,
-				text: `
+			// Send confirmation email (non-blocking - don't fail order creation if email fails)
+			try {
+				const domainUrl = getDomainUrl(request)
+				await sendEmail({
+					to: order.email,
+					subject: `Order Confirmation - ${order.orderNumber}`,
+					html: `
+						<h1>Order Confirmation</h1>
+						<p>Thank you for your order!</p>
+						<p><strong>Order Number:</strong> ${order.orderNumber}</p>
+						<p><strong>Total:</strong> $${(order.total / 100).toFixed(2)}</p>
+						<p><a href="${domainUrl}/shop/orders/${order.orderNumber}">View Order Details</a></p>
+					`,
+					text: `
 Order Confirmation
 
 Thank you for your order!
@@ -218,8 +219,16 @@ Order Number: ${order.orderNumber}
 Total: $${(order.total / 100).toFixed(2)}
 
 View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
-				`,
-			})
+					`,
+				})
+			} catch (emailError) {
+				// Log email error but don't fail order creation
+				// Order was successfully created, email is secondary
+				console.error(
+					`Failed to send confirmation email for order ${order.orderNumber}:`,
+					emailError,
+				)
+			}
 
 			// Clear cart
 			await prisma.cart.delete({ where: { id: cartId } })
