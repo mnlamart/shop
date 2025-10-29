@@ -14,7 +14,7 @@ type WebhookResponse = {
 	message?: string
 }
 
-// Mock Stripe webhook utilities
+// Mock Stripe client and webhook utilities
 vi.mock('#app/utils/stripe.server.ts', async () => {
 	const actual = await vi.importActual('#app/utils/stripe.server.ts')
 	return {
@@ -22,6 +22,9 @@ vi.mock('#app/utils/stripe.server.ts', async () => {
 		stripe: {
 			webhooks: {
 				constructEvent: vi.fn(),
+			},
+			refunds: {
+				create: vi.fn(),
 			},
 		},
 		handleStripeError: actual.handleStripeError,
@@ -516,6 +519,109 @@ describe('Stripe Webhook - Handler Logic', () => {
 			where: { id: variant.id },
 		})
 		expect(unchangedVariant?.stockQuantity).toBe(0)
+	})
+
+	test('should create refund when stock is unavailable after payment', async () => {
+		// Mock console.error to prevent test failure
+		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+		// Set stock to 0 to trigger stock unavailable error
+		await prisma.productVariant.update({
+			where: { id: variant.id },
+			data: { stockQuantity: 0 },
+		})
+
+		const session = createMockCheckoutSession({
+			payment_intent: 'pi_test_123',
+		})
+		const event = createMockEvent(session)
+
+		const mockRefund = {
+			id: 're_test_123',
+			object: 'refund' as const,
+			amount: session.amount_total,
+			status: 'succeeded' as const,
+			payment_intent: session.payment_intent as string,
+		}
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+		vi.mocked(stripe.refunds.create).mockResolvedValue(mockRefund as any)
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		// Restore console.error
+		consoleErrorSpy.mockRestore()
+
+		expect(response.status).toBe(500)
+		expect(data.received).toBe(true)
+		expect(data.error).toBe('Stock unavailable')
+
+		// Verify refund was created with correct parameters
+		const paymentIntentId =
+			typeof session.payment_intent === 'string'
+				? session.payment_intent
+				: session.payment_intent?.id
+		expect(stripe.refunds.create).toHaveBeenCalledWith({
+			payment_intent: paymentIntentId,
+			amount: session.amount_total,
+			reason: 'requested_by_customer',
+			metadata: {
+				reason: 'stock_unavailable',
+				checkout_session_id: session.id,
+				product_name: expect.any(String),
+			},
+		})
+	})
+
+	test('should handle refund creation failure gracefully', async () => {
+		// Mock console.error to prevent test failure
+		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+		// Set stock to 0 to trigger stock unavailable error
+		await prisma.productVariant.update({
+			where: { id: variant.id },
+			data: { stockQuantity: 0 },
+		})
+
+		const session = createMockCheckoutSession({
+			payment_intent: 'pi_test_123',
+		})
+		const event = createMockEvent(session)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+		vi.mocked(stripe.refunds.create).mockRejectedValue(
+			new Error('Refund failed'),
+		)
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		// Restore console.error
+		consoleErrorSpy.mockRestore()
+
+		expect(response.status).toBe(500)
+		expect(data.received).toBe(true)
+		expect(data.error).toBe('Stock unavailable')
+
+		// Verify refund was attempted
+		expect(stripe.refunds.create).toHaveBeenCalled()
 	})
 
 	test('should handle unknown event types gracefully', async () => {
