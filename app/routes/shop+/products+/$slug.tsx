@@ -1,8 +1,7 @@
 import { invariantResponse } from '@epic-web/invariant'
 import { Link, redirect } from 'react-router'
 import { Button } from '#app/components/ui/button.tsx'
-import { getCartSessionId } from '#app/utils/cart-session.server.ts'
-import { addToCart, getOrCreateCart } from '#app/utils/cart.server.ts'
+import { addToCart, getOrCreateCartFromRequest } from '#app/utils/cart.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
@@ -44,9 +43,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 
 		invariantResponse(product, 'Product not found', { status: 404 })
 
-		// Get or create cart session
-		const { sessionId, needsCommit, cookieHeader } = await getCartSessionId(request)
-		const cart = await getOrCreateCart({ sessionId })
+		// Get or create cart
+		const { cart, needsCommit, cookieHeader } = await getOrCreateCartFromRequest(request)
 
 		// Add product to cart
 		const variantId = formData.get('variantId') as string | null
@@ -54,14 +52,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 
 		await addToCart(cart.id, product.id, variantId, quantity)
 
-		// Return with cookie header if needed
+		// Redirect to cart page
 		if (needsCommit && cookieHeader) {
-			return redirect(`/shop/products/${params.slug}`, {
+			return redirect(`/shop/cart`, {
 				headers: { 'Set-Cookie': cookieHeader },
 			})
 		}
 
-		return redirect(`/shop/products/${params.slug}`)
+		return redirect(`/shop/cart`)
 	}
 
 	invariantResponse(false, 'Bad Request', { status: 400 })

@@ -2,22 +2,21 @@ import { invariantResponse } from '@epic-web/invariant'
 import { data, Link, redirect } from 'react-router'
 import { Button } from '#app/components/ui/button.tsx'
 import { Input } from '#app/components/ui/input.tsx'
-import { getCartSessionId } from '#app/utils/cart-session.server.ts'
-import { getCart, updateCartItemQuantity, removeFromCart } from '#app/utils/cart.server.ts'
+import { getOrCreateCartFromRequest, updateCartItemQuantity, removeFromCart } from '#app/utils/cart.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
 import { type Route } from './+types/cart.ts'
 
 export async function loader({ request }: Route.LoaderArgs) {
-	const { sessionId, needsCommit, cookieHeader } = await getCartSessionId(request)
-
-	const cart = await getCart(sessionId)
+	const { cart, needsCommit, cookieHeader } = await getOrCreateCartFromRequest(request)
 
 	if (!cart) {
+		const currency = await getStoreCurrency()
 		return { 
 			cart: null, 
-			items: [] 
+			items: [],
+			currency
 		}
 	}
 
@@ -65,9 +64,7 @@ export async function action({ request }: Route.ActionArgs) {
 	const formData = await request.formData()
 	const intent = formData.get('intent')
 
-	const { sessionId, needsCommit, cookieHeader } = await getCartSessionId(request)
-
-	const cart = await getCart(sessionId)
+	const { cart, needsCommit, cookieHeader } = await getOrCreateCartFromRequest(request)
 	invariantResponse(cart, 'Cart not found', { status: 404 })
 
 	if (intent === 'update-quantity') {

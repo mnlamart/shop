@@ -137,7 +137,6 @@ export default function EditProduct({ loaderData, actionData }: Route.ComponentP
 			description: product.description || '',
 			sku: product.sku,
 			price: product.price,
-			currency: product.currency,
 			status: product.status,
 			categoryId: product.categoryId,
 			tags: product.tags.map(pt => pt.tag.name),

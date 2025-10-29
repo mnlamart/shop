@@ -1,3 +1,5 @@
+import { getUserId } from './auth.server.ts'
+import { getCartSessionId, getCartSessionIdFromRequest } from './cart-session.server.ts'
 import { prisma } from './db.server.ts'
 
 export async function createCart({
@@ -48,6 +50,27 @@ export async function getOrCreateCart({
 	}
 
 	return createCart({ userId, sessionId })
+}
+
+/**
+ * Gets or creates a cart from a request, automatically detecting if user is authenticated.
+ * For authenticated users, returns their user cart. For guests, returns/create their session cart.
+ * @param request - The incoming request
+ * @returns Object containing the cart, whether session needs to be committed, and cookie header if needed
+ */
+export async function getOrCreateCartFromRequest(request: Request) {
+	const userId = await getUserId(request)
+	
+	if (userId) {
+		// Authenticated user - use their cart
+		const cart = await getOrCreateCart({ userId })
+		return { cart, needsCommit: false, cookieHeader: undefined }
+	} else {
+		// Guest user - use session cart
+		const { sessionId, needsCommit, cookieHeader } = await getCartSessionId(request)
+		const cart = await getOrCreateCart({ sessionId })
+		return { cart, needsCommit, cookieHeader }
+	}
 }
 
 export async function addToCart(
@@ -173,6 +196,24 @@ export async function mergeGuestCartToUser(sessionId: string, userId: string) {
 			items: true,
 		},
 	})
+}
+
+/**
+ * Merge the guest cart into the user's cart on login.
+ * This is called from handleNewSession and can be called directly in tests.
+ * @param request - The incoming request containing guest session cookies
+ * @param userId - The ID of the user to merge the cart for
+ */
+export async function mergeCartOnUserLogin(request: Request, userId: string) {
+	try {
+		const guestSessionId = await getCartSessionIdFromRequest(request)
+		if (guestSessionId) {
+			await mergeGuestCartToUser(guestSessionId, userId)
+		}
+	} catch (error) {
+		// Log error but don't fail login if cart merge fails
+		console.error('Failed to merge cart on login:', error)
+	}
 }
 
 export async function getCartSummary(cartId: string) {

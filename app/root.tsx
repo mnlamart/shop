@@ -14,6 +14,7 @@ import { HoneypotProvider } from 'remix-utils/honeypot/react'
 import { type Route } from './+types/root.ts'
 import appleTouchIconAssetUrl from './assets/favicons/apple-touch-icon.png'
 import faviconAssetUrl from './assets/favicons/favicon.svg'
+import { CartBadge } from './components/cart-badge.tsx'
 import { GeneralErrorBoundary } from './components/error-boundary.tsx'
 import { EpicProgress } from './components/progress-bar.tsx'
 import { SearchBar } from './components/search-bar.tsx'
@@ -29,6 +30,7 @@ import {
 } from './routes/resources+/theme-switch.tsx'
 import tailwindStyleSheetUrl from './styles/tailwind.css?url'
 import { getUserId, logout } from './utils/auth.server.ts'
+import { getOrCreateCartFromRequest } from './utils/cart.server.ts'
 import { ClientHintCheck, getHints } from './utils/client-hints.tsx'
 import { prisma } from './utils/db.server.ts'
 import { getEnv } from './utils/env.server.ts'
@@ -105,12 +107,24 @@ export async function loader({ request }: Route.LoaderArgs) {
 		// them in the database. Maybe they were deleted? Let's log them out.
 		await logout({ request, redirectTo: '/' })
 	}
+
+	// Get cart count for all users (guest or authenticated)
+	let cartCount = 0
+	try {
+		const { cart } = await getOrCreateCartFromRequest(request)
+		cartCount = cart?.items.reduce((sum, item) => sum + item.quantity, 0) || 0
+	} catch (error) {
+		// If cart creation fails, just default to 0
+		console.error('Failed to get cart count:', error)
+	}
+
 	const { toast, headers: toastHeaders } = await getToast(request)
 	const honeyProps = await honeypot.getInputProps()
 
 	return data(
 		{
 			user,
+			cartCount,
 			requestInfo: {
 				hints: getHints(request),
 				origin: getDomainUrl(request),
@@ -226,6 +240,7 @@ function App() {
 							{searchBar}
 						</div>
 						<div className="flex items-center gap-10">
+							<CartBadge count={data.cartCount} />
 							{user ? (
 								<UserDropdown />
 							) : (
