@@ -3,6 +3,14 @@ import './db-setup.ts'
 import '#app/utils/env.server.ts'
 // we need these to be imported first 👆
 
+// Set mock Stripe keys for testing (MSW will intercept actual API calls)
+if (!process.env.STRIPE_SECRET_KEY) {
+	process.env.STRIPE_SECRET_KEY = 'sk_test_mock_key_for_testing'
+}
+if (!process.env.STRIPE_WEBHOOK_SECRET) {
+	process.env.STRIPE_WEBHOOK_SECRET = 'whsec_mock_webhook_secret_for_testing'
+}
+
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, vi, type MockInstance } from 'vitest'
 import { server } from '#tests/mocks/index.ts'
