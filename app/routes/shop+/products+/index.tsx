@@ -64,7 +64,8 @@ export default function ProductsIndex({ loaderData }: Route.ComponentProps) {
 	}, [products, searchTerm, selectedCategory])
 
 	return (
-		<div className="space-y-8 animate-slide-top">
+		<div className="container py-8">
+			<div className="space-y-8 animate-slide-top">
 			{/* Header */}
 			<div>
 				<h1 className="text-3xl font-bold tracking-tight">Products</h1>
@@ -135,6 +136,7 @@ export default function ProductsIndex({ loaderData }: Route.ComponentProps) {
 					))}
 				</div>
 			)}
+		</div>
 		</div>
 	)
 }

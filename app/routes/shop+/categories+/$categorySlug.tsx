@@ -68,7 +68,8 @@ export default function CategoryPage({ loaderData }: Route.ComponentProps) {
 	const selectedCategoryObj = allCategories.find((cat) => cat.id === selectedCategory)
 
 	return (
-		<div className="space-y-8 animate-slide-top">
+		<div className="container py-8">
+			<div className="space-y-8 animate-slide-top">
 			{/* Header */}
 			<div>
 				<h1 className="text-3xl font-bold tracking-tight">
@@ -128,6 +129,7 @@ export default function CategoryPage({ loaderData }: Route.ComponentProps) {
 					))}
 				</div>
 			)}
+		</div>
 		</div>
 	)
 }
