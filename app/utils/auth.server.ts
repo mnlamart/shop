@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { redirect } from 'react-router'
 import { Authenticator } from 'remix-auth'
 import { safeRedirect } from 'remix-utils/safe-redirect'
+import { clearCartSessionCookieHeader } from './cart-session.server.ts'
 import { providers } from './connections.server.ts'
 import { prisma } from './db.server.ts'
 import { combineHeaders, downloadFile } from './misc.tsx'
@@ -221,10 +222,14 @@ export async function logout(
 		// learn more about PrismaPromise: https://www.prisma.io/docs/orm/reference/prisma-client-reference#prismapromise-behavior
 		void prisma.session.deleteMany({ where: { id: sessionId } }).catch(() => {})
 	}
+	// Clear the cart session cookie on logout
+	const clearCartCookie = await clearCartSessionCookieHeader()
+	
 	throw redirect(safeRedirect(redirectTo), {
 		...responseInit,
 		headers: combineHeaders(
 			{ 'set-cookie': await authSessionStorage.destroySession(authSession) },
+			{ 'set-cookie': clearCartCookie },
 			responseInit?.headers,
 		),
 	})

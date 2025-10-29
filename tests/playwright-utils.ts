@@ -72,6 +72,7 @@ export const test = base.extend<{
 	) => Promise<null | Response>
 	insertNewUser(options?: GetOrInsertUserOptions): Promise<User>
 	login(options?: GetOrInsertUserOptions): Promise<User>
+	logout(): Promise<void>
 	prepareGitHubUser(): Promise<GitHubUser>
 }>({
 	navigate: async ({ page }, use) => {
@@ -112,11 +113,19 @@ export const test = base.extend<{
 				expires: cookieConfig.expires?.getTime(),
 				sameSite: cookieConfig.sameSite as 'Strict' | 'Lax' | 'None',
 			}
-			await page.context().addCookies([newConfig])
-			return user
-		})
-		await prisma.user.deleteMany({ where: { id: userId } })
-	},
+		await page.context().addCookies([newConfig])
+		return user
+	})
+	await prisma.user.deleteMany({ where: { id: userId } })
+},
+logout: async ({ page }, use) => {
+	await use(async () => {
+		// Call the logout endpoint to clear the session
+		await page.request.post('/logout')
+		// Navigate to home to ensure logout is complete
+		await page.goto('/')
+	})
+},
 	prepareGitHubUser: async ({ page }, use, testInfo) => {
 		await page.route(/\/auth\/github(?!\/callback)/, async (route, request) => {
 			const headers = {

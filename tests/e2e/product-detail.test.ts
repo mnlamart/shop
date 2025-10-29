@@ -62,16 +62,15 @@ test.describe('Product Detail', () => {
 			},
 		})
 
-		await page.goto(`/shop/products/${product.slug}`)
+	await page.goto(`/shop/products/${product.slug}`)
 
-		// Find and click add to cart button
-		const addToCartButton = page.getByRole('button', { name: /add to cart/i })
-		await expect(addToCartButton).toBeVisible()
-		await addToCartButton.click()
+	// Find and click add to cart button
+	const addToCartButton = page.getByRole('button', { name: /add to cart/i })
+	await expect(addToCartButton).toBeVisible()
+	await addToCartButton.click()
 
-		// Verify success message or redirect to cart
-		// For now, we'll just verify the button is still there (not disabled)
-		await expect(addToCartButton).toBeEnabled()
+	// After adding to cart, should redirect to cart page
+	await expect(page).toHaveURL(/\/shop\/cart/)
 	})
 
 	test.afterEach(async () => {

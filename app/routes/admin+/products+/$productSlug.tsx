@@ -25,6 +25,8 @@ import {
 } from '#app/components/ui/table.tsx'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
+import { formatPrice } from '#app/utils/price.ts'
+import { getStoreCurrency } from '#app/utils/settings.server.ts'
 import { type Route } from './+types/$productSlug.ts'
 
 /**
@@ -69,6 +71,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 	invariantResponse(product, 'Product not found', { status: 404 })
 
+	const currency = await getStoreCurrency()
+
 	return {
 		product: {
 			...product,
@@ -82,6 +86,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 				}, {}),
 			})),
 		},
+		currency,
 	}
 }
 
@@ -187,7 +192,7 @@ function DeleteProductButton({ product }: { product: any }) {
  * @returns React component with product information, images, variants, and metadata
  */
 export default function ProductView({ loaderData }: Route.ComponentProps) {
-	const { product } = loaderData
+	const { product, currency } = loaderData
 	const totalStock = product.variants.reduce((sum: number, variant: any) => sum + variant.stockQuantity, 0)
 	const primaryImage = product.images[0] // Already ordered by displayOrder in loader
 
@@ -253,7 +258,7 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 					</CardHeader>
 					<CardContent>
 						<div className="text-3xl font-bold">
-							{product.currency} {product.price.toFixed(2)}
+							{formatPrice(product.price, currency)}
 						</div>
 						<p className="text-xs text-muted-foreground">
 							Base price
@@ -391,7 +396,7 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 										<TableCell className="hidden md:table-cell">
 											{variant.price ? (
 												<span className="font-medium">
-													{product.currency} {variant.price.toFixed(2)}
+													{formatPrice(variant.price, currency)}
 												</span>
 											) : (
 												<span className="text-muted-foreground">Base price</span>

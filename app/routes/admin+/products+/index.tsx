@@ -32,6 +32,8 @@ import {
 } from '#app/components/ui/table.tsx'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
+import { formatPrice } from '#app/utils/price.ts'
+import { getStoreCurrency } from '#app/utils/settings.server.ts'
 import { type Route } from './+types/index.ts'
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -66,9 +68,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 		orderBy: { name: 'asc' },
 	})
 
+	// Get currency for price formatting
+	const currency = await getStoreCurrency()
+
 	return {
 		products,
 		categories,
+		currency,
 	}
 }
 
@@ -144,7 +150,7 @@ function DeleteProductButton({ product }: { product: any }) {
 }
 
 export default function ProductsList({ loaderData }: Route.ComponentProps) {
-	const { products, categories } = loaderData
+	const { products, categories, currency } = loaderData
 	
 	// State for search and filtering
 	const [searchTerm, setSearchTerm] = useState('')
@@ -305,7 +311,7 @@ export default function ProductsList({ loaderData }: Route.ComponentProps) {
 													</Link>
 												</div>
 												<p className="text-sm text-muted-foreground md:hidden">
-													SKU: {product.sku} • {product.currency} {Number(product.price).toFixed(2)}
+													SKU: {product.sku} • {formatPrice(product.price, currency)}
 												</p>
 												<div className="flex items-center gap-4 text-xs text-muted-foreground md:hidden mt-1">
 													<span>{totalStock} in stock</span>
@@ -319,11 +325,11 @@ export default function ProductsList({ loaderData }: Route.ComponentProps) {
 											{product.sku}
 										</span>
 									</TableCell>
-									<TableCell className="hidden md:table-cell">
-										<span className="font-medium">
-											{product.currency} {Number(product.price).toFixed(2)}
-										</span>
-									</TableCell>
+								<TableCell className="hidden md:table-cell">
+									<span className="font-medium">
+										{formatPrice(product.price, currency)}
+									</span>
+								</TableCell>
 									<TableCell>
 										<StockBadge stockQuantity={totalStock} />
 									</TableCell>

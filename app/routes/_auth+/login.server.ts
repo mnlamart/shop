@@ -3,6 +3,7 @@ import { redirect } from 'react-router'
 import { safeRedirect } from 'remix-utils/safe-redirect'
 import { twoFAVerificationType } from '#app/routes/settings+/profile.two-factor.tsx'
 import { getUserId, sessionKey } from '#app/utils/auth.server.ts'
+import { mergeCartOnUserLogin } from '#app/utils/cart.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { combineResponseInits } from '#app/utils/misc.tsx'
 import { authSessionStorage } from '#app/utils/session.server.ts'
@@ -28,6 +29,9 @@ export async function handleNewSession(
 	},
 	responseInit?: ResponseInit,
 ) {
+	// Merge guest cart into user cart on login
+	await mergeCartOnUserLogin(request, session.userId)
+
 	const verification = await prisma.verification.findUnique({
 		select: { id: true },
 		where: {
@@ -103,7 +107,7 @@ export async function handleVerification({
 	const unverifiedSessionId = verifySession.get(unverifiedSessionIdKey)
 	if (unverifiedSessionId) {
 		const session = await prisma.session.findUnique({
-			select: { expirationDate: true },
+			select: { expirationDate: true, userId: true },
 			where: { id: unverifiedSessionId },
 		})
 		if (!session) {
@@ -113,6 +117,10 @@ export async function handleVerification({
 				description: 'Could not find session to verify. Please try again.',
 			})
 		}
+
+		// Merge guest cart into user cart after 2FA verification
+		await mergeCartOnUserLogin(request, session.userId)
+
 		authSession.set(sessionKey, unverifiedSessionId)
 
 		headers.append(
