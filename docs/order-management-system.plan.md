@@ -242,11 +242,15 @@ admin+/
 16. **Transaction-Based Order Creation**:
     - Start database transaction with timeout
     - Re-check stock (final validation, handles race conditions)
-    - If insufficient: throw error (triggers refund handling)
-    - If sufficient: atomically (all in transaction):
-      - Reduce ProductVariant.stockQuantity for all items
-      - Create Order with shipping info and Stripe payment IDs
-      - Create OrderItems with price snapshots
+      - If insufficient: throw error (triggers refund handling)
+      - If sufficient: atomically (all in transaction):
+        - Reduce stock for each item:
+          - If item has variant: Reduce `ProductVariant.stockQuantity`
+          - If item has no variant and `Product.stockQuantity` is not null: Reduce `Product.stockQuantity`
+          - If `Product.stockQuantity` is null: Skip (unlimited stock)
+        - Generate unique order number
+        - Create Order with shipping info and Stripe payment IDs
+        - Create OrderItems with price snapshots
 17. **Success**: Send order confirmation email, clear cart
 18. **Failure (Insufficient Stock)**: Handle refund (see Refund Handling below)
 
@@ -300,9 +304,11 @@ export async function action({ request }: Route.ActionArgs) {
   const body = await request.text()
   const sig = request.headers.get('stripe-signature')
   
-  if (!sig || !process.env.STRIPE_WEBHOOK_SECRET) {
-    throw new Response('Missing webhook secret', { status: 400 })
-  }
+  invariant(sig, 'Missing webhook signature')
+  invariant(
+    process.env.STRIPE_WEBHOOK_SECRET,
+    'Missing webhook secret',
+  )
 
   let event: Stripe.Event
   try {
@@ -330,37 +336,75 @@ export async function action({ request }: Route.ActionArgs) {
 
     // Load cart data BEFORE transaction (more efficient)
     const cartId = session.metadata?.cartId
-    if (!cartId) {
-      throw new Error('Missing cartId in session metadata')
-    }
+    invariant(cartId, 'Missing cartId in session metadata')
 
     const cart = await prisma.cart.findUnique({
       where: { id: cartId },
       include: {
         items: {
-          include: { product: true }
-        }
-      }
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                price: true,
+                stockQuantity: true,
+              },
+            },
+            variant: {
+              select: {
+                id: true,
+                price: true,
+                stockQuantity: true,
+              },
+            },
+          },
+        },
+      },
     })
 
-    if (!cart || cart.items.length === 0) {
-      throw new Error('Cart not found or empty')
-    }
+    invariant(cart, 'Cart not found')
+    invariant(cart.items, 'Cart items not loaded')
+    invariant(cart.items.length > 0, 'Cart is empty')
 
     // Create order in transaction
     try {
       const order = await prisma.$transaction(async (tx) => {
         // 1. Re-check stock (final validation, handles race conditions)
         for (const item of cart.items) {
-          if (item.variantId) {
+          if (item.variantId && item.variant) {
+            // Item has variant - check variant-level stock
             const variant = await tx.productVariant.findUnique({
               where: { id: item.variantId },
+              select: { id: true, stockQuantity: true },
             })
-            if (!variant || variant.stockQuantity < item.quantity) {
+            invariant(
+              variant,
+              `Variant ${item.variantId} not found for product ${item.product.name}`,
+            )
+            if (variant.stockQuantity < item.quantity) {
               throw new StockUnavailableError({
                 productName: item.product.name,
                 requested: item.quantity,
-                available: variant?.stockQuantity ?? 0
+                available: variant.stockQuantity,
+              })
+            }
+          } else {
+            // Item has no variant - check product-level stock
+            const product = await tx.product.findUnique({
+              where: { id: item.productId },
+              select: { id: true, name: true, stockQuantity: true },
+            })
+            invariant(product, `Product ${item.productId} not found`)
+            if (
+              product.stockQuantity !== null &&
+              product.stockQuantity < item.quantity
+            ) {
+              throw new StockUnavailableError({
+                productName: product.name,
+                requested: item.quantity,
+                available: product.stockQuantity,
               })
             }
           }
@@ -372,31 +416,35 @@ export async function action({ request }: Route.ActionArgs) {
             // Reduce variant stock
             await tx.productVariant.update({
               where: { id: item.variantId },
-              data: { stockQuantity: { decrement: item.quantity } }
+              data: { stockQuantity: { decrement: item.quantity } },
             })
           } else {
             // Reduce product stock (if it has stock tracking)
             const product = await tx.product.findUnique({
               where: { id: item.productId },
-              select: { stockQuantity: true }
+              select: { stockQuantity: true },
             })
             if (product && product.stockQuantity !== null) {
               await tx.product.update({
                 where: { id: item.productId },
-                data: { stockQuantity: { decrement: item.quantity } }
+                data: { stockQuantity: { decrement: item.quantity } },
               })
             }
           }
         }
 
-        // 3. Create order and order items atomically
-        const order = await tx.order.create({
+        // 3. Generate order number
+        const orderNumber = await generateOrderNumber()
+
+        // 4. Create order
+        const newOrder = await tx.order.create({
           data: {
-            orderNumber: await generateOrderNumber(),
+            orderNumber,
             userId: session.metadata?.userId || null,
-            email: session.customer_email || session.metadata?.email || '',
-            subtotal: session.amount_subtotal,
-            total: session.amount_total,
+            email:
+              session.customer_email || session.metadata?.email || '',
+            subtotal: session.amount_subtotal ?? 0,
+            total: session.amount_total ?? 0,
             shippingName: session.metadata?.shippingName || '',
             shippingStreet: session.metadata?.shippingStreet || '',
             shippingCity: session.metadata?.shippingCity || '',
@@ -404,43 +452,96 @@ export async function action({ request }: Route.ActionArgs) {
             shippingPostal: session.metadata?.shippingPostal || '',
             shippingCountry: session.metadata?.shippingCountry || 'US',
             stripeCheckoutSessionId: session.id,
-            stripePaymentIntentId: session.payment_intent as string || null,
+            stripePaymentIntentId:
+              (typeof session.payment_intent === 'string'
+                ? session.payment_intent
+                : session.payment_intent?.id) || null,
             status: 'CONFIRMED',
-          }
+          },
         })
 
+        // 5. Create order items
         await Promise.all(
-          cart.items.map(item => 
+          cart.items.map((item) =>
             tx.orderItem.create({
               data: {
-                orderId: order.id,
+                orderId: newOrder.id,
                 productId: item.productId,
                 variantId: item.variantId,
-                price: item.variantId
-                  ? (item.variant?.price ?? item.product.price)
-                  : item.product.price,
+                price:
+                  item.variantId && item.variant
+                    ? item.variant.price ?? item.product.price
+                    : item.product.price,
                 quantity: item.quantity,
-              }
-            })
-          )
+              },
+            }),
+          ),
         )
 
-        return order
+        return newOrder
       }, {
         timeout: 30000, // 30 second timeout
       })
 
-      // Send confirmation email
-      await sendOrderConfirmationEmail(order)
+      // Send confirmation email (non-blocking - don't fail order creation if email fails)
+      try {
+        const domainUrl = getDomainUrl(request)
+        await sendEmail({
+          to: order.email,
+          subject: `Order Confirmation - ${order.orderNumber}`,
+          html: `...`, // Email template inline
+          text: `...`, // Plain text version
+        })
+      } catch (emailError) {
+        // Log email error but don't fail order creation
+        // Order was successfully created, email is secondary
+        console.error(
+          `Failed to send confirmation email for order ${order.orderNumber}:`,
+          emailError,
+        )
+      }
 
       // Clear cart
       await prisma.cart.delete({ where: { id: cartId } })
 
-      return json({ received: true, orderId: order.id })
+      return Response.json({ received: true, orderId: order.id })
     } catch (error) {
       if (error instanceof StockUnavailableError) {
-        // Handle refund (see Refund Handling section)
-        return handleStockUnavailableRefund(session, error)
+        // Handle refund inline (see Refund Handling section below)
+        const paymentIntentId = typeof session.payment_intent === 'string'
+          ? session.payment_intent
+          : session.payment_intent?.id
+        
+        if (paymentIntentId && session.amount_total) {
+          try {
+            await stripe.refunds.create({
+              payment_intent: paymentIntentId,
+              amount: session.amount_total,
+              reason: 'requested_by_customer',
+              metadata: {
+                reason: 'stock_unavailable',
+                checkout_session_id: session.id,
+                product_name: error.data.productName,
+              },
+            })
+          } catch (refundError) {
+            // Log refund error but don't fail webhook processing
+            // Stripe will retry webhook if needed
+            console.error(
+              `Failed to create refund for payment ${paymentIntentId}:`,
+              refundError,
+            )
+          }
+        }
+        
+        return Response.json(
+          {
+            received: true,
+            error: 'Stock unavailable',
+            message: error.message,
+          },
+          { status: 500 },
+        )
       }
       throw error
     }
@@ -628,9 +729,43 @@ for (const item of cart.items) {
 
 **Multiple testing approaches for different scenarios:**
 
-#### 1. MSW Mocking (Unit/Integration Tests)
+#### 1. Direct Mocking (Unit/Integration Tests)
 
-Mock Stripe API calls using MSW (following existing pattern):
+For unit tests, directly mock the Stripe client using `vi.mock`:
+
+```typescript
+// In test file
+vi.mock('#app/utils/stripe.server.ts', async () => {
+  const actual = await vi.importActual('#app/utils/stripe.server.ts')
+  return {
+    ...actual,
+    stripe: {
+      checkout: {
+        sessions: {
+          create: vi.fn(),
+        },
+      },
+      webhooks: {
+        constructEvent: vi.fn(),
+      },
+      refunds: {
+        create: vi.fn(),
+      },
+    },
+    handleStripeError: actual.handleStripeError,
+  }
+})
+```
+
+**Benefits:**
+- Full control over Stripe API responses
+- No network calls
+- Can test error handling specifically
+- Works well with Vitest mocking system
+
+#### 2. MSW Mocking (Integration/E2E Tests)
+
+For integration/E2E tests, use MSW to mock Stripe API calls (following existing pattern):
 
 **File:** `tests/mocks/stripe.ts`
 
@@ -696,7 +831,7 @@ export const handlers = [
 - Easy to simulate edge cases (payment failures, webhook retries)
 - No Stripe API keys needed for tests
 
-#### 2. Stripe Test Mode (E2E Tests with Real Flow)
+#### 3. Stripe Test Mode (E2E Tests with Real Flow)
 
 Use Stripe test API keys and test cards:
 
@@ -925,13 +1060,15 @@ stripe trigger checkout.session.async_payment_failed
 
 ### Test Environment Setup
 
-**Add to `tests/setup/setup-test-env.ts`:**
+**Stripe test environment variables added to `tests/setup/setup-test-env.ts`:**
 
 ```typescript
-// Mock Stripe in test environment
-if (process.env.MOCKS === 'true') {
-  process.env.STRIPE_SECRET_KEY = 'sk_test_mock'
-  process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_mock'
+// Set mock Stripe keys for testing (MSW will intercept actual API calls)
+if (!process.env.STRIPE_SECRET_KEY) {
+  process.env.STRIPE_SECRET_KEY = 'sk_test_mock_key_for_testing'
+}
+if (!process.env.STRIPE_WEBHOOK_SECRET) {
+  process.env.STRIPE_WEBHOOK_SECRET = 'whsec_mock_webhook_secret_for_testing'
 }
 ```
 
@@ -1079,6 +1216,9 @@ prisma/
 - Transaction timeouts set to 30 seconds to prevent hanging
 - Cart data loaded before transaction for better performance
 - Explicit Stripe error handling for all API calls
+- **Email notifications:** Sent inline in webhook handler with try-catch error handling (non-blocking - order creation succeeds even if email fails)
+- **Refund handling:** Performed inline in webhook handler when stock unavailable after payment, with error logging but non-blocking webhook processing
+- **Testing pattern:** Use Epic Stack's `consoleError` pattern from `#tests/setup/setup-test-env.ts` - mock with `consoleError.mockImplementation(() => {})` and verify with `expect(consoleError).toHaveBeenCalledTimes(1)` for precise error logging verification
 
 ### To-dos
 
