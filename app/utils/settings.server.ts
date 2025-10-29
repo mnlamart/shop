@@ -18,7 +18,7 @@ export async function getStoreCurrency({ timings }: { timings?: Timings } = {}) 
 				where: { id: 'settings' },
 				include: {
 					currency: {
-						select: { symbol: true, decimals: true },
+						select: { code: true, symbol: true, decimals: true },
 					},
 				},
 			})
