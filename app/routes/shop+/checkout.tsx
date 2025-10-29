@@ -8,7 +8,7 @@ import { prisma } from '#app/utils/db.server.ts'
 import { getDomainUrl } from '#app/utils/misc.tsx'
 import { validateStockAvailability } from '#app/utils/order.server.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
-import { stripe } from '#app/utils/stripe.server.ts'
+import { handleStripeError, stripe } from '#app/utils/stripe.server.ts'
 import { type Route } from './+types/checkout.ts'
 
 const ShippingFormSchema = z.object({
@@ -146,41 +146,52 @@ export async function action({ request }: Route.ActionArgs) {
 	invariantResponse(cartWithItems, 'Cart not found', { status: 404 })
 
 	// Create Stripe Checkout Session
-	const session = await stripe.checkout.sessions.create({
-		line_items: cartWithItems.items.map((item) => ({
-			price_data: {
-				currency: currency.code.toLowerCase(),
-				product_data: {
-					name: item.product.name,
-					description: item.product.description || undefined,
+	let session
+	try {
+		session = await stripe.checkout.sessions.create({
+			line_items: cartWithItems.items.map((item) => ({
+				price_data: {
+					currency: currency.code.toLowerCase(),
+					product_data: {
+						name: item.product.name,
+						description: item.product.description || undefined,
+					},
+					unit_amount:
+						item.variantId && item.variant
+							? item.variant.price ?? item.product.price
+							: item.product.price,
 				},
-				unit_amount:
-					item.variantId && item.variant
-						? item.variant.price ?? item.product.price
-						: item.product.price,
-			},
-			quantity: item.quantity,
-		})),
-		mode: 'payment',
-		success_url: `${getDomainUrl(request)}/shop/orders?session_id={CHECKOUT_SESSION_ID}`,
-		cancel_url: `${getDomainUrl(request)}/shop/checkout?canceled=true`,
-		customer_email: shippingData.email,
-		metadata: {
-			cartId: cart.id,
-			userId: userId || '',
-			shippingName: shippingData.name,
-			shippingStreet: shippingData.street,
-			shippingCity: shippingData.city,
-			shippingState: shippingData.state || '',
-			shippingPostal: shippingData.postal,
-			shippingCountry: shippingData.country,
-		},
-		payment_intent_data: {
+				quantity: item.quantity,
+			})),
+			mode: 'payment',
+			success_url: `${getDomainUrl(request)}/shop/orders?session_id={CHECKOUT_SESSION_ID}`,
+			cancel_url: `${getDomainUrl(request)}/shop/checkout?canceled=true`,
+			customer_email: shippingData.email,
 			metadata: {
 				cartId: cart.id,
+				userId: userId || '',
+				shippingName: shippingData.name,
+				shippingStreet: shippingData.street,
+				shippingCity: shippingData.city,
+				shippingState: shippingData.state || '',
+				shippingPostal: shippingData.postal,
+				shippingCountry: shippingData.country,
 			},
-		},
-	})
+			payment_intent_data: {
+				metadata: {
+					cartId: cart.id,
+				},
+			},
+		})
+	} catch (error) {
+		const stripeError = handleStripeError(error)
+		console.error('Stripe checkout session creation failed:', stripeError)
+		return submission.reply({
+			formErrors: [
+				`Payment processing error: ${stripeError.message}. Please try again.`,
+			],
+		})
+	}
 
 	invariantResponse(
 		session.url,
