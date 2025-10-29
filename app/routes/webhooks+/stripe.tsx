@@ -228,10 +228,33 @@ View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
 		} catch (error) {
 			if (error instanceof StockUnavailableError) {
 				// Handle refund for stock unavailable (payment already processed)
-				// TODO: Implement refund handling in next phase
-				console.error(
-					`Stock unavailable after payment for ${error.data.productName}. Refund needed.`,
-				)
+				const paymentIntentId =
+					typeof session.payment_intent === 'string'
+						? session.payment_intent
+						: session.payment_intent?.id
+
+				if (paymentIntentId && session.amount_total) {
+					try {
+						await stripe.refunds.create({
+							payment_intent: paymentIntentId,
+							amount: session.amount_total,
+							reason: 'requested_by_customer',
+							metadata: {
+								reason: 'stock_unavailable',
+								checkout_session_id: session.id,
+								product_name: error.data.productName,
+							},
+						})
+					} catch (refundError) {
+						// Log refund error but don't fail webhook processing
+						// Stripe will retry webhook if needed
+						console.error(
+							`Failed to create refund for payment ${paymentIntentId}:`,
+							refundError,
+						)
+					}
+				}
+
 				return Response.json(
 					{
 						received: true,
