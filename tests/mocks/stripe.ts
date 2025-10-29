@@ -38,7 +38,15 @@ function parseLineItems(formData: FormData): Array<{
 export const handlers = [
 	// Mock Checkout Session creation
 	http.post('https://api.stripe.com/v1/checkout/sessions', async ({ request }) => {
-		requireHeader(request.headers, 'Authorization')
+		// Verify Authorization header exists but don't throw (Stripe uses Bearer token)
+		const authHeader = request.headers.get('Authorization')
+		if (!authHeader) {
+			return HttpResponse.json(
+				{ error: { message: 'Missing Authorization header', type: 'invalid_request_error' } },
+				{ status: 401 },
+			)
+		}
+
 		const body = await request.formData()
 
 		// Parse line items to calculate amounts (Stripe does this server-side)
