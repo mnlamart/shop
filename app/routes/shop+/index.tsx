@@ -31,7 +31,8 @@ export default function ShopIndex({ loaderData }: Route.ComponentProps) {
 	const { categories } = loaderData
 
 	return (
-		<div className="space-y-12 animate-slide-top">
+		<div className="container py-8">
+			<div className="space-y-12 animate-slide-top">
 			{/* Hero Section */}
 			<div className="text-center space-y-4">
 				<h1 className="text-4xl font-bold tracking-tight">Welcome to our Shop</h1>
@@ -75,6 +76,7 @@ export default function ShopIndex({ loaderData }: Route.ComponentProps) {
 					</div>
 				)}
 			</div>
+		</div>
 		</div>
 	)
 }

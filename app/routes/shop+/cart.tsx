@@ -98,7 +98,7 @@ export default function Cart({ loaderData }: Route.ComponentProps) {
 
 	if (!cart || items.length === 0) {
 		return (
-			<div className="container mx-auto px-4 py-8">
+			<div className="container py-8">
 				<h1 className="text-3xl font-bold tracking-tight mb-6">Shopping Cart</h1>
 				<div className="text-center py-12">
 					<p className="text-muted-foreground text-lg mb-4">Your cart is empty</p>
@@ -115,7 +115,7 @@ export default function Cart({ loaderData }: Route.ComponentProps) {
 	}, 0)
 
 	return (
-		<div className="container mx-auto px-4 py-8">
+		<div className="container py-8">
 			<h1 className="text-3xl font-bold tracking-tight mb-6">Shopping Cart</h1>
 
 			<div className="grid gap-8 lg:grid-cols-3">
