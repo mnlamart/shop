@@ -16,6 +16,16 @@ export const server = setupServer(
 
 server.listen({
 	onUnhandledRequest(request, print) {
+		// Log unhandled requests to help debug Stripe interception
+		if (request.url.includes('api.stripe.com')) {
+			console.log('[MSW] ===== UNHANDLED STRIPE REQUEST =====')
+			console.log('[MSW] Method:', request.method)
+			console.log('[MSW] URL:', request.url)
+			console.log('[MSW] Headers:', Object.fromEntries(request.headers.entries()))
+			console.log('[MSW] This means MSW saw the request but no handler matched!')
+			print.warning()
+			return
+		}
 		// Do not print warnings on unhandled requests to https://<:userId>.ingest.us.sentry.io/api/
 		// Note: a request handler with passthrough is not suited with this type of url
 		//       until there is a more permissible url catching system
