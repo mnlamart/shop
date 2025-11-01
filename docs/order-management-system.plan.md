@@ -849,31 +849,98 @@ process.env.STRIPE_SECRET_KEY = 'sk_test_...' // Stripe test key
 process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_...' // Stripe test key
 ```
 
-**E2E Test Example:**
+**E2E Test Examples:**
+
+**Testing Form Validation (Epic Stack Pattern):**
 
 ```typescript
-test('can complete checkout with successful payment', async ({ page }) => {
-  // Fill checkout form
-  await page.fill('[name="shippingName"]', 'Test User')
-  // ... other fields
+test('shows validation errors on checkout form', async ({ page, navigate }) => {
+  // Setup: create product and add to cart first
+  // ... setup code ...
   
-  // Submit and redirect to Stripe Checkout
-  await page.click('button[type="submit"]')
-  await page.waitForURL(/checkout\.stripe\.com/)
+  await navigate('/shop/checkout')
   
-  // Use Stripe test card
-  await page.fill('[name="cardNumber"]', '4242 4242 4242 4242')
-  await page.fill('[name="cardExpiry"]', '12/34')
-  await page.fill('[name="cardCvc"]', '123')
+  // Submit empty form
+  await page.getByRole('button', { name: /submit|continue|proceed to checkout/i }).click()
   
-  // Complete payment
-  await page.click('button:has-text("Pay")')
+  // Verify validation errors are displayed (no redirect)
+  await expect(page).toHaveURL(/\/shop\/checkout/)
+  await expect(page.getByText(/name is required/i)).toBeVisible()
+  await expect(page.getByText(/email is required/i)).toBeVisible()
+  await expect(page.getByText(/street address is required/i)).toBeVisible()
   
-  // Verify redirect to success page
-  await page.waitForURL(/orders/)
-  await expect(page.locator('text=Order confirmed')).toBeVisible()
+  // Fill invalid email
+  await page.getByRole('textbox', { name: /email/i }).fill('invalid-email')
+  await page.getByRole('button', { name: /submit/i }).click()
+  await expect(page.getByText(/invalid email address/i)).toBeVisible()
 })
 ```
+
+**Testing External Redirects (Stripe Checkout):**
+
+For E2E tests, intercept the redirect to verify it's correct without following it to Stripe's domain:
+
+```typescript
+test('redirects to Stripe Checkout after form submission', async ({ page, navigate }) => {
+  // Setup: create product with stock and add to cart
+  // ... setup code ...
+  
+  await navigate('/shop/checkout')
+  
+  // Fill checkout form using Epic Stack patterns
+  await page.getByRole('textbox', { name: /^name/i }).fill('Test User')
+  await page.getByRole('textbox', { name: /email/i }).fill('test@example.com')
+  await page.getByRole('textbox', { name: /street/i }).fill('123 Main St')
+  await page.getByRole('textbox', { name: /city/i }).fill('New York')
+  await page.getByRole('textbox', { name: /postal|zip/i }).fill('10001')
+  await page.getByRole('textbox', { name: /country/i }).fill('US')
+  
+  // Intercept navigation to Stripe
+  let redirectUrl: string | null = null
+  page.on('request', (request) => {
+    if (request.url().includes('checkout.stripe.com')) {
+      redirectUrl = request.url()
+    }
+  })
+  
+  // Submit form
+  await page.getByRole('button', { name: /submit|proceed/i }).click()
+  
+  // Verify redirect URL pattern (Stripe Checkout)
+  await expect(async () => {
+    expect(redirectUrl).toMatch(/^https:\/\/checkout\.stripe\.com\//)
+  }).toPass()
+})
+```
+
+**Alternative: Test redirect response header (for unit-style E2E tests):**
+
+```typescript
+test('returns redirect response to Stripe Checkout URL', async ({ page, navigate }) => {
+  // Setup code ...
+  
+  await navigate('/shop/checkout')
+  
+  // Fill form and submit via request API to check response
+  const response = await page.request.post('/shop/checkout', {
+    form: {
+      name: 'Test User',
+      email: 'test@example.com',
+      street: '123 Main St',
+      city: 'New York',
+      postal: '10001',
+      country: 'US',
+    },
+  })
+  
+  const location = response.headers()['location']
+  expect(location).toMatch(/^https:\/\/checkout\.stripe\.com\//)
+  expect(response.status()).toBeGreaterThanOrEqual(300)
+  expect(response.status()).toBeLessThan(400)
+})
+```
+
+**Note:** With MSW mocking in E2E tests, the Stripe API is already mocked, so the redirect URL will be from the mock (`https://checkout.stripe.com/test/...`). For real Stripe integration testing (optional), use Stripe test keys and actual test cards.
 
 #### 3. Stripe Test Mode (Development & E2E)
 
@@ -1162,12 +1229,18 @@ prisma/
 
 ### Phase 3: Checkout Flow (TDD)
 
-20. Write E2E tests for checkout page (validation, stock check)
-21. Build checkout page with shipping form
-22. Write E2E tests for checkout action (pre-payment stock validation)
-23. Implement checkout action with pre-payment stock check
-24. Write E2E tests for Stripe Checkout Session redirect
-25. Integrate Stripe Checkout Session redirect to hosted checkout page
+**Note:** Steps 23 and 25 are already implemented. The checkout action with pre-payment stock validation and Stripe redirect integration were completed in Phase 2.
+
+**Remaining Tasks:**
+
+20. Write E2E tests for checkout page form validation
+21. Build checkout page UI with shipping form (using Epic Stack patterns: `Field`, `Form`, `StatusButton`, `ErrorList`)
+22. Write E2E tests for checkout action
+    - Test pre-payment stock validation: when stock is insufficient, verify error message is displayed
+    - Test successful form submission: verify redirect to Stripe Checkout
+    - Test Stripe API errors: verify form-level errors are shown (using MSW to mock error responses)
+    - Follow Epic Stack E2E patterns: use `page.getByRole()`, `page.getByText()`, and `expect(page).toHaveURL()`
+24. Write E2E tests for Stripe Checkout Session redirect (verify redirect URL without following)
 
 ### Phase 4: User-Facing Features (TDD)
 
