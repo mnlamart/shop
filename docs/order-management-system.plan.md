@@ -5,6 +5,33 @@
 
 Complete order management system that converts cart items into orders, tracks status, manages inventory, and provides user and admin interfaces. Orders support both authenticated users and guests, with email notifications and comprehensive status tracking.
 
+## Recent Implementation Summary (Latest Session)
+
+**Date:** 2025-01-04
+
+**Major Accomplishments:**
+- ✅ Fully implemented and tested Stripe Checkout integration
+- ✅ Fixed critical transaction and race condition issues
+- ✅ Resolved MSW interception problems preventing Stripe API calls in development
+- ✅ Tested complete order flow end-to-end (checkout → payment → webhook → order creation)
+- ✅ Tested admin order status update functionality
+
+**Key Technical Fixes:**
+1. **Nested Transaction Fix:** Modified `generateOrderNumber()` to accept optional transaction client parameter, preventing "Unable to start a transaction in the given time" errors
+2. **Race Condition Fix:** Added unique constraint error handling in `getOrCreateCart()` to gracefully handle concurrent cart creation attempts
+3. **MSW Interception Fix:** Configured Stripe SDK to use `createFetchHttpClient()` which uses native `fetch` API, bypassing MSW's interception of Node.js `http/https` modules
+4. **MSW Passthrough Configuration:** Added proper passthrough handlers for Stripe API requests in development mode
+
+**Testing Verified:**
+- ✅ Checkout form submission and validation
+- ✅ Stripe Checkout Session creation and redirect
+- ✅ Payment processing with test cards
+- ✅ Webhook order creation (idempotency, stock validation, inventory reduction)
+- ✅ Order confirmation emails
+- ✅ Admin order status updates
+- ✅ Status update email notifications
+- ✅ Order list display and filtering
+
 ## Database Schema
 
 ### Order Model
@@ -1293,16 +1320,89 @@ prisma/
 - **Refund handling:** Performed inline in webhook handler when stock unavailable after payment, with error logging but non-blocking webhook processing
 - **Testing pattern:** Use Epic Stack's `consoleError` pattern from `#tests/setup/setup-test-env.ts` - mock with `consoleError.mockImplementation(() => {})` and verify with `expect(consoleError).toHaveBeenCalledTimes(1)` for precise error logging verification
 
-### To-dos
+### Implementation Status
 
-- [ ] Create Order and OrderItem models in Prisma schema with OrderStatus enum, add relations to User, Product, and ProductVariant
-- [ ] Create and run Prisma migration for orders system
-- [ ] Implement order.server.ts utilities: createOrderFromCart, getOrderById, getUserOrders, getGuestOrder, updateOrderStatus, generateOrderNumber
-- [ ] Build checkout page with shipping address form, order summary, and validation
-- [ ] Implement order creation action that converts cart to order with inventory reduction and price snapshots
-- [ ] Create order confirmation email template and send on order creation
-- [ ] Build user order history page and order details view
-- [ ] Create admin order list page with filtering and search following MODERN_ADMIN_PAGES.md patterns
-- [ ] Build admin order detail page with status update functionality
-- [ ] Create status update email template and send notifications on status changes
-- [ ] Write comprehensive E2E tests for checkout, order history, and admin order management
+#### ✅ Completed
+
+- [x] Create Order and OrderItem models in Prisma schema with OrderStatus enum, add relations to User, Product, and ProductVariant
+- [x] Create and run Prisma migration for orders system
+- [x] Implement order.server.ts utilities: createOrderFromCart, getOrderById, getUserOrders, getGuestOrder, updateOrderStatus, generateOrderNumber
+- [x] Build checkout page with shipping address form, order summary, and validation
+- [x] Implement Stripe Checkout Session creation and redirect
+- [x] Implement Stripe webhook handler for order creation with idempotency
+- [x] Implement order creation action that converts cart to order with inventory reduction and price snapshots
+- [x] Create order confirmation email template and send on order creation
+- [x] Build user order history page and order details view
+- [x] Implement guest order lookup functionality
+- [x] Create admin order list page with filtering and search following MODERN_ADMIN_PAGES.md patterns
+- [x] Build admin order detail page with status update functionality
+- [x] Create status update email template and send notifications on status changes
+- [x] Write comprehensive E2E tests for checkout, order history, and admin order management
+- [x] Fix nested transaction issue in generateOrderNumber (accepts optional transaction client)
+- [x] Fix race condition in cart creation (unique constraint error handling)
+- [x] Fix Stripe MSW interception issue using createFetchHttpClient()
+- [x] Configure MSW passthrough handlers for Stripe requests in development mode
+
+#### 🚀 Key Features Implemented
+
+**Stripe Integration:**
+- Stripe Checkout Session creation with proper error handling
+- Webhook handler for `checkout.session.completed` events
+- Idempotency checks to prevent duplicate orders
+- Stock validation and reduction within transactions
+- Refund handling for stock unavailability edge cases
+- Email notifications for order confirmation and status updates
+
+**Order Management:**
+- Unique order number generation (ORD-XXXXXX format)
+- Support for both authenticated users and guest orders
+- Status tracking (PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED)
+- Admin status update functionality with email notifications
+- Price snapshots at order time
+- Inventory management (variant-level and product-level stock tracking)
+
+**User Features:**
+- User order history page (authenticated users)
+- Guest order lookup by order number + email
+- Order detail view with full order information
+- Shipping address display
+- Order items with product details
+
+**Admin Features:**
+- Order list page with search and status filtering
+- Order detail page with complete order information
+- Status update dropdown with email notifications
+- Order management interface following Epic Stack patterns
+
+#### 🔧 Technical Fixes & Improvements
+
+**Transaction Management:**
+- Fixed nested transaction error by allowing `generateOrderNumber()` to accept optional transaction client
+- Implemented proper transaction handling throughout order creation flow
+
+**Race Condition Fixes:**
+- Added unique constraint error handling in `getOrCreateCart()` to handle concurrent cart creation
+- Proper retry logic for cart creation race conditions
+
+**MSW Configuration:**
+- Configured Stripe SDK to use `createFetchHttpClient()` to bypass MSW interception
+- Added passthrough handlers for Stripe API requests in development mode
+- Proper MSW configuration to allow real Stripe API calls in development
+
+**Important Note on Stripe + MSW:** 
+To prevent MSW from intercepting Stripe API requests in development mode, we use `Stripe.createFetchHttpClient()` instead of Node's default `http/https` modules. MSW only intercepts Node's `http/https` modules, not the native `fetch` API. This allows real Stripe API calls to work correctly in development while MSW can still mock other services. See: https://github.com/mswjs/msw/issues/2259#issuecomment-2422672039
+
+**Error Handling:**
+- Comprehensive Stripe error handling (CardError, InvalidRequestError, APIError, etc.)
+- Non-blocking email sending (order creation succeeds even if email fails)
+- Proper error logging and user-friendly error messages
+
+### Remaining Tasks
+
+- [ ] Clean up debug logging (remove console.log statements)
+- [ ] Add comprehensive error handling edge cases
+- [ ] Add loading states and UX polish
+- [ ] Documentation updates for API usage
+- [ ] Performance optimization for large order lists
+- [ ] Add order cancellation with refund functionality
+- [ ] Add tracking number support for shipped orders
