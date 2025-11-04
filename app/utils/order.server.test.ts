@@ -1,8 +1,24 @@
-import { describe, expect, test, beforeEach, afterEach } from 'vitest'
+import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
 import { createProductData, createVariantData } from '#tests/product-utils.ts'
 import { UNCATEGORIZED_CATEGORY_ID } from './category.ts'
 import { prisma } from './db.server.ts'
-import { validateStockAvailability } from './order.server.ts'
+import { validateStockAvailability, updateOrderStatus } from './order.server.ts'
+
+// Mock email service
+vi.mock('./email.server.ts', () => ({
+	sendEmail: vi.fn().mockResolvedValue({
+		status: 'success' as const,
+		data: { id: 'email-123' },
+	}),
+}))
+
+// Mock getDomainUrl
+vi.mock('./misc.tsx', () => ({
+	getDomainUrl: vi.fn(() => 'http://localhost:3000'),
+}))
+
+// Import after mocking
+import { sendEmail } from './email.server.ts'
 
 describe('validateStockAvailability', () => {
 	let categoryId: string
@@ -313,6 +329,111 @@ describe('validateStockAvailability', () => {
 
 	test('should throw error when cart does not exist', async () => {
 		await expect(validateStockAvailability('non-existent-cart')).rejects.toThrow()
+	})
+})
+
+describe('updateOrderStatus', () => {
+	let orderId: string
+	let orderNumber: string
+
+	beforeEach(async () => {
+		vi.clearAllMocks()
+		
+		// Create a test order
+		const order = await prisma.order.create({
+			data: {
+				orderNumber: 'ORD-TEST-001',
+				email: 'test@example.com',
+				subtotal: 10000,
+				total: 10000,
+				shippingName: 'Test User',
+				shippingStreet: '123 Test St',
+				shippingCity: 'Test City',
+				shippingPostal: '12345',
+				shippingCountry: 'US',
+				stripeCheckoutSessionId: `cs_test_${Date.now()}`,
+				status: 'CONFIRMED',
+			},
+		})
+		orderId = order.id
+		orderNumber = order.orderNumber
+	})
+
+	afterEach(async () => {
+		await prisma.orderItem.deleteMany({ where: { orderId } })
+		await prisma.order.deleteMany({ where: { id: orderId } })
+	})
+
+	test('should update order status and send email notification', async () => {
+		await updateOrderStatus(orderId, 'SHIPPED')
+
+		// Verify status was updated
+		const updatedOrder = await prisma.order.findUnique({
+			where: { id: orderId },
+		})
+		expect(updatedOrder?.status).toBe('SHIPPED')
+
+		// Verify email was sent
+		expect(sendEmail).toHaveBeenCalledTimes(1)
+		const emailCall = vi.mocked(sendEmail).mock.calls[0]?.[0]
+		expect(emailCall?.to).toBe('test@example.com')
+		expect(emailCall?.subject).toBe(`Order Status Update - ${orderNumber}`)
+		expect(emailCall?.html).toContain(orderNumber)
+		expect(emailCall?.html).toContain('Shipped') // Human-readable label
+		expect(emailCall?.text).toContain(orderNumber)
+		expect(emailCall?.text).toContain('Shipped') // Human-readable label
+	})
+
+	test('should include order details in email', async () => {
+		await updateOrderStatus(orderId, 'DELIVERED')
+
+		const emailCall = vi.mocked(sendEmail).mock.calls[0]?.[0]
+		expect(emailCall?.html).toContain('Order Status Update')
+		expect(emailCall?.html).toContain(orderNumber)
+		expect(emailCall?.html).toContain('Delivered') // Human-readable label
+		expect(emailCall?.html).toContain('/shop/orders/' + orderNumber)
+	})
+
+	test('should handle email sending failure gracefully', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+		
+		// Mock email sending to fail
+		vi.mocked(sendEmail).mockRejectedValueOnce(
+			new Error('Email service unavailable'),
+		)
+
+		// Should not throw - status update should succeed even if email fails
+		await expect(updateOrderStatus(orderId, 'SHIPPED')).resolves.not.toThrow()
+
+		// Verify status was still updated
+		const updatedOrder = await prisma.order.findUnique({
+			where: { id: orderId },
+		})
+		expect(updatedOrder?.status).toBe('SHIPPED')
+
+		// Verify error was logged
+		expect(consoleError).toHaveBeenCalledTimes(1)
+		
+		consoleError.mockRestore()
+	})
+
+	test('should send email for all status transitions', async () => {
+		const statuses: Array<'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'> = [
+			'PENDING',
+			'SHIPPED',
+			'DELIVERED',
+		]
+
+		for (const status of statuses) {
+			await updateOrderStatus(orderId, status)
+			const updatedOrder = await prisma.order.findUnique({
+				where: { id: orderId },
+			})
+			expect(updatedOrder?.status).toBe(status)
+		}
+
+		// Should have sent 3 emails (one for each status change)
+		expect(sendEmail).toHaveBeenCalledTimes(3)
 	})
 })
 

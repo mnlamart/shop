@@ -1,5 +1,6 @@
-import { Agent as HttpAgent } from 'node:http'
 import { invariant } from '@epic-web/invariant'
+import { invariantResponse } from '@epic-web/invariant'
+import { z } from 'zod'
 import Stripe from 'stripe'
 
 invariant(
@@ -12,30 +13,66 @@ invariant(
  * Automatically uses test mode if key starts with sk_test_
  * No code changes needed between test/production!
  * 
- * Note on MSW mocking:
- * - In test mode: Uses vi.mock (see checkout.test.ts) - works perfectly
- * - In dev mode with MOCKS=true: MSW may interfere with Stripe SDK requests even if not intercepting.
- *   Solution: Use a custom HTTP agent to bypass MSW's HTTP patching.
- * - In production: Uses real Stripe keys (sk_live_* or sk_test_*)
+ * We use the Stripe SDK throughout for type safety, automatic retries, and proper error handling.
+ * MSW passthrough handlers allow Stripe API calls to reach the real API in dev/test mode.
  */
-
-// Create custom HTTP agent that bypasses MSW's patching
-// MSW patches the global http/https modules, but we can use our own agent
-// The Stripe SDK uses the httpAgent for both HTTP and HTTPS requests internally
-const httpAgent = new HttpAgent({ 
-	keepAlive: true,
-	// Create a new HTTPS agent instance for HTTPS connections
-	// Note: Stripe SDK uses this agent, so we ensure it's not patched by MSW
-})
-
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 	apiVersion: '2025-09-30.clover', // Use stable version
 	maxNetworkRetries: 2,
 	timeout: 30000,
-	// Use custom agent to bypass MSW interference in dev mode
-	// This ensures Stripe requests go directly to the API, not through MSW
-	httpAgent: httpAgent,
 })
+
+/**
+ * Create a Stripe Checkout Session using the Stripe SDK
+ * 
+ * Uses stripe.checkout.sessions.create() which provides:
+ * - Type safety
+ * - Automatic retries
+ * - Proper error handling with Stripe error types
+ */
+export async function createCheckoutSession(params: {
+	line_items: Array<{
+		price_data: {
+			currency: string
+			unit_amount: number
+			product_data: {
+				name: string
+				description?: string
+			}
+		}
+		quantity: number
+	}>
+	mode: 'payment' | 'subscription'
+	success_url: string
+	cancel_url: string
+	customer_email: string
+	metadata: Record<string, string>
+	payment_intent_data?: {
+		metadata: Record<string, string>
+	}
+}): Promise<{ id: string; url: string }> {
+	try {
+		const session = await stripe.checkout.sessions.create({
+			line_items: params.line_items,
+			mode: params.mode,
+			success_url: params.success_url,
+			cancel_url: params.cancel_url,
+			customer_email: params.customer_email,
+			metadata: params.metadata,
+			payment_intent_data: params.payment_intent_data,
+		})
+
+		invariantResponse(session.url, 'Stripe checkout session URL is missing')
+
+		return {
+			id: session.id,
+			url: session.url,
+		}
+	} catch (error) {
+		// SDK throws Stripe error types directly - let them propagate
+		throw error
+	}
+}
 
 /**
  * Stripe error handling utility.
