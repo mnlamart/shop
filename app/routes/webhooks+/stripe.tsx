@@ -18,11 +18,9 @@ import { type Route } from './+types/stripe.ts'
  * Handles checkout.session.completed events to create orders.
  */
 export async function action({ request }: Route.ActionArgs) {
-	console.log('[WEBHOOK] Webhook received')
 	const body = await request.text()
 	const sig = request.headers.get('stripe-signature')
 
-	console.log('[WEBHOOK] Signature header:', sig ? 'present' : 'missing')
 	invariant(sig, 'Missing webhook signature')
 	invariant(
 		process.env.STRIPE_WEBHOOK_SECRET,
@@ -31,14 +29,12 @@ export async function action({ request }: Route.ActionArgs) {
 
 	let event: Stripe.Event
 	try {
-		console.log('[WEBHOOK] Verifying webhook signature')
 		event = stripe.webhooks.constructEvent(
 			body,
 			sig,
 			process.env.STRIPE_WEBHOOK_SECRET,
 			300, // tolerance in seconds
 		)
-		console.log('[WEBHOOK] Signature verified. Event type:', event.type, 'Event ID:', event.id)
 	} catch (err) {
 		console.error(`[WEBHOOK] Webhook signature verification failed:`, err)
 		return data(
@@ -49,38 +45,53 @@ export async function action({ request }: Route.ActionArgs) {
 
 	// Handle checkout.session.completed event
 	if (event.type === 'checkout.session.completed') {
-		console.log('[WEBHOOK] Processing checkout.session.completed event')
 		const session = event.data.object as Stripe.Checkout.Session
-		console.log('[WEBHOOK] Session ID:', session.id)
+
+		console.log('[WEBHOOK] Processing checkout.session.completed event for session:', session.id)
 
 		// Idempotency check - prevent duplicate order creation
-		console.log('[WEBHOOK] Checking for existing order by session ID')
 		const existingOrder = await getOrderByCheckoutSessionId(session.id)
 		if (existingOrder) {
-			console.log(`[WEBHOOK] Order already exists for session ${session.id}, orderNumber: ${existingOrder.orderNumber}`)
+			console.log('[WEBHOOK] Order already exists (idempotency check):', existingOrder.orderNumber)
+			// Order already exists - ensure cart is deleted (idempotent operation)
+			// This handles webhook retries and ensures cart is cleaned up even if
+			// the first webhook call deleted the cart but a retry comes in
+			// Retrieve full session to get metadata (cartId)
+			const fullSession = await stripe.checkout.sessions.retrieve(session.id)
+			const cartId = fullSession.metadata?.cartId
+			if (cartId) {
+				try {
+					console.log('[WEBHOOK] Deleting cart (idempotency):', cartId)
+					// Try to delete cart items first, then cart
+					await prisma.cartItem.deleteMany({
+						where: { cartId },
+					})
+					await prisma.cart.delete({
+						where: { id: cartId },
+					}).catch(() => {
+						// Cart might already be deleted - that's fine
+					})
+					console.log('[WEBHOOK] Cart deleted successfully (idempotency)')
+				} catch (error) {
+					// Cart might already be deleted or not exist - that's fine
+					// This is idempotent - we don't want to fail if cart is already gone
+					console.log('[WEBHOOK] Cart already deleted or not found (idempotency)')
+				}
+			}
 			return data({ received: true, orderId: existingOrder.id })
 		}
 
 		// Retrieve full session from Stripe with expanded data
-		console.log('[WEBHOOK] Retrieving full session from Stripe')
 		const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
 			expand: ['line_items', 'payment_intent'],
-		})
-		console.log('[WEBHOOK] Full session retrieved:', {
-			id: fullSession.id,
-			payment_status: fullSession.payment_status,
-			amount_total: fullSession.amount_total,
-			metadata: fullSession.metadata,
 		})
 
 		// Extract metadata
 		const cartId = fullSession.metadata?.cartId
 		const userId = fullSession.metadata?.userId || null
-		console.log('[WEBHOOK] Extracted metadata:', { cartId, userId })
 		invariant(cartId, 'Missing cartId in session metadata')
 
 		// Load cart data BEFORE transaction (more efficient)
-		console.log('[WEBHOOK] Loading cart data:', cartId)
 		const cart = await prisma.cart.findUnique({
 			where: { id: cartId },
 			include: {
@@ -107,27 +118,14 @@ export async function action({ request }: Route.ActionArgs) {
 			},
 		})
 
-		console.log('[WEBHOOK] Cart loaded:', {
-			cartId: cart?.id,
-			itemCount: cart?.items.length,
-			items: cart?.items.map((item) => ({
-				productId: item.productId,
-				productName: item.product.name,
-				variantId: item.variantId,
-				quantity: item.quantity,
-			})),
-		})
 		invariant(cart, 'Cart not found')
 		invariant(cart.items.length > 0, 'Cart is empty')
 
 		// Create order in transaction
-		console.log('[WEBHOOK] Starting order creation transaction')
 		try {
 			const order = await prisma.$transaction(
 				async (tx) => {
-					console.log('[WEBHOOK] Transaction started')
 					// 1. Re-check stock (final validation, handles race conditions)
-					console.log('[WEBHOOK] Re-checking stock availability')
 					for (const item of cart.items) {
 						if (item.variantId && item.variant) {
 							// Item has variant - check variant-level stock
@@ -139,11 +137,6 @@ export async function action({ request }: Route.ActionArgs) {
 								variant,
 								`Variant ${item.variantId} not found for product ${item.product.name}`,
 							)
-							console.log('[WEBHOOK] Stock check - variant:', {
-								variantId: item.variantId,
-								requested: item.quantity,
-								available: variant.stockQuantity,
-							})
 							if (variant.stockQuantity < item.quantity) {
 								throw new StockUnavailableError({
 									productName: item.product.name,
@@ -158,11 +151,6 @@ export async function action({ request }: Route.ActionArgs) {
 								select: { id: true, name: true, stockQuantity: true },
 							})
 							invariant(product, `Product ${item.productId} not found`)
-							console.log('[WEBHOOK] Stock check - product:', {
-								productId: item.productId,
-								requested: item.quantity,
-								available: product.stockQuantity,
-							})
 							if (
 								product.stockQuantity !== null &&
 								product.stockQuantity < item.quantity
@@ -175,20 +163,14 @@ export async function action({ request }: Route.ActionArgs) {
 							}
 						}
 					}
-					console.log('[WEBHOOK] Stock validation passed')
 
 					// 2. Reduce stock atomically
-					console.log('[WEBHOOK] Reducing stock')
 					for (const item of cart.items) {
 						if (item.variantId) {
 							// Reduce variant stock
 							await tx.productVariant.update({
 								where: { id: item.variantId },
 								data: { stockQuantity: { decrement: item.quantity } },
-							})
-							console.log('[WEBHOOK] Reduced variant stock:', {
-								variantId: item.variantId,
-								quantity: item.quantity,
 							})
 						} else {
 							// Reduce product stock (if it has stock tracking)
@@ -201,18 +183,12 @@ export async function action({ request }: Route.ActionArgs) {
 									where: { id: item.productId },
 									data: { stockQuantity: { decrement: item.quantity } },
 								})
-								console.log('[WEBHOOK] Reduced product stock:', {
-									productId: item.productId,
-									quantity: item.quantity,
-								})
 							}
 						}
 					}
 
 					// 3. Generate order number (using existing transaction)
-					console.log('[WEBHOOK] Generating order number')
 					const orderNumber = await generateOrderNumber(tx)
-					console.log('[WEBHOOK] Order number generated:', orderNumber)
 
 					// 4. Create order
 					const paymentIntentId =
@@ -220,19 +196,15 @@ export async function action({ request }: Route.ActionArgs) {
 							? fullSession.payment_intent
 							: fullSession.payment_intent?.id || null
 
-					console.log('[WEBHOOK] Payment intent ID:', paymentIntentId)
-
 					// Get payment intent to extract charge ID
 					let chargeId: string | null = null
 					if (paymentIntentId) {
 						try {
-							console.log('[WEBHOOK] Retrieving payment intent to get charge ID')
 							const paymentIntent = await stripe.paymentIntents.retrieve(
 								paymentIntentId,
 							)
 							if (typeof paymentIntent.latest_charge === 'string') {
 								chargeId = paymentIntent.latest_charge
-								console.log('[WEBHOOK] Charge ID:', chargeId)
 							}
 						} catch (err) {
 							// Log but don't fail order creation if charge retrieval fails
@@ -243,7 +215,6 @@ export async function action({ request }: Route.ActionArgs) {
 						}
 					}
 
-					console.log('[WEBHOOK] Creating order in database')
 					const newOrder = await tx.order.create({
 						data: {
 							orderNumber,
@@ -263,16 +234,11 @@ export async function action({ request }: Route.ActionArgs) {
 							stripeCheckoutSessionId: fullSession.id,
 							stripePaymentIntentId: paymentIntentId,
 							stripeChargeId: chargeId,
-							status: 'CONFIRMED',
-						},
-					})
-					console.log('[WEBHOOK] Order created:', {
-						orderId: newOrder.id,
-						orderNumber: newOrder.orderNumber,
-					})
+						status: 'CONFIRMED',
+					},
+				})
 
 					// 5. Create order items
-					console.log('[WEBHOOK] Creating order items')
 					await Promise.all(
 						cart.items.map((item) =>
 							tx.orderItem.create({
@@ -289,7 +255,16 @@ export async function action({ request }: Route.ActionArgs) {
 							}),
 						),
 					)
-					console.log('[WEBHOOK] Order items created:', cart.items.length)
+
+					// 6. Delete cart items (within transaction for atomicity)
+					await tx.cartItem.deleteMany({
+						where: { cartId },
+					})
+
+					// 7. Delete cart (within transaction for atomicity)
+					await tx.cart.delete({
+						where: { id: cartId },
+					})
 
 					return newOrder
 				},
@@ -298,14 +273,10 @@ export async function action({ request }: Route.ActionArgs) {
 				},
 			)
 
-			console.log('[WEBHOOK] Transaction completed successfully. Order:', {
-				orderId: order.id,
-				orderNumber: order.orderNumber,
-			})
+			console.log('[WEBHOOK] Order created successfully:', order.orderNumber)
 
 			// Send confirmation email (non-blocking - don't fail order creation if email fails)
 			try {
-				console.log('[WEBHOOK] Sending confirmation email')
 				const domainUrl = getDomainUrl(request)
 				await sendEmail({
 					to: order.email,
@@ -328,7 +299,6 @@ Total: ${(order.total / 100).toFixed(2)}
 View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
 					`,
 				})
-				console.log('[WEBHOOK] Confirmation email sent successfully')
 			} catch (emailError) {
 				// Log email error but don't fail order creation
 				console.error(
@@ -337,17 +307,7 @@ View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
 				)
 			}
 
-			// Clear cart
-			try {
-				console.log('[WEBHOOK] Deleting cart:', cartId)
-				await prisma.cart.delete({ where: { id: cartId } })
-				console.log('[WEBHOOK] Cart deleted successfully')
-			} catch (cartError) {
-				// Log but don't fail - cart might already be deleted
-				console.error(`[WEBHOOK] Failed to delete cart ${cartId}:`, cartError)
-			}
-
-			console.log('[WEBHOOK] Webhook processing completed successfully')
+			// Cart is already deleted within the transaction above
 			return data({ received: true, orderId: order.id })
 		} catch (error) {
 			console.error('[WEBHOOK] Error in transaction:', {
@@ -366,7 +326,6 @@ View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
 
 				if (paymentIntentId && fullSession.amount_total) {
 					try {
-						console.log('[WEBHOOK] Creating refund for payment:', paymentIntentId)
 						await stripe.refunds.create({
 							payment_intent: paymentIntentId,
 							amount: fullSession.amount_total,
@@ -377,7 +336,7 @@ View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
 								product_name: error.data.productName,
 							},
 						})
-						console.log(
+						console.error(
 							`[WEBHOOK] Refund created for payment ${paymentIntentId} due to stock unavailability`,
 						)
 					} catch (refundError) {
@@ -404,7 +363,6 @@ View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
 	}
 
 	// Return success for unhandled event types
-	console.log('[WEBHOOK] Unhandled event type:', event.type)
 	return data({ received: true })
 }
 

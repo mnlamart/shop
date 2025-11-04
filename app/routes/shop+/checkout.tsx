@@ -2,7 +2,7 @@ import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import { useEffect } from 'react'
-import { data, Form, redirect } from 'react-router'
+import { data, Form, redirect, redirectDocument } from 'react-router'
 import { z } from 'zod'
 import { ErrorList, Field } from '#app/components/forms.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
@@ -83,11 +83,43 @@ const ShippingFormSchema = z.object({
 })
 
 export async function loader({ request }: Route.LoaderArgs) {
+	const url = new URL(request.url)
+	const pathname = url.pathname
+	
+	// Don't run checkout loader logic if we're on the success page
+	// React Router runs parent loaders even for child routes, so we need to skip
+	if (pathname === '/shop/checkout/success') {
+		// Return empty data - the success page will handle everything
+		return {
+			cart: null,
+			currency: null,
+			subtotal: 0,
+			userEmail: undefined,
+			canceled: false,
+		}
+	}
+	
+	// Check if this is a redirect from Stripe success page
+	// If user has session_id in URL but lands on checkout page, redirect to success page
+	const sessionId = url.searchParams.get('session_id')
+	if (sessionId) {
+		console.log('[CHECKOUT LOADER] Found session_id in URL, redirecting to success page')
+		return redirectDocument(`/shop/checkout/success?session_id=${sessionId}`)
+	}
+	
 	const { cart } = await getOrCreateCartFromRequest(request)
 
+	// If cart is empty or doesn't exist, redirect to cart page
+	// This handles cases where cart was deleted after successful checkout
 	if (!cart || cart.items.length === 0) {
+		console.log('[CHECKOUT LOADER] Cart is empty or missing, redirecting to /shop/cart')
 		return redirect('/shop/cart')
 	}
+
+	console.log('[CHECKOUT LOADER] Cart found with', cart.items.length, 'items')
+
+	// Check if user canceled Stripe checkout
+	const canceled = url.searchParams.get('canceled') === 'true'
 
 	// Load cart with full product details for display
 	const cartWithItems = await prisma.cart.findUnique({
@@ -146,18 +178,17 @@ export async function loader({ request }: Route.LoaderArgs) {
 		currency,
 		subtotal,
 		userEmail,
+		canceled,
 	}
 }
 
 export async function action({ request }: Route.ActionArgs) {
-	console.log('[CHECKOUT] Action started')
 	const formData = await request.formData()
 	const submission = parseWithZod(formData, {
 		schema: ShippingFormSchema,
 	})
 
 	if (submission.status !== 'success') {
-		console.log('[CHECKOUT] Form validation failed:', submission.status)
 		return data(
 			{ result: submission.reply() },
 			{ status: submission.status === 'error' ? 400 : 200 },
@@ -165,24 +196,15 @@ export async function action({ request }: Route.ActionArgs) {
 	}
 
 	const shippingData = submission.value
-	console.log('[CHECKOUT] Form validated successfully:', {
-		name: shippingData.name,
-		email: shippingData.email,
-		city: shippingData.city,
-	})
 
 	// Get cart
-	console.log('[CHECKOUT] Getting cart from request')
 	const { cart } = await getOrCreateCartFromRequest(request)
-	console.log('[CHECKOUT] Cart retrieved:', { cartId: cart?.id, itemCount: cart?.items.length })
 	invariantResponse(cart, 'Cart not found', { status: 404 })
 	invariantResponse(cart.items.length > 0, 'Cart is empty', { status: 400 })
 
 	// Validate stock availability before creating checkout session
-	console.log('[CHECKOUT] Validating stock availability for cart:', cart.id)
 	try {
 		await validateStockAvailability(cart.id)
-		console.log('[CHECKOUT] Stock validation passed')
 	} catch (error) {
 		console.error('[CHECKOUT] Stock validation failed:', error)
 		if (error instanceof StockValidationError) {
@@ -203,7 +225,6 @@ export async function action({ request }: Route.ActionArgs) {
 	}
 
 	// Get cart with full product details for checkout session
-	console.log('[CHECKOUT] Loading cart with full product details')
 	const cartWithItems = await prisma.cart.findUnique({
 		where: { id: cart.id },
 		include: {
@@ -230,31 +251,17 @@ export async function action({ request }: Route.ActionArgs) {
 	})
 
 	invariantResponse(cartWithItems, 'Cart not found', { status: 404 })
-	console.log('[CHECKOUT] Cart with items loaded:', {
-		cartId: cartWithItems.id,
-		items: cartWithItems.items.map((item) => ({
-			productId: item.productId,
-			productName: item.product.name,
-			price: item.variant?.price ?? item.product.price,
-			quantity: item.quantity,
-		})),
-	})
 
 	// Get currency
-	console.log('[CHECKOUT] Getting currency')
 	const currency = await getStoreCurrency()
-	console.log('[CHECKOUT] Currency:', currency?.code)
 	invariantResponse(currency, 'Currency not configured', { status: 500 })
 
 	// Get user ID (optional - guest checkout supported)
 	const userId = await getUserId(request)
-	console.log('[CHECKOUT] User ID:', userId || 'guest')
 
 	// Create Stripe Checkout Session
-	console.log('[CHECKOUT] Creating Stripe checkout session')
 	try {
 		const domainUrl = getDomainUrl(request)
-		console.log('[CHECKOUT] Domain URL:', domainUrl)
 		const session = await createCheckoutSession({
 			cart: cartWithItems,
 			shippingInfo: {
@@ -271,34 +278,15 @@ export async function action({ request }: Route.ActionArgs) {
 			userId,
 		})
 
-		console.log('[CHECKOUT] Stripe session created:', {
-			sessionId: session.id,
-			url: session.url,
-			status: session.status,
-		})
-
 		// Redirect to Stripe Checkout (external URL)
 		invariantResponse(session.url, 'Failed to create checkout session URL', {
 			status: 500,
 		})
-		console.log('[CHECKOUT] Redirecting to Stripe:', session.url)
-		console.log('[CHECKOUT] Session URL type:', typeof session.url)
-		console.log('[CHECKOUT] Session URL length:', session.url?.length)
 		// Return redirect URL in response for client-side redirect (external URLs don't work with redirectDocument from form actions)
 		return data({ redirectUrl: session.url }, { status: 200 })
 	} catch (error) {
-		console.error('[CHECKOUT] Error caught in try-catch block:', {
-			error,
-			errorType: error instanceof Error ? error.constructor.name : typeof error,
-			message: error instanceof Error ? error.message : String(error),
-			stack: error instanceof Error ? error.stack : undefined,
-		})
+		console.error('[CHECKOUT] Error creating checkout session:', error)
 		const stripeError = handleStripeError(error)
-		console.error('[CHECKOUT] Stripe checkout session creation failed:', {
-			error: stripeError,
-			originalError: error,
-			stack: error instanceof Error ? error.stack : undefined,
-		})
 
 		return data(
 			{
@@ -323,7 +311,8 @@ export default function Checkout({
 }: Route.ComponentProps) {
 	const isPending = useIsPending()
 	const { cart, currency, subtotal, userEmail } = loaderData || {}
-
+	
+	// Call hooks unconditionally (React rules)
 	const [form, fields] = useForm({
 		id: 'checkout-form',
 		constraint: getZodConstraint(ShippingFormSchema),
@@ -340,22 +329,60 @@ export default function Checkout({
 
 	// Handle external redirect to Stripe Checkout
 	useEffect(() => {
-		console.log('[CHECKOUT] useEffect triggered, actionData:', actionData)
 		if (actionData && 'redirectUrl' in actionData && actionData.redirectUrl) {
-			console.log('[CHECKOUT] Client-side redirect to Stripe:', actionData.redirectUrl)
+			// Show loading state before redirect
 			window.location.href = actionData.redirectUrl
 		}
 	}, [actionData])
+	
+	// If we're on the success page (cart is null from loader), don't render checkout form
+	// The success page component will handle rendering via React Router's outlet
+	if (!cart || !currency) {
+		return null
+	}
+
+	// Show loading overlay when redirecting
+	const isRedirecting = actionData && 'redirectUrl' in actionData && actionData.redirectUrl
 
 	return (
-		<div className="container py-8">
-			<h1 className="text-3xl font-bold tracking-tight mb-6">Checkout</h1>
+		<>
+			{isRedirecting && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+					<div className="text-center">
+						<div className="mb-4 inline-block animate-spin">
+							<svg
+								className="h-8 w-8 text-primary"
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+							>
+								<circle
+									className="opacity-25"
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									strokeWidth="4"
+								></circle>
+								<path
+									className="opacity-75"
+									fill="currentColor"
+									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+								></path>
+							</svg>
+						</div>
+						<p className="text-lg font-semibold">Redirecting to payment...</p>
+					</div>
+				</div>
+			)}
+			<div className="container py-8">
+				<h1 className="text-3xl font-bold tracking-tight mb-6">Checkout</h1>
 
-			<div className="grid gap-8 lg:grid-cols-2">
-				{/* Checkout Form */}
-				<div>
-					<h2 className="text-xl font-semibold mb-4">Shipping Information</h2>
-					<Form method="POST" className="space-y-4" {...getFormProps(form)} noValidate>
+				<div className="grid gap-8 lg:grid-cols-2">
+					{/* Checkout Form */}
+					<div>
+						<h2 className="text-xl font-semibold mb-4">Shipping Information</h2>
+						<Form method="POST" className="space-y-4" {...getFormProps(form)} noValidate>
 						<Field
 							labelProps={{
 								htmlFor: fields.name.id,
@@ -501,7 +528,7 @@ export default function Checkout({
 					</div>
 				</div>
 			</div>
-		</div>
+			</div>
+		</>
 	)
 }
-

@@ -19,6 +19,11 @@ const navData = {
 					isActive: true,
 				},
 				{
+					title: 'Orders',
+					url: '/admin/orders',
+					icon: 'file-text',
+				},
+				{
 					title: 'Products',
 					url: '/admin/products',
 					icon: 'archive',

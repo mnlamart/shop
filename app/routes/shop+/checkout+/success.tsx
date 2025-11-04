@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
-import { redirect, useRevalidator } from 'react-router'
+import { redirect, redirectDocument, useRevalidator } from 'react-router'
+import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
-import { Button } from '#app/components/ui/button.tsx'
 import { getUserId } from '#app/utils/auth.server.ts'
 import { getOrderByCheckoutSessionId } from '#app/utils/order.server.ts'
 import { type Route } from './+types/success.ts'
@@ -11,29 +11,50 @@ export async function loader({ request }: Route.LoaderArgs) {
 	const url = new URL(request.url)
 	const sessionId = url.searchParams.get('session_id')
 
+	console.log('[CHECKOUT SUCCESS] Loader called with session_id:', sessionId)
+
 	if (!sessionId) {
 		// No session_id - redirect to shop
+		console.log('[CHECKOUT SUCCESS] No session_id, redirecting to /shop')
 		return redirect('/shop')
 	}
 
 	// Wait 1-2 seconds for webhook to process (webhooks are usually very fast)
+	console.log('[CHECKOUT SUCCESS] Waiting 1.5 seconds for webhook to process...')
 	await new Promise((resolve) => setTimeout(resolve, 1500))
 
 	// Check database for order by session_id (webhook creates it)
-	const order = await getOrderByCheckoutSessionId(sessionId)
+	console.log('[CHECKOUT SUCCESS] Checking for order with session_id:', sessionId)
+	let order
+	try {
+		order = await getOrderByCheckoutSessionId(sessionId)
+		console.log('[CHECKOUT SUCCESS] Order lookup result:', order ? `Found order ${order.orderNumber}` : 'Not found')
+	} catch (error) {
+		console.error('[CHECKOUT SUCCESS] Error looking up order:', error)
+		// If there's an error, still show processing state
+		order = null
+	}
 
 	if (order) {
-		// Order exists - redirect to order detail
+		console.log('[CHECKOUT SUCCESS] Order found:', order.orderNumber, 'Redirecting to order detail')
+		// Order exists - redirect to order detail using redirectDocument to replace history
 		const userId = await getUserId(request)
 		// For authenticated users, redirect directly
 		if (userId) {
-			return redirect(`/shop/orders/${order.orderNumber}`)
+			const redirectUrl = `/shop/orders/${order.orderNumber}`
+			console.log('[CHECKOUT SUCCESS] Redirecting authenticated user to:', redirectUrl)
+			return redirectDocument(redirectUrl)
 		}
 		// For guests, redirect with email parameter
-		return redirect(`/shop/orders/${order.orderNumber}?email=${encodeURIComponent(order.email)}`)
+		const redirectUrl = `/shop/orders/${order.orderNumber}?email=${encodeURIComponent(order.email)}`
+		console.log('[CHECKOUT SUCCESS] Redirecting guest user to:', redirectUrl)
+		return redirectDocument(redirectUrl)
 	}
 
+	console.log('[CHECKOUT SUCCESS] Order not found yet, showing processing state')
+	console.log('[CHECKOUT SUCCESS] NOTE: If order doesn\'t appear, ensure Stripe CLI is running: stripe listen --forward-to localhost:3000/webhooks/stripe')
 	// Order doesn't exist yet - return processing state
+	// DO NOT redirect - let the component handle the processing state
 	return {
 		processing: true,
 		sessionId,
@@ -52,7 +73,17 @@ export default function CheckoutSuccess({ loaderData }: Route.ComponentProps) {
 	// Auto-refresh if order is processing
 	useEffect(() => {
 		if (processing && sessionId) {
+			// Set max polling duration (30 seconds)
+			const maxPollingDuration = 30000 // 30 seconds
+			const startTime = Date.now()
+			
 			const interval = setInterval(() => {
+				const elapsed = Date.now() - startTime
+				if (elapsed >= maxPollingDuration) {
+					console.warn('[CHECKOUT SUCCESS] Max polling duration reached, stopping auto-refresh')
+					clearInterval(interval)
+					return
+				}
 				void revalidator.revalidate()
 			}, 3000) // Check every 3 seconds
 
@@ -86,6 +117,11 @@ export default function CheckoutSuccess({ loaderData }: Route.ComponentProps) {
 							If this takes longer than expected, please check your email for order
 							confirmation or contact support.
 						</p>
+						{sessionId && (
+							<p className="text-xs text-muted-foreground mt-4">
+								Session ID: {sessionId.substring(0, 20)}...
+							</p>
+						)}
 					</CardContent>
 				</Card>
 			</div>
