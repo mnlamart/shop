@@ -80,6 +80,21 @@ export async function action({ request }: Route.ActionArgs) {
 			expand: ['line_items', 'payment_intent'],
 		})
 
+		// Verify payment status before fulfilling order
+		if (fullSession.payment_status !== 'paid') {
+			console.error(
+				`[WEBHOOK] Payment not completed for session ${session.id}. Payment status: ${fullSession.payment_status}`,
+			)
+			return data(
+				{
+					received: true,
+					skipped: true,
+					message: `Payment not completed. Status: ${fullSession.payment_status}`,
+				},
+				{ status: 200 },
+			)
+		}
+
 		// Extract metadata
 		const cartId = fullSession.metadata?.cartId
 		const userId = fullSession.metadata?.userId || null

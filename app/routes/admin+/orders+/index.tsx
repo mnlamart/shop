@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
@@ -84,12 +84,15 @@ function StatusBadge({ status }: { status: string }) {
 	)
 }
 
+const ITEMS_PER_PAGE = 25
+
 export default function OrdersList({ loaderData }: Route.ComponentProps) {
 	const { orders, currency } = loaderData
 
 	// State for search and filtering
 	const [searchTerm, setSearchTerm] = useState('')
 	const [statusFilter, setStatusFilter] = useState('all')
+	const [currentPage, setCurrentPage] = useState(1)
 
 	// Filter orders based on search and filter criteria
 	const filteredOrders = useMemo(() => {
@@ -113,6 +116,17 @@ export default function OrdersList({ loaderData }: Route.ComponentProps) {
 
 		return filtered
 	}, [orders, searchTerm, statusFilter])
+
+	// Pagination calculations
+	const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE)
+	const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+	const endIndex = startIndex + ITEMS_PER_PAGE
+	const paginatedOrders = filteredOrders.slice(startIndex, endIndex)
+
+	// Reset to page 1 when filters change
+	useEffect(() => {
+		setCurrentPage(1)
+	}, [searchTerm, statusFilter])
 
 	return (
 		<div className="space-y-8 animate-slide-top">
@@ -199,7 +213,7 @@ export default function OrdersList({ loaderData }: Route.ComponentProps) {
 							</TableCell>
 						</TableRow>
 					) : (
-						filteredOrders.map((order) => {
+						paginatedOrders.map((order) => {
 							const itemCount = order.items.reduce(
 								(sum, item) => sum + item.quantity,
 								0,
@@ -257,6 +271,75 @@ export default function OrdersList({ loaderData }: Route.ComponentProps) {
 					)}
 				</TableBody>
 			</Table>
+
+			{/* Pagination */}
+			{totalPages > 1 && (
+				<div className="flex items-center justify-between">
+					<div className="text-sm text-muted-foreground">
+						Showing {startIndex + 1} to {Math.min(endIndex, filteredOrders.length)} of{' '}
+						{filteredOrders.length} orders
+					</div>
+					<div className="flex items-center gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={currentPage === 1}
+							onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+						>
+							<Icon name="chevron-left" className="h-4 w-4" />
+							Previous
+						</Button>
+						<div className="flex items-center gap-1">
+							{Array.from({ length: totalPages }, (_, i) => i + 1)
+								.filter(
+									(page) =>
+										page === 1 ||
+										page === totalPages ||
+										Math.abs(page - currentPage) <= 1,
+								)
+								.map((page, index, arr) => (
+									<div key={page} className="flex items-center gap-1">
+										{index > 0 && arr[index - 1] !== page - 1 && (
+											<span className="px-2 text-muted-foreground">...</span>
+										)}
+										<Button
+											variant={currentPage === page ? 'default' : 'outline'}
+											size="sm"
+											onClick={() => setCurrentPage(page)}
+											className="min-w-[2.5rem]"
+										>
+											{page}
+										</Button>
+									</div>
+								))}
+						</div>
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={currentPage === totalPages}
+							onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+						>
+							Next
+							<Icon name="chevron-right" className="h-4 w-4" />
+						</Button>
+					</div>
+				</div>
+			)}
+		</div>
+	)
+}
+
+export function ErrorBoundary() {
+	return (
+		<div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+			<Icon name="question-mark-circled" className="h-12 w-12 text-muted-foreground" />
+			<h2 className="text-xl font-semibold">Error loading orders</h2>
+			<p className="text-muted-foreground text-center">
+				We encountered an error while loading orders. Please try again later.
+			</p>
+			<Button asChild>
+				<Link to="/admin/orders">Retry</Link>
+			</Button>
 		</div>
 	)
 }
