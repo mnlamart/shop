@@ -333,7 +333,7 @@ function getStatusLabel(status: OrderStatus): string {
 }
 
 /**
- * Gets an order by Stripe Checkout Session ID (for webhook idempotency).
+ * Gets an order by checkout session ID (for webhook idempotency).
  */
 export async function getOrderByCheckoutSessionId(
 	checkoutSessionId: string,

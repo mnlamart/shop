@@ -1,67 +1,86 @@
 import { invariant } from '@epic-web/invariant'
-import  { type ActionFunctionArgs } from 'react-router'
-import type Stripe from 'stripe'
+import { invariantResponse } from '@epic-web/invariant'
+import { data } from 'react-router'
+import Stripe from 'stripe'
 import { prisma } from '#app/utils/db.server.ts'
-import { sendEmail } from '#app/utils/email.server.ts'
 import { getDomainUrl } from '#app/utils/misc.tsx'
-import { generateOrderNumber } from '#app/utils/order-number.server.ts'
+import { sendEmail } from '#app/utils/email.server.ts'
 import {
+	getOrderByCheckoutSessionId,
 	StockUnavailableError,
 } from '#app/utils/order.server.ts'
+import { generateOrderNumber } from '#app/utils/order-number.server.ts'
 import { stripe } from '#app/utils/stripe.server.ts'
+import { type Route } from './+types/stripe.ts'
 
-export async function action({ request }: ActionFunctionArgs) {
+/**
+ * Webhook handler for Stripe events.
+ * Handles checkout.session.completed events to create orders.
+ */
+export async function action({ request }: Route.ActionArgs) {
+	console.log('[WEBHOOK] Webhook received')
 	const body = await request.text()
 	const sig = request.headers.get('stripe-signature')
 
+	console.log('[WEBHOOK] Signature header:', sig ? 'present' : 'missing')
 	invariant(sig, 'Missing webhook signature')
 	invariant(
 		process.env.STRIPE_WEBHOOK_SECRET,
-		'Missing webhook secret',
+		'STRIPE_WEBHOOK_SECRET must be set in environment variables',
 	)
 
 	let event: Stripe.Event
 	try {
+		console.log('[WEBHOOK] Verifying webhook signature')
 		event = stripe.webhooks.constructEvent(
 			body,
 			sig,
 			process.env.STRIPE_WEBHOOK_SECRET,
 			300, // tolerance in seconds
 		)
+		console.log('[WEBHOOK] Signature verified. Event type:', event.type, 'Event ID:', event.id)
 	} catch (err) {
-		const error = err as Error
-		console.error(`Webhook signature verification failed: ${error.message}`)
-		return new Response(`Webhook Error: ${error.message}`, { status: 400 })
+		console.error(`[WEBHOOK] Webhook signature verification failed:`, err)
+		return data(
+			{ error: `Webhook Error: ${err instanceof Error ? err.message : 'Unknown error'}` },
+			{ status: 400 },
+		)
 	}
 
-	// Handle both immediate and async payment events
-	if (
-		event.type === 'checkout.session.completed' ||
-		event.type === 'checkout.session.async_payment_succeeded'
-	) {
+	// Handle checkout.session.completed event
+	if (event.type === 'checkout.session.completed') {
+		console.log('[WEBHOOK] Processing checkout.session.completed event')
 		const session = event.data.object as Stripe.Checkout.Session
+		console.log('[WEBHOOK] Session ID:', session.id)
 
-		// CRITICAL: Only create orders when payment is confirmed paid
-		// checkout.session.completed fires when session completes, but payment may still be processing
-		// async_payment_succeeded fires when delayed payment methods (ACH, BACS) complete
-		if (session.payment_status !== 'paid') {
-			// Payment not yet confirmed - return success but don't create order
-			// Stripe will retry the webhook when payment_status changes to 'paid'
-			return Response.json({ received: true })
-		}
-
-		// Idempotency check - MUST happen before any database operations
-		const existingOrder = await prisma.order.findUnique({
-			where: { stripeCheckoutSessionId: session.id },
-		})
+		// Idempotency check - prevent duplicate order creation
+		console.log('[WEBHOOK] Checking for existing order by session ID')
+		const existingOrder = await getOrderByCheckoutSessionId(session.id)
 		if (existingOrder) {
-			return Response.json({ received: true, orderId: existingOrder.id })
+			console.log(`[WEBHOOK] Order already exists for session ${session.id}, orderNumber: ${existingOrder.orderNumber}`)
+			return data({ received: true, orderId: existingOrder.id })
 		}
 
-		// Load cart data BEFORE transaction (more efficient)
-		const cartId = session.metadata?.cartId
+		// Retrieve full session from Stripe with expanded data
+		console.log('[WEBHOOK] Retrieving full session from Stripe')
+		const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
+			expand: ['line_items', 'payment_intent'],
+		})
+		console.log('[WEBHOOK] Full session retrieved:', {
+			id: fullSession.id,
+			payment_status: fullSession.payment_status,
+			amount_total: fullSession.amount_total,
+			metadata: fullSession.metadata,
+		})
+
+		// Extract metadata
+		const cartId = fullSession.metadata?.cartId
+		const userId = fullSession.metadata?.userId || null
+		console.log('[WEBHOOK] Extracted metadata:', { cartId, userId })
 		invariant(cartId, 'Missing cartId in session metadata')
 
+		// Load cart data BEFORE transaction (more efficient)
+		console.log('[WEBHOOK] Loading cart data:', cartId)
 		const cart = await prisma.cart.findUnique({
 			where: { id: cartId },
 			include: {
@@ -88,15 +107,27 @@ export async function action({ request }: ActionFunctionArgs) {
 			},
 		})
 
+		console.log('[WEBHOOK] Cart loaded:', {
+			cartId: cart?.id,
+			itemCount: cart?.items.length,
+			items: cart?.items.map((item) => ({
+				productId: item.productId,
+				productName: item.product.name,
+				variantId: item.variantId,
+				quantity: item.quantity,
+			})),
+		})
 		invariant(cart, 'Cart not found')
-		invariant(cart.items, 'Cart items not loaded')
 		invariant(cart.items.length > 0, 'Cart is empty')
 
 		// Create order in transaction
+		console.log('[WEBHOOK] Starting order creation transaction')
 		try {
 			const order = await prisma.$transaction(
 				async (tx) => {
+					console.log('[WEBHOOK] Transaction started')
 					// 1. Re-check stock (final validation, handles race conditions)
+					console.log('[WEBHOOK] Re-checking stock availability')
 					for (const item of cart.items) {
 						if (item.variantId && item.variant) {
 							// Item has variant - check variant-level stock
@@ -108,6 +139,11 @@ export async function action({ request }: ActionFunctionArgs) {
 								variant,
 								`Variant ${item.variantId} not found for product ${item.product.name}`,
 							)
+							console.log('[WEBHOOK] Stock check - variant:', {
+								variantId: item.variantId,
+								requested: item.quantity,
+								available: variant.stockQuantity,
+							})
 							if (variant.stockQuantity < item.quantity) {
 								throw new StockUnavailableError({
 									productName: item.product.name,
@@ -122,6 +158,11 @@ export async function action({ request }: ActionFunctionArgs) {
 								select: { id: true, name: true, stockQuantity: true },
 							})
 							invariant(product, `Product ${item.productId} not found`)
+							console.log('[WEBHOOK] Stock check - product:', {
+								productId: item.productId,
+								requested: item.quantity,
+								available: product.stockQuantity,
+							})
 							if (
 								product.stockQuantity !== null &&
 								product.stockQuantity < item.quantity
@@ -134,14 +175,20 @@ export async function action({ request }: ActionFunctionArgs) {
 							}
 						}
 					}
+					console.log('[WEBHOOK] Stock validation passed')
 
 					// 2. Reduce stock atomically
+					console.log('[WEBHOOK] Reducing stock')
 					for (const item of cart.items) {
 						if (item.variantId) {
 							// Reduce variant stock
 							await tx.productVariant.update({
 								where: { id: item.variantId },
 								data: { stockQuantity: { decrement: item.quantity } },
+							})
+							console.log('[WEBHOOK] Reduced variant stock:', {
+								variantId: item.variantId,
+								quantity: item.quantity,
 							})
 						} else {
 							// Reduce product stock (if it has stock tracking)
@@ -154,38 +201,78 @@ export async function action({ request }: ActionFunctionArgs) {
 									where: { id: item.productId },
 									data: { stockQuantity: { decrement: item.quantity } },
 								})
+								console.log('[WEBHOOK] Reduced product stock:', {
+									productId: item.productId,
+									quantity: item.quantity,
+								})
 							}
 						}
 					}
 
-					// 3. Generate order number
-					const orderNumber = await generateOrderNumber()
+					// 3. Generate order number (using existing transaction)
+					console.log('[WEBHOOK] Generating order number')
+					const orderNumber = await generateOrderNumber(tx)
+					console.log('[WEBHOOK] Order number generated:', orderNumber)
 
 					// 4. Create order
+					const paymentIntentId =
+						typeof fullSession.payment_intent === 'string'
+							? fullSession.payment_intent
+							: fullSession.payment_intent?.id || null
+
+					console.log('[WEBHOOK] Payment intent ID:', paymentIntentId)
+
+					// Get payment intent to extract charge ID
+					let chargeId: string | null = null
+					if (paymentIntentId) {
+						try {
+							console.log('[WEBHOOK] Retrieving payment intent to get charge ID')
+							const paymentIntent = await stripe.paymentIntents.retrieve(
+								paymentIntentId,
+							)
+							if (typeof paymentIntent.latest_charge === 'string') {
+								chargeId = paymentIntent.latest_charge
+								console.log('[WEBHOOK] Charge ID:', chargeId)
+							}
+						} catch (err) {
+							// Log but don't fail order creation if charge retrieval fails
+							console.error(
+								`[WEBHOOK] Failed to retrieve charge ID for payment intent ${paymentIntentId}:`,
+								err,
+							)
+						}
+					}
+
+					console.log('[WEBHOOK] Creating order in database')
 					const newOrder = await tx.order.create({
 						data: {
 							orderNumber,
-							userId: session.metadata?.userId || null,
+							userId: userId || null,
 							email:
-								session.customer_email || session.metadata?.email || '',
-							subtotal: session.amount_subtotal ?? 0,
-							total: session.amount_total ?? 0,
-							shippingName: session.metadata?.shippingName || '',
-							shippingStreet: session.metadata?.shippingStreet || '',
-							shippingCity: session.metadata?.shippingCity || '',
-							shippingState: session.metadata?.shippingState || null,
-							shippingPostal: session.metadata?.shippingPostal || '',
-							shippingCountry: session.metadata?.shippingCountry || 'US',
-							stripeCheckoutSessionId: session.id,
-							stripePaymentIntentId:
-								(typeof session.payment_intent === 'string'
-									? session.payment_intent
-									: session.payment_intent?.id) || null,
+								fullSession.customer_email ||
+								fullSession.metadata?.email ||
+								'',
+							subtotal: fullSession.amount_subtotal ?? 0,
+							total: fullSession.amount_total ?? 0,
+							shippingName: fullSession.metadata?.shippingName || '',
+							shippingStreet: fullSession.metadata?.shippingStreet || '',
+							shippingCity: fullSession.metadata?.shippingCity || '',
+							shippingState: fullSession.metadata?.shippingState || null,
+							shippingPostal: fullSession.metadata?.shippingPostal || '',
+							shippingCountry: fullSession.metadata?.shippingCountry || 'US',
+							stripeCheckoutSessionId: fullSession.id,
+							stripePaymentIntentId: paymentIntentId,
+							stripeChargeId: chargeId,
 							status: 'CONFIRMED',
 						},
 					})
+					console.log('[WEBHOOK] Order created:', {
+						orderId: newOrder.id,
+						orderNumber: newOrder.orderNumber,
+					})
 
 					// 5. Create order items
+					console.log('[WEBHOOK] Creating order items')
 					await Promise.all(
 						cart.items.map((item) =>
 							tx.orderItem.create({
@@ -202,17 +289,23 @@ export async function action({ request }: ActionFunctionArgs) {
 							}),
 						),
 					)
+					console.log('[WEBHOOK] Order items created:', cart.items.length)
 
 					return newOrder
 				},
 				{
-					maxWait: 5000, // 5 seconds to acquire transaction lock (prevents P2028 errors)
-					timeout: 30000, // 30 second timeout for transaction execution
+					timeout: 30000, // 30 second timeout
 				},
 			)
 
+			console.log('[WEBHOOK] Transaction completed successfully. Order:', {
+				orderId: order.id,
+				orderNumber: order.orderNumber,
+			})
+
 			// Send confirmation email (non-blocking - don't fail order creation if email fails)
 			try {
+				console.log('[WEBHOOK] Sending confirmation email')
 				const domainUrl = getDomainUrl(request)
 				await sendEmail({
 					to: order.email,
@@ -221,7 +314,7 @@ export async function action({ request }: ActionFunctionArgs) {
 						<h1>Order Confirmation</h1>
 						<p>Thank you for your order!</p>
 						<p><strong>Order Number:</strong> ${order.orderNumber}</p>
-						<p><strong>Total:</strong> $${(order.total / 100).toFixed(2)}</p>
+						<p><strong>Total:</strong> ${(order.total / 100).toFixed(2)}</p>
 						<p><a href="${domainUrl}/shop/orders/${order.orderNumber}">View Order Details</a></p>
 					`,
 					text: `
@@ -230,55 +323,73 @@ Order Confirmation
 Thank you for your order!
 
 Order Number: ${order.orderNumber}
-Total: $${(order.total / 100).toFixed(2)}
+Total: ${(order.total / 100).toFixed(2)}
 
 View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
 					`,
 				})
+				console.log('[WEBHOOK] Confirmation email sent successfully')
 			} catch (emailError) {
 				// Log email error but don't fail order creation
-				// Order was successfully created, email is secondary
 				console.error(
-					`Failed to send confirmation email for order ${order.orderNumber}:`,
+					`[WEBHOOK] Failed to send confirmation email for order ${order.orderNumber}:`,
 					emailError,
 				)
 			}
 
 			// Clear cart
-			await prisma.cart.delete({ where: { id: cartId } })
+			try {
+				console.log('[WEBHOOK] Deleting cart:', cartId)
+				await prisma.cart.delete({ where: { id: cartId } })
+				console.log('[WEBHOOK] Cart deleted successfully')
+			} catch (cartError) {
+				// Log but don't fail - cart might already be deleted
+				console.error(`[WEBHOOK] Failed to delete cart ${cartId}:`, cartError)
+			}
 
-			return Response.json({ received: true, orderId: order.id })
+			console.log('[WEBHOOK] Webhook processing completed successfully')
+			return data({ received: true, orderId: order.id })
 		} catch (error) {
+			console.error('[WEBHOOK] Error in transaction:', {
+				error,
+				message: error instanceof Error ? error.message : 'Unknown error',
+				stack: error instanceof Error ? error.stack : undefined,
+			})
 			if (error instanceof StockUnavailableError) {
-				// Handle refund for stock unavailable (payment already processed)
+				console.error('[WEBHOOK] Stock unavailable error:', error.data)
+				// Stock unavailable after payment - this is a critical error
+				// Payment was already processed, so we need to handle refund
 				const paymentIntentId =
-					typeof session.payment_intent === 'string'
-						? session.payment_intent
-						: session.payment_intent?.id
+					typeof fullSession.payment_intent === 'string'
+						? fullSession.payment_intent
+						: fullSession.payment_intent?.id
 
-				if (paymentIntentId && session.amount_total) {
+				if (paymentIntentId && fullSession.amount_total) {
 					try {
+						console.log('[WEBHOOK] Creating refund for payment:', paymentIntentId)
 						await stripe.refunds.create({
 							payment_intent: paymentIntentId,
-							amount: session.amount_total,
+							amount: fullSession.amount_total,
 							reason: 'requested_by_customer',
 							metadata: {
 								reason: 'stock_unavailable',
-								checkout_session_id: session.id,
+								checkout_session_id: fullSession.id,
 								product_name: error.data.productName,
 							},
 						})
+						console.log(
+							`[WEBHOOK] Refund created for payment ${paymentIntentId} due to stock unavailability`,
+						)
 					} catch (refundError) {
 						// Log refund error but don't fail webhook processing
-						// Stripe will retry webhook if needed
 						console.error(
-							`Failed to create refund for payment ${paymentIntentId}:`,
+							`[WEBHOOK] Failed to create refund for payment ${paymentIntentId}:`,
 							refundError,
 						)
 					}
 				}
 
-				return Response.json(
+				return data(
 					{
 						received: true,
 						error: 'Stock unavailable',
@@ -287,10 +398,13 @@ View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
 					{ status: 500 },
 				)
 			}
+			// Re-throw other errors to trigger Stripe retry
 			throw error
 		}
 	}
 
-	return Response.json({ received: true })
+	// Return success for unhandled event types
+	console.log('[WEBHOOK] Unhandled event type:', event.type)
+	return data({ received: true })
 }
 

@@ -170,12 +170,6 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 								<p className="text-sm text-muted-foreground">Email</p>
 								<p>{order.email}</p>
 							</div>
-							{order.stripeCheckoutSessionId && (
-								<div>
-									<p className="text-sm text-muted-foreground">Payment</p>
-									<p className="text-sm">Paid via Stripe</p>
-								</div>
-							)}
 						</CardContent>
 					</Card>
 				</div>
