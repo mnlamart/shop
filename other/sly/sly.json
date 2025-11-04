@@ -5,6 +5,11 @@
 			"name": "@radix-ui/icons",
 			"directory": "./other/svg-icons",
 			"transformers": ["transform-icon.ts"]
+		},
+		{
+			"name": "lucide-icons",
+			"directory": "./other/svg-icons",
+			"transformers": ["transform-icon.ts"]
 		}
 	]
 }

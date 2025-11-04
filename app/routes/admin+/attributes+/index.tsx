@@ -276,7 +276,7 @@ export default function AttributesList({ loaderData }: Route.ComponentProps) {
 									</div>
 								) : (
 									<div className="text-muted-foreground">
-										<Icon name="gear" className="h-8 w-8 mx-auto mb-2 opacity-50" />
+										<Icon name="settings" className="h-8 w-8 mx-auto mb-2 opacity-50" />
 										<p>No attributes found.</p>
 										<p className="text-sm">Create attributes like Size, Color, or Material to use in product variants.</p>
 										<Link to="/admin/attributes/new" className="text-primary hover:underline">

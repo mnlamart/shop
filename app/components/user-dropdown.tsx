@@ -67,7 +67,7 @@ export function UserDropdown() {
 					</DropdownMenuItem>
 					<DropdownMenuItem asChild>
 						<Link prefetch="intent" to="/settings/profile">
-							<Icon className="text-body-md" name="gear">
+							<Icon className="text-body-md" name="settings">
 								Settings
 							</Icon>
 						</Link>
@@ -75,7 +75,7 @@ export function UserDropdown() {
 					{isAdmin && (
 						<DropdownMenuItem asChild>
 							<Link prefetch="intent" to={`/admin`}>
-								<Icon className="text-body-md" name="gear">
+								<Icon className="text-body-md" name="layout-dashboard">
 									Admin
 								</Icon>
 							</Link>
@@ -91,7 +91,7 @@ export function UserDropdown() {
 					<Form action="/logout" method="POST" ref={formRef}>
 						<DropdownMenuItem asChild>
 							<button type="submit" className="w-full">
-								<Icon className="text-body-md" name="exit">
+								<Icon className="text-body-md" name="log-out">
 									Logout
 								</Icon>
 							</button>

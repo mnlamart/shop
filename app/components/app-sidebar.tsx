@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router'
+import { Icon, type IconName } from '#app/components/ui/icon.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#app/components/ui/collapsible.tsx'
-import { Icon } from '#app/components/ui/icon.tsx'
 import { cn } from '#app/utils/misc.tsx'
 import { useOptionalUser } from '#app/utils/user.ts'
 
@@ -15,18 +15,18 @@ const navData = {
 				{
 					title: 'Dashboard',
 					url: '/admin',
-					icon: 'home',
+					icon: 'layout-dashboard' as IconName,
 					isActive: true,
 				},
 				{
 					title: 'Orders',
 					url: '/admin/orders',
-					icon: 'file-text',
+					icon: 'file-text' as IconName,
 				},
 				{
 					title: 'Products',
 					url: '/admin/products',
-					icon: 'archive',
+					icon: 'package' as IconName,
 					hasSubmenu: true,
 					items: [
 						{ title: 'All Products', url: '/admin/products' },
@@ -36,7 +36,7 @@ const navData = {
 				{
 					title: 'Categories',
 					url: '/admin/categories',
-					icon: 'backpack',
+					icon: 'tags' as IconName,
 					hasSubmenu: true,
 					items: [
 						{ title: 'All Categories', url: '/admin/categories' },
@@ -46,7 +46,7 @@ const navData = {
 				{
 					title: 'Attributes',
 					url: '/admin/attributes',
-					icon: 'gear',
+					icon: 'settings' as IconName,
 					hasSubmenu: true,
 					items: [
 						{ title: 'All Attributes', url: '/admin/attributes' },
@@ -61,7 +61,7 @@ const navData = {
 				{
 					title: 'Settings',
 					url: '/admin/settings',
-					icon: 'gear',
+					icon: 'settings' as IconName,
 					hasSubmenu: true,
 					items: [
 						{ title: 'General', url: '/admin/settings/general' },
@@ -72,7 +72,7 @@ const navData = {
 				{
 					title: 'View Store',
 					url: '/',
-					icon: 'home',
+					icon: 'store' as IconName,
 				},
 			],
 		},
@@ -146,7 +146,7 @@ export function AppSidebar() {
 					<>
 						<div className="flex items-center gap-2">
 							<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-								<Icon name="gear" className="size-4" />
+								<Icon name="settings" className="size-4" />
 							</div>
 							<div className="grid text-left text-sm leading-tight">
 								<span className="truncate font-semibold">Epic Shop</span>
@@ -181,7 +181,7 @@ export function AppSidebar() {
 													variant={location.pathname.startsWith(item.url) ? "secondary" : "ghost"}
 													className={`${isCollapsed ? 'w-12 h-12 p-0 justify-center' : 'w-full justify-start px-3'}`}
 												>
-													<Icon name={item.icon as any} className="size-4" />
+													<Icon name={item.icon} className="size-4" />
 													{!isCollapsed && (
 														<>
 															<span className="ml-2">{item.title}</span>
@@ -219,7 +219,7 @@ export function AppSidebar() {
 											className={`${isCollapsed ? 'w-12 h-12 p-0 justify-center' : 'w-full justify-start px-3'}`}
 										>
 											<Link to={item.url}>
-												<Icon name={item.icon as any} className="size-4" />
+												<Icon name={item.icon} className="size-4" />
 												{!isCollapsed && <span className="ml-2">{item.title}</span>}
 											</Link>
 										</Button>
