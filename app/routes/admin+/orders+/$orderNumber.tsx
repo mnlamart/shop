@@ -1,5 +1,5 @@
 import { invariantResponse } from '@epic-web/invariant'
-import { parseWithZod } from '@conform-to/zod'
+import { parseWithZod } from '@conform-to/zod/v4'
 import { useEffect, useState } from 'react'
 import { data, Link, redirect, useFetcher } from 'react-router'
 import { z } from 'zod'
@@ -206,23 +206,10 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 								</label>
 								<div className="mt-1">
 									<Badge variant="success" className="text-sm">
-										Paid via Stripe
+										Paid
 									</Badge>
 								</div>
-								{order.stripeCheckoutSessionId && (
-									<p className="text-xs text-muted-foreground mt-1">
-										Session: {order.stripeCheckoutSessionId}
-									</p>
-								)}
 							</div>
-							{order.stripePaymentIntentId && (
-								<div>
-									<label className="text-sm font-medium text-muted-foreground">
-										Payment Intent
-									</label>
-									<p className="text-sm font-mono mt-1">{order.stripePaymentIntentId}</p>
-								</div>
-							)}
 						</CardContent>
 					</Card>
 

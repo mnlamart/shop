@@ -49,7 +49,36 @@ export async function getOrCreateCart({
 		return existing
 	}
 
-	return createCart({ userId, sessionId })
+	try {
+		return await createCart({ userId, sessionId })
+	} catch (error) {
+		// Handle race condition: if cart was created by another request between findFirst and create
+		// (e.g., after webhook deleted cart, another request created it)
+		if (
+			error &&
+			typeof error === 'object' &&
+			'code' in error &&
+			error.code === 'P2002' &&
+			'meta' in error &&
+			error.meta &&
+			typeof error.meta === 'object' &&
+			'modelName' in error.meta &&
+			error.meta.modelName === 'Cart'
+		) {
+			// Unique constraint violation - try to find the cart again
+			const retryCart = await prisma.cart.findFirst({
+				where: userId ? { userId } : { sessionId },
+				include: {
+					items: true,
+				},
+			})
+			if (retryCart) {
+				return retryCart
+			}
+		}
+		// Re-throw if it's not a unique constraint error or if cart still doesn't exist
+		throw error
+	}
 }
 
 /**

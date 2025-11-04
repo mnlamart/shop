@@ -1,15 +1,19 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
+import { useEffect } from 'react'
 import { data, Form, redirect } from 'react-router'
 import { z } from 'zod'
 import { ErrorList, Field } from '#app/components/forms.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
-import { getUserId, requireUserId } from '#app/utils/auth.server.ts'
+import { getUserId } from '#app/utils/auth.server.ts'
 import { getOrCreateCartFromRequest } from '#app/utils/cart.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { getDomainUrl, useIsPending } from '#app/utils/misc.tsx'
-import { validateStockAvailability } from '#app/utils/order.server.ts'
+import {
+	StockValidationError,
+	validateStockAvailability,
+} from '#app/utils/order.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
 import { createCheckoutSession, handleStripeError } from '#app/utils/stripe.server.ts'
@@ -128,16 +132,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 	// Get user email if authenticated (for pre-filling)
 	let userEmail: string | undefined = undefined
-	try {
-		const userId = await requireUserId(request)
+	const userId = await getUserId(request)
+	if (userId) {
 		const user = await prisma.user.findUnique({
 			where: { id: userId },
 			select: { email: true },
 		})
 		userEmail = user?.email || undefined
-	} catch {
-		// User not authenticated - that's fine for guest checkout
-		userEmail = undefined
 	}
 
 	return {
@@ -149,12 +150,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+	console.log('[CHECKOUT] Action started')
 	const formData = await request.formData()
 	const submission = parseWithZod(formData, {
 		schema: ShippingFormSchema,
 	})
 
 	if (submission.status !== 'success') {
+		console.log('[CHECKOUT] Form validation failed:', submission.status)
 		return data(
 			{ result: submission.reply() },
 			{ status: submission.status === 'error' ? 400 : 200 },
@@ -162,144 +165,152 @@ export async function action({ request }: Route.ActionArgs) {
 	}
 
 	const shippingData = submission.value
+	console.log('[CHECKOUT] Form validated successfully:', {
+		name: shippingData.name,
+		email: shippingData.email,
+		city: shippingData.city,
+	})
 
-	// Get cart and user
+	// Get cart
+	console.log('[CHECKOUT] Getting cart from request')
 	const { cart } = await getOrCreateCartFromRequest(request)
+	console.log('[CHECKOUT] Cart retrieved:', { cartId: cart?.id, itemCount: cart?.items.length })
 	invariantResponse(cart, 'Cart not found', { status: 404 })
 	invariantResponse(cart.items.length > 0, 'Cart is empty', { status: 400 })
 
-	// Get currency
-	const currency = await getStoreCurrency()
-	if (!currency || !currency.code || typeof currency.code !== 'string') {
-		console.error('Currency configuration error:', {
-			currency,
-			hasCode: !!currency?.code,
-			codeType: typeof currency?.code,
-		})
-		invariantResponse(false, 'Currency is not properly configured', { status: 500 })
+	// Validate stock availability before creating checkout session
+	console.log('[CHECKOUT] Validating stock availability for cart:', cart.id)
+	try {
+		await validateStockAvailability(cart.id)
+		console.log('[CHECKOUT] Stock validation passed')
+	} catch (error) {
+		console.error('[CHECKOUT] Stock validation failed:', error)
+		if (error instanceof StockValidationError) {
+			const stockMessages = error.issues.map(
+				(issue) =>
+					`${issue.productName}: Only ${issue.available} available, ${issue.requested} requested`,
+			)
+			return data(
+				{
+					result: submission.reply({
+						formErrors: ['Insufficient stock:', ...stockMessages],
+					}),
+				},
+				{ status: 400 },
+			)
+		}
+		throw error
 	}
 
-	// Get user ID (optional - for guest checkout)
-	const userId = await getUserId(request)
-
-	// Validate stock availability BEFORE creating checkout session
-	await validateStockAvailability(cart.id)
-
-	// Load cart with products and variants for checkout session
+	// Get cart with full product details for checkout session
+	console.log('[CHECKOUT] Loading cart with full product details')
 	const cartWithItems = await prisma.cart.findUnique({
 		where: { id: cart.id },
 		include: {
 			items: {
 				include: {
-					product: true,
-					variant: true,
+					product: {
+						select: {
+							id: true,
+							name: true,
+							description: true,
+							price: true,
+						},
+					},
+					variant: {
+						select: {
+							id: true,
+							price: true,
+							sku: true,
+						},
+					},
 				},
 			},
 		},
 	})
 
 	invariantResponse(cartWithItems, 'Cart not found', { status: 404 })
+	console.log('[CHECKOUT] Cart with items loaded:', {
+		cartId: cartWithItems.id,
+		items: cartWithItems.items.map((item) => ({
+			productId: item.productId,
+			productName: item.product.name,
+			price: item.variant?.price ?? item.product.price,
+			quantity: item.quantity,
+		})),
+	})
+
+	// Get currency
+	console.log('[CHECKOUT] Getting currency')
+	const currency = await getStoreCurrency()
+	console.log('[CHECKOUT] Currency:', currency?.code)
+	invariantResponse(currency, 'Currency not configured', { status: 500 })
+
+	// Get user ID (optional - guest checkout supported)
+	const userId = await getUserId(request)
+	console.log('[CHECKOUT] User ID:', userId || 'guest')
 
 	// Create Stripe Checkout Session
-	let session
+	console.log('[CHECKOUT] Creating Stripe checkout session')
 	try {
-		// Validate prices before creating checkout session
-		const lineItems = cartWithItems.items.map((item) => {
-				const unitAmount =
-					item.variantId && item.variant
-						? item.variant.price ?? item.product.price
-						: item.product.price
-
-				invariantResponse(
-					unitAmount !== null && unitAmount !== undefined && unitAmount > 0,
-					`Invalid price for product ${item.product.name}`,
-					{ status: 400 },
-				)
-
-				return {
-					price_data: {
-						currency: currency.code.toLowerCase(),
-						product_data: {
-							name: item.product.name,
-							description: item.product.description || undefined,
-						},
-						unit_amount: unitAmount,
-					},
-					quantity: item.quantity,
-				}
-			})
-
-		invariantResponse(
-			lineItems.length > 0,
-			'Cart must contain at least one item',
-			{ status: 400 },
-		)
-
-		// Create Stripe checkout session
-		const sessionResult = await createCheckoutSession({
-			line_items: lineItems,
-			mode: 'payment',
-			success_url: `${getDomainUrl(request)}/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-			cancel_url: `${getDomainUrl(request)}/shop/checkout?canceled=true`,
-			customer_email: shippingData.email,
-			metadata: {
-				cartId: cart.id,
-				userId: userId || '',
-				shippingName: shippingData.name,
-				shippingStreet: shippingData.street,
-				shippingCity: shippingData.city,
-				shippingState: shippingData.state || '',
-				shippingPostal: shippingData.postal,
-				shippingCountry: shippingData.country,
+		const domainUrl = getDomainUrl(request)
+		console.log('[CHECKOUT] Domain URL:', domainUrl)
+		const session = await createCheckoutSession({
+			cart: cartWithItems,
+			shippingInfo: {
+				name: shippingData.name,
+				email: shippingData.email,
+				street: shippingData.street,
+				city: shippingData.city,
+				state: shippingData.state,
+				postal: shippingData.postal,
+				country: shippingData.country,
 			},
-			payment_intent_data: {
-				metadata: {
-					cartId: cart.id,
-				},
-			},
+			currency,
+			domainUrl,
+			userId,
 		})
-		
-		session = {
-			id: sessionResult.id,
-			url: sessionResult.url,
-		} as { id: string; url: string }
+
+		console.log('[CHECKOUT] Stripe session created:', {
+			sessionId: session.id,
+			url: session.url,
+			status: session.status,
+		})
+
+		// Redirect to Stripe Checkout (external URL)
+		invariantResponse(session.url, 'Failed to create checkout session URL', {
+			status: 500,
+		})
+		console.log('[CHECKOUT] Redirecting to Stripe:', session.url)
+		console.log('[CHECKOUT] Session URL type:', typeof session.url)
+		console.log('[CHECKOUT] Session URL length:', session.url?.length)
+		// Return redirect URL in response for client-side redirect (external URLs don't work with redirectDocument from form actions)
+		return data({ redirectUrl: session.url }, { status: 200 })
 	} catch (error) {
+		console.error('[CHECKOUT] Error caught in try-catch block:', {
+			error,
+			errorType: error instanceof Error ? error.constructor.name : typeof error,
+			message: error instanceof Error ? error.message : String(error),
+			stack: error instanceof Error ? error.stack : undefined,
+		})
 		const stripeError = handleStripeError(error)
-		console.error('Stripe checkout session creation failed:', stripeError)
+		console.error('[CHECKOUT] Stripe checkout session creation failed:', {
+			error: stripeError,
+			originalError: error,
+			stack: error instanceof Error ? error.stack : undefined,
+		})
+
 		return data(
 			{
 				result: submission.reply({
 					formErrors: [
-						`Payment processing error: ${stripeError.message}. Please try again.`,
+						`Payment processing failed: ${stripeError.message}. Please try again.`,
 					],
 				}),
 			},
-			{ status: 400 },
+			{ status: 500 },
 		)
 	}
-
-	invariantResponse(
-		session.url,
-		'Failed to create checkout session',
-		{ status: 500 },
-	)
-
-	invariantResponse(
-		session.url &&
-			typeof session.url === 'string' &&
-			(session.url.startsWith('http://') || session.url.startsWith('https://')),
-		'Invalid checkout session URL',
-		{ status: 500 },
-	)
-
-	// For external URLs (Stripe), return a redirect Response with Location header
-	// This works better than React Router's redirect() for external URLs
-	return new Response(null, {
-		status: 302,
-		headers: {
-			Location: session.url,
-		},
-	})
 }
 
 export const meta: Route.MetaFunction = () => [
@@ -311,12 +322,12 @@ export default function Checkout({
 	actionData,
 }: Route.ComponentProps) {
 	const isPending = useIsPending()
-	const { cart, currency, subtotal, userEmail } = loaderData
+	const { cart, currency, subtotal, userEmail } = loaderData || {}
 
 	const [form, fields] = useForm({
 		id: 'checkout-form',
 		constraint: getZodConstraint(ShippingFormSchema),
-		lastResult: actionData?.result,
+		lastResult: actionData && 'result' in actionData ? actionData.result : undefined,
 		onValidate({ formData }) {
 			return parseWithZod(formData, { schema: ShippingFormSchema })
 		},
@@ -326,6 +337,15 @@ export default function Checkout({
 			country: 'US',
 		},
 	})
+
+	// Handle external redirect to Stripe Checkout
+	useEffect(() => {
+		console.log('[CHECKOUT] useEffect triggered, actionData:', actionData)
+		if (actionData && 'redirectUrl' in actionData && actionData.redirectUrl) {
+			console.log('[CHECKOUT] Client-side redirect to Stripe:', actionData.redirectUrl)
+			window.location.href = actionData.redirectUrl
+		}
+	}, [actionData])
 
 	return (
 		<div className="container py-8">
