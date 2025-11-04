@@ -4,6 +4,7 @@ import type Stripe from 'stripe'
 import { prisma } from './db.server.ts'
 import { sendEmail } from './email.server.ts'
 import { getDomainUrl } from './misc.tsx'
+import { generateOrderNumber } from './order-number.server.ts'
 import { stripe } from './stripe.server.ts'
 
 /**
@@ -465,5 +466,284 @@ export async function getOrderByCheckoutSessionId(
 			},
 		},
 	})
+}
+
+/**
+ * Creates an order from a Stripe checkout session.
+ * This function handles the complete order creation process including:
+ * - Payment status verification
+ * - Idempotency checking
+ * - Stock validation
+ * - Atomic order creation with stock reduction and cart deletion
+ * 
+ * @param sessionId - The Stripe checkout session ID
+ * @param fullSession - Optional pre-retrieved session (to avoid duplicate API calls)
+ * @param request - Optional request object for getting domain URL (for email links)
+ * @returns The created or existing order
+ * @throws StockUnavailableError if stock is insufficient
+ */
+export async function createOrderFromStripeSession(
+	sessionId: string,
+	fullSession?: Stripe.Checkout.Session,
+	request?: Request,
+): Promise<{ id: string; orderNumber: string }> {
+	// Idempotency check - prevent duplicate order creation
+	const existingOrder = await getOrderByCheckoutSessionId(sessionId)
+	if (existingOrder) {
+		// Order already exists - ensure cart is deleted (idempotent operation)
+		// This handles webhook retries and ensures cart is cleaned up even if
+		// the first call deleted the cart but a retry comes in
+		const session = fullSession || await stripe.checkout.sessions.retrieve(sessionId)
+		const cartId = session.metadata?.cartId
+		if (cartId) {
+			try {
+				// Try to delete cart items first, then cart
+				await prisma.cartItem.deleteMany({
+					where: { cartId },
+				})
+				await prisma.cart.delete({
+					where: { id: cartId },
+				}).catch(() => {
+					// Cart might already be deleted - that's fine
+				})
+			} catch {
+				// Cart might already be deleted or not exist - that's fine
+				// This is idempotent - we don't want to fail if cart is already gone
+			}
+		}
+		return { id: existingOrder.id, orderNumber: existingOrder.orderNumber }
+	}
+
+	// Retrieve full session from Stripe with expanded data if not provided
+	const session = fullSession || await stripe.checkout.sessions.retrieve(sessionId, {
+		expand: ['line_items', 'payment_intent'],
+	})
+
+	// Verify payment status before fulfilling order
+	if (session.payment_status !== 'paid') {
+		throw new Error(
+			`Payment not completed for session ${sessionId}. Payment status: ${session.payment_status}`,
+		)
+	}
+
+	// Extract metadata
+	const cartId = session.metadata?.cartId
+	const userId = session.metadata?.userId || null
+	invariant(cartId, 'Missing cartId in session metadata')
+
+	// Load cart data BEFORE transaction (more efficient)
+	const cart = await prisma.cart.findUnique({
+		where: { id: cartId },
+		include: {
+			items: {
+				include: {
+					product: {
+						select: {
+							id: true,
+							name: true,
+							description: true,
+							price: true,
+							stockQuantity: true,
+						},
+					},
+					variant: {
+						select: {
+							id: true,
+							price: true,
+							stockQuantity: true,
+						},
+					},
+				},
+			},
+		},
+	})
+
+	invariant(cart, 'Cart not found')
+	invariant(cart.items.length > 0, 'Cart is empty')
+
+	// Create order in transaction
+	const order = await prisma.$transaction(
+		async (tx) => {
+			// 1. Re-check stock (final validation, handles race conditions)
+			for (const item of cart.items) {
+				if (item.variantId && item.variant) {
+					// Item has variant - check variant-level stock
+					const variant = await tx.productVariant.findUnique({
+						where: { id: item.variantId },
+						select: { id: true, stockQuantity: true },
+					})
+					invariant(
+						variant,
+						`Variant ${item.variantId} not found for product ${item.product.name}`,
+					)
+					if (variant.stockQuantity < item.quantity) {
+						throw new StockUnavailableError({
+							productName: item.product.name,
+							requested: item.quantity,
+							available: variant.stockQuantity,
+						})
+					}
+				} else {
+					// Item has no variant - check product-level stock
+					const product = await tx.product.findUnique({
+						where: { id: item.productId },
+						select: { id: true, name: true, stockQuantity: true },
+					})
+					invariant(product, `Product ${item.productId} not found`)
+					if (
+						product.stockQuantity !== null &&
+						product.stockQuantity < item.quantity
+					) {
+						throw new StockUnavailableError({
+							productName: product.name,
+							requested: item.quantity,
+							available: product.stockQuantity,
+						})
+					}
+				}
+			}
+
+			// 2. Reduce stock atomically
+			for (const item of cart.items) {
+				if (item.variantId) {
+					// Reduce variant stock
+					await tx.productVariant.update({
+						where: { id: item.variantId },
+						data: { stockQuantity: { decrement: item.quantity } },
+					})
+				} else {
+					// Reduce product stock (if it has stock tracking)
+					const product = await tx.product.findUnique({
+						where: { id: item.productId },
+						select: { stockQuantity: true },
+					})
+					if (product && product.stockQuantity !== null) {
+						await tx.product.update({
+							where: { id: item.productId },
+							data: { stockQuantity: { decrement: item.quantity } },
+						})
+					}
+				}
+			}
+
+			// 3. Generate order number (using existing transaction)
+			const orderNumber = await generateOrderNumber(tx)
+
+			// 4. Create order
+			const paymentIntentId =
+				typeof session.payment_intent === 'string'
+					? session.payment_intent
+					: session.payment_intent?.id || null
+
+			// Get payment intent to extract charge ID
+			let chargeId: string | null = null
+			if (paymentIntentId) {
+				try {
+					const paymentIntent = await stripe.paymentIntents.retrieve(
+						paymentIntentId,
+					)
+					if (typeof paymentIntent.latest_charge === 'string') {
+						chargeId = paymentIntent.latest_charge
+					}
+				} catch (err) {
+					// Log but don't fail order creation if charge retrieval fails
+					console.error(
+						`[ORDER] Failed to retrieve charge ID for payment intent ${paymentIntentId}:`,
+						err,
+					)
+				}
+			}
+
+			const newOrder = await tx.order.create({
+				data: {
+					orderNumber,
+					userId: userId || null,
+					email:
+						session.customer_email ||
+						session.metadata?.email ||
+						'',
+					subtotal: session.amount_subtotal ?? 0,
+					total: session.amount_total ?? 0,
+					shippingName: session.metadata?.shippingName || '',
+					shippingStreet: session.metadata?.shippingStreet || '',
+					shippingCity: session.metadata?.shippingCity || '',
+					shippingState: session.metadata?.shippingState || null,
+					shippingPostal: session.metadata?.shippingPostal || '',
+					shippingCountry: session.metadata?.shippingCountry || 'US',
+					stripeCheckoutSessionId: session.id,
+					stripePaymentIntentId: paymentIntentId,
+					stripeChargeId: chargeId,
+					status: 'CONFIRMED',
+				},
+			})
+
+			// 5. Create order items
+			await Promise.all(
+				cart.items.map((item) =>
+					tx.orderItem.create({
+						data: {
+							orderId: newOrder.id,
+							productId: item.productId,
+							variantId: item.variantId,
+							price:
+								item.variantId && item.variant
+									? item.variant.price ?? item.product.price
+									: item.product.price,
+							quantity: item.quantity,
+						},
+					}),
+				),
+			)
+
+			// 6. Delete cart items (within transaction for atomicity)
+			await tx.cartItem.deleteMany({
+				where: { cartId },
+			})
+
+			// 7. Delete cart (within transaction for atomicity)
+			await tx.cart.delete({
+				where: { id: cartId },
+			})
+
+			return newOrder
+		},
+		{
+			timeout: 30000, // 30 second timeout
+		},
+	)
+
+	// Send confirmation email (non-blocking - don't fail order creation if email fails)
+	try {
+		const domainUrl = request ? getDomainUrl(request) : 'http://localhost:3000'
+		await sendEmail({
+			to: order.email,
+			subject: `Order Confirmation - ${order.orderNumber}`,
+			html: `
+				<h1>Order Confirmation</h1>
+				<p>Thank you for your order!</p>
+				<p><strong>Order Number:</strong> ${order.orderNumber}</p>
+				<p><strong>Total:</strong> ${(order.total / 100).toFixed(2)}</p>
+				<p><a href="${domainUrl}/shop/orders/${order.orderNumber}">View Order Details</a></p>
+			`,
+			text: `
+Order Confirmation
+
+Thank you for your order!
+
+Order Number: ${order.orderNumber}
+Total: ${(order.total / 100).toFixed(2)}
+
+View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
+			`,
+		})
+	} catch (emailError) {
+		// Log email error but don't fail order creation
+		console.error(
+			`[ORDER] Failed to send confirmation email for order ${order.orderNumber}:`,
+			emailError,
+		)
+	}
+
+	return { id: order.id, orderNumber: order.orderNumber }
 }
 

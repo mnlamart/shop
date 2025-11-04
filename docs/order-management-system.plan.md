@@ -255,7 +255,14 @@ admin+/
 
 **Phase 2: Payment Processing (Stripe Hosted Checkout)**
 7. User completes payment on Stripe's hosted checkout page
-8. Stripe redirects back to success URL (with `session_id` parameter)
+8. Stripe redirects back to success URL (`/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}`)
+
+**Phase 2.5: Success Page Handling**
+8a. Success page loader waits 1.5 seconds for webhook
+8b. Checks database for order by `session_id`
+8c. If order exists: Redirects to order detail page
+8d. If order doesn't exist: Shows processing state and starts polling
+8e. After 15 seconds: Automatically triggers fallback sync (creates order directly from Stripe session)
 
 **Phase 3: Order Creation (Webhook Handler)**
 9. Stripe webhook receives `checkout.session.completed` event
@@ -300,7 +307,7 @@ const session = await stripe.checkout.sessions.create({
     quantity: item.quantity,
   })),
   mode: 'payment',
-  success_url: `${getDomainUrl(request)}/shop/orders?session_id={CHECKOUT_SESSION_ID}`,
+  success_url: `${getDomainUrl(request)}/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
   cancel_url: `${getDomainUrl(request)}/shop/checkout?canceled=true`,
   customer_email: shippingData.email,
   metadata: {
@@ -588,7 +595,106 @@ export async function action({ request }: Route.ActionArgs) {
 - Webhook signature verification: Always verify Stripe signatures before processing
 - Transaction timeout: Set explicit 30-second timeout to prevent hanging transactions
 
-### 3. User Order History (`shop+/orders+/index.tsx`)
+### 3. Checkout Success Page (`shop+/checkout+/success.tsx`)
+
+**Purpose:** Handle user redirect from Stripe after payment completion, with fallback mechanism for webhook failures.
+
+**Flow:**
+
+1. **Loader (`loader` function):**
+   - Extracts `session_id` from URL query parameters
+   - Waits 1.5 seconds for webhook to process (webhooks are usually very fast)
+   - Checks database for order by `session_id`
+   - If order exists: Redirects to order detail page (authenticated users) or order detail with email parameter (guests)
+   - If order doesn't exist: Returns processing state with `sessionId` for client-side handling
+
+2. **Action (`action` function - Manual Sync Fallback):**
+   - Triggered when webhook hasn't processed after 15 seconds
+   - Validates `intent` is `sync-order` and `session_id` is provided
+   - Retrieves session from Stripe API
+   - Verifies `payment_status === 'paid'`
+   - Creates order using `createOrderFromStripeSession` (shared with webhook handler)
+   - Returns success with `orderNumber` and `email` for redirect
+
+3. **Component (Client-Side Handling):**
+   - **Initial State:** Shows "Processing Your Order" message
+   - **Polling:** Revalidates loader every 3 seconds to check for order
+   - **Fallback Trigger:** After 15 seconds:
+     - If page was already open >15s: Triggers fallback immediately
+     - Otherwise: Triggers fallback after 15s of polling
+   - **Manual Sync:** Shows "Sync Order Now" button after timeout
+   - **Success:** Automatically redirects to order detail page when order is created
+
+**Key Features:**
+
+- ✅ **Idempotent:** Uses same `createOrderFromStripeSession` function as webhook
+- ✅ **Payment Verification:** Verifies payment status before creating order
+- ✅ **User-Friendly:** Clear messaging and manual sync option
+- ✅ **Error Handling:** Displays errors if sync fails
+- ✅ **Development-Friendly:** Handles cases where `stripe listen` isn't running
+
+**Webhook Failure Handling:**
+
+**Scenario:** Webhook fails or isn't running (e.g., in development without `stripe listen`).
+
+**Solution:** Recommended fallback mechanism:
+
+1. **Polling:** Success page polls for order every 3 seconds
+2. **Timeout:** After 15 seconds, automatically triggers manual sync
+3. **Manual Sync Action:** 
+   - Retrieves session from Stripe API
+   - Verifies payment was completed
+   - Creates order directly (same logic as webhook)
+   - Redirects to order detail page
+
+**Why This Approach:**
+
+- ✅ **Best Practice:** Follows Stripe's recommendation for webhook failure handling
+- ✅ **Idempotent:** Same function handles both webhook and manual sync
+- ✅ **User Experience:** User doesn't see cart indefinitely
+- ✅ **Development:** Works even when webhook forwarding isn't running
+- ✅ **Production:** Provides resilience if webhook temporarily fails
+
+**Implementation Details:**
+
+```typescript
+// Loader: Check for order, wait briefly for webhook
+export async function loader({ request }: Route.LoaderArgs) {
+  const sessionId = url.searchParams.get('session_id')
+  await new Promise((resolve) => setTimeout(resolve, 1500)) // Wait for webhook
+  const order = await getOrderByCheckoutSessionId(sessionId)
+  if (order) return redirectDocument(`/shop/orders/${order.orderNumber}`)
+  return { processing: true, sessionId }
+}
+
+// Action: Manual sync fallback
+export async function action({ request }: Route.ActionArgs) {
+  const sessionId = formData.get('session_id')
+  const session = await stripe.checkout.sessions.retrieve(sessionId)
+  if (session.payment_status !== 'paid') {
+    return { error: 'Payment not completed' }
+  }
+  const order = await createOrderFromStripeSession(sessionId, session, request)
+  return { success: true, orderNumber: order.orderNumber }
+}
+
+// Component: Polling + fallback trigger
+useEffect(() => {
+  if (processing && sessionId && !hasTriggeredFallback) {
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime
+      if (elapsed >= 15000) {
+        handleSyncOrder() // Trigger fallback
+        clearInterval(interval)
+      }
+      revalidator.revalidate()
+    }, 3000)
+    return () => clearInterval(interval)
+  }
+}, [processing, sessionId])
+```
+
+### 4. User Order History (`shop+/orders+/index.tsx`)
 
 **Features:**
 
