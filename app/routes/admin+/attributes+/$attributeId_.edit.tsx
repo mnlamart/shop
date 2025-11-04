@@ -182,12 +182,12 @@ export default function AttributeEdit({ loaderData }: Route.ComponentProps) {
 			{/* Header */}
 			<div className="flex items-center justify-between">
 				<div>
-					<h1 className="text-3xl font-bold tracking-tight">Edit Attribute</h1>
-					<p className="text-muted-foreground">
+					<h1 className="text-2xl font-normal tracking-tight text-foreground">Edit Attribute</h1>
+					<p className="text-sm text-muted-foreground mt-1">
 						Update attribute information and values
 					</p>
 				</div>
-				<Button variant="outline" asChild>
+				<Button variant="outline" asChild className="h-9 rounded-lg font-medium">
 					<Link to={`/admin/attributes/${attribute.id}`}>
 						<Icon name="arrow-left" className="h-4 w-4 mr-2" />
 						Back to Attribute
@@ -195,10 +195,10 @@ export default function AttributeEdit({ loaderData }: Route.ComponentProps) {
 				</Button>
 			</div>
 
-			<Card>
+			<Card className="rounded-[14px]">
 				<CardHeader>
 					<div className="flex items-center justify-between">
-						<CardTitle>Attribute Details</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Attribute Details</CardTitle>
 						{hasVariants && (
 							<Badge variant="warning">In Use</Badge>
 						)}

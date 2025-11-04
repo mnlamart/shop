@@ -13,6 +13,7 @@ import {
 } from '#app/components/ui/alert-dialog.tsx'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
+import { Card } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import {
@@ -269,8 +270,8 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 			{/* Header */}
 			<div className="flex items-center justify-between">
 				<div>
-					<h1 className="text-3xl font-bold tracking-tight">Categories</h1>
-					<p className="text-muted-foreground mt-2">
+					<h1 className="text-2xl font-normal tracking-tight text-foreground">Categories</h1>
+					<p className="text-sm text-muted-foreground mt-1">
 						Organize your products into categories ({categories.length} categories)
 						{searchTerm || filterType !== 'all' ? (
 							<span className="ml-2">
@@ -279,7 +280,7 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 						) : null}
 					</p>
 				</div>
-				<Button asChild className="transition-all duration-200 hover:shadow-md">
+				<Button asChild className="h-9 rounded-lg font-medium">
 					<Link to="/admin/categories/new">
 						<Icon name="plus" className="mr-2 h-4 w-4" />
 						Add Category
@@ -315,7 +316,7 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 			</div>
 
 			{/* Categories Table */}
-			<div className="rounded-lg border bg-card shadow-sm transition-shadow duration-200 hover:shadow-md">
+			<Card className="rounded-[14px]">
 				<Table>
 					<TableHeader>
 						<TableRow className="border-b">
@@ -336,7 +337,7 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 						))}
 					</TableBody>
 				</Table>
-			</div>
+			</Card>
 
 			{categories.length === 0 && (
 				<div className="text-center py-16 animate-slide-top">
@@ -347,7 +348,7 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 					<p className="text-muted-foreground mb-8 max-w-md mx-auto">
 						Get started by creating your first category to organize your products.
 					</p>
-					<Button asChild size="lg" className="transition-all duration-200 hover:shadow-md">
+					<Button asChild size="lg" className="h-9 rounded-lg font-medium">
 						<Link to="/admin/categories/new">
 							<Icon name="plus" className="mr-2 h-4 w-4" />
 							Add Category
@@ -377,11 +378,11 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 								setSearchTerm('')
 								setFilterType('all')
 							}}
-							className="transition-all duration-200 hover:shadow-sm"
+							className="h-9 rounded-lg font-medium"
 						>
 							Clear filters
 						</Button>
-						<Button asChild className="transition-all duration-200 hover:shadow-md">
+						<Button asChild className="h-9 rounded-lg font-medium">
 							<Link to="/admin/categories/new">
 								<Icon name="plus" className="mr-2 h-4 w-4" />
 								Add Category

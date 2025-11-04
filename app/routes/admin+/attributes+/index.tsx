@@ -212,14 +212,14 @@ export default function AttributesList({ loaderData }: Route.ComponentProps) {
 			{/* Header */}
 			<div className="flex items-center justify-between">
 				<div>
-					<h1 className="text-3xl font-bold tracking-tight">Attributes</h1>
-					<p className="text-muted-foreground">
+					<h1 className="text-2xl font-normal tracking-tight text-foreground">Attributes</h1>
+					<p className="text-sm text-muted-foreground mt-1">
 						Configure attributes for product variants ({attributes.length} attributes)
 						{searchTerm.trim() || filterType !== 'all' ? ` • ${filteredAttributes.length} shown` : ''}
 					</p>
 				</div>
 				<Link to="/admin/attributes/new">
-					<Button>
+					<Button className="h-9 rounded-lg font-medium">
 						<Icon name="plus" className="h-4 w-4 mr-2" />
 						Add Attribute
 					</Button>

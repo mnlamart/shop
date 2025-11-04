@@ -133,8 +133,8 @@ export default function OrdersList({ loaderData }: Route.ComponentProps) {
 			{/* Header with title */}
 			<div className="flex items-center justify-between">
 				<div>
-					<h1 className="text-3xl font-bold tracking-tight">Orders</h1>
-					<p className="text-muted-foreground">
+					<h1 className="text-2xl font-normal tracking-tight text-foreground">Orders</h1>
+					<p className="text-sm text-muted-foreground mt-1">
 						Manage all orders ({orders.length} total)
 						{searchTerm.trim() || statusFilter !== 'all'
 							? ` • ${filteredOrders.length} shown`

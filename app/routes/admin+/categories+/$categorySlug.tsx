@@ -73,13 +73,13 @@ export default function CategoryView({ loaderData }: Route.ComponentProps) {
 			{/* Header */}
 			<div className="flex items-center justify-between">
 				<div>
-					<div className="flex items-center gap-3 mb-2">
-						<h1 className="text-3xl font-bold tracking-tight">{category.name}</h1>
+					<div className="flex items-center gap-3 mb-1">
+						<h1 className="text-2xl font-normal tracking-tight text-foreground">{category.name}</h1>
 						{isUncategorized && (
 							<Badge variant="warning">System Category</Badge>
 						)}
 					</div>
-					<p className="text-muted-foreground">
+					<p className="text-sm text-muted-foreground">
 						{category.description || 'No description provided'}
 						{isUncategorized && (
 							<span className="block mt-2 text-sm text-amber-600 dark:text-amber-400">
@@ -89,13 +89,13 @@ export default function CategoryView({ loaderData }: Route.ComponentProps) {
 					</p>
 				</div>
 				<div className="flex items-center space-x-3">
-					<Button asChild variant="outline" className="transition-all duration-200 hover:shadow-sm">
+					<Button asChild variant="outline" className="h-9 rounded-lg font-medium">
 						<Link to="/admin/categories">
 							<Icon name="arrow-left" className="mr-2 h-4 w-4" />
 							Back to Categories
 						</Link>
 					</Button>
-					<Button asChild className="transition-all duration-200 hover:shadow-md">
+					<Button asChild className="h-9 rounded-lg font-medium">
 						<Link to={`/admin/categories/${category.slug}/edit`}>
 							<Icon name="pencil-1" className="mr-2 h-4 w-4" />
 							Edit Category
@@ -107,9 +107,9 @@ export default function CategoryView({ loaderData }: Route.ComponentProps) {
 			<div className="grid gap-8 lg:grid-cols-2">
 				{/* Category Information */}
 				<div className="space-y-8">
-					<Card className="transition-shadow duration-200 hover:shadow-md">
+					<Card className="rounded-[14px]">
 						<CardHeader>
-							<CardTitle className="text-xl">Category Information</CardTitle>
+							<CardTitle className="text-base font-normal text-foreground">Category Information</CardTitle>
 						</CardHeader>
 						<CardContent className="space-y-6">
 							<div>
@@ -149,9 +149,9 @@ export default function CategoryView({ loaderData }: Route.ComponentProps) {
 					</Card>
 
 					{/* Statistics */}
-					<Card className="transition-shadow duration-200 hover:shadow-md">
+					<Card className="rounded-[14px]">
 						<CardHeader>
-							<CardTitle className="text-xl">Statistics</CardTitle>
+							<CardTitle className="text-base font-normal text-foreground">Statistics</CardTitle>
 						</CardHeader>
 						<CardContent>
 							<div className="grid grid-cols-2 gap-6">
@@ -171,9 +171,9 @@ export default function CategoryView({ loaderData }: Route.ComponentProps) {
 				{/* Subcategories */}
 				<div className="space-y-8">
 					{category.children.length > 0 && (
-						<Card className="transition-shadow duration-200 hover:shadow-md">
+						<Card className="rounded-[14px]">
 							<CardHeader>
-								<CardTitle className="text-xl">Subcategories</CardTitle>
+								<CardTitle className="text-base font-normal text-foreground">Subcategories</CardTitle>
 							</CardHeader>
 							<CardContent>
 								<div className="space-y-3">
@@ -202,11 +202,11 @@ export default function CategoryView({ loaderData }: Route.ComponentProps) {
 
 					{/* Recent Products */}
 					{products.length > 0 && (
-						<Card className="transition-shadow duration-200 hover:shadow-md">
+						<Card className="rounded-[14px]">
 							<CardHeader>
 								<div className="flex items-center justify-between">
-									<CardTitle className="text-xl">Recent Products</CardTitle>
-									<Button asChild variant="outline" size="sm" className="transition-all duration-200 hover:shadow-sm">
+									<CardTitle className="text-base font-normal text-foreground">Recent Products</CardTitle>
+									<Button asChild variant="outline" size="sm" className="h-9 rounded-lg font-medium">
 										<Link to={`/admin/products?category=${category.slug}`}>
 											View All Products
 										</Link>

@@ -188,14 +188,14 @@ export default function ProductsList({ loaderData }: Route.ComponentProps) {
 			{/* Header with title and action button */}
 			<div className="flex items-center justify-between">
 				<div>
-					<h1 className="text-3xl font-bold tracking-tight">Products</h1>
-					<p className="text-muted-foreground">
+					<h1 className="text-2xl font-normal tracking-tight text-foreground">Products</h1>
+					<p className="text-sm text-muted-foreground mt-1">
 						Manage your product catalog ({products.length} total)
 						{searchTerm.trim() || statusFilter !== 'all' || categoryFilter !== 'all' ? ` • ${filteredProducts.length} shown` : ''}
 					</p>
 				</div>
 				<Link to="/admin/products/new">
-					<Button>
+					<Button className="h-9 rounded-lg font-medium">
 						<Icon name="plus" className="h-4 w-4 mr-2" />
 						Add Product
 					</Button>

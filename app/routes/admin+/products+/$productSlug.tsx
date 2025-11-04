@@ -201,16 +201,16 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 			{/* Header with title and badges */}
 			<div className="flex items-center justify-between">
 				<div>
-					<div className="flex items-center gap-3 mb-2">
-						<h1 className="text-3xl font-bold tracking-tight">{product.name}</h1>
+					<div className="flex items-center gap-3 mb-1">
+						<h1 className="text-2xl font-normal tracking-tight text-foreground">{product.name}</h1>
 						<StatusBadge status={product.status} />
 					</div>
-					<p className="text-muted-foreground">
+					<p className="text-sm text-muted-foreground">
 						SKU: {product.sku} • Created {new Date(product.createdAt).toLocaleDateString()}
 					</p>
 				</div>
 				<div className="flex gap-2">
-					<Button variant="outline" asChild>
+					<Button variant="outline" asChild className="h-9 rounded-lg font-medium">
 						<Link to={`/admin/products/${product.slug}/edit`}>
 							<Icon name="pencil-1" className="h-4 w-4 mr-2" />
 							Edit
@@ -222,42 +222,42 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 
 			{/* Statistics cards in grid */}
 			<div className="grid gap-6 md:grid-cols-3">
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader className="pb-2">
 						<CardTitle className="text-sm font-medium text-muted-foreground">
 							Total Variants
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="text-3xl font-bold">{product.variants.length}</div>
+						<div className="text-2xl font-normal text-foreground">{product.variants.length}</div>
 						<p className="text-xs text-muted-foreground">
 							Product variations
 						</p>
 					</CardContent>
 				</Card>
 				
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader className="pb-2">
 						<CardTitle className="text-sm font-medium text-muted-foreground">
 							Total Stock
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="text-3xl font-bold">{totalStock}</div>
+						<div className="text-2xl font-normal text-foreground">{totalStock}</div>
 						<p className="text-xs text-muted-foreground">
 							Units available
 						</p>
 					</CardContent>
 				</Card>
 				
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader className="pb-2">
 						<CardTitle className="text-sm font-medium text-muted-foreground">
 							Price
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="text-3xl font-bold">
+						<div className="text-2xl font-normal text-foreground">
 							{formatPrice(product.price, currency)}
 						</div>
 						<p className="text-xs text-muted-foreground">
@@ -269,9 +269,9 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 
 			<div className="grid gap-6 lg:grid-cols-2">
 				{/* Product Images */}
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Product Images</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Product Images</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<div className="space-y-4">
@@ -307,9 +307,9 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 				</Card>
 
 				{/* Product Details */}
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Product Details</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Product Details</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<div className="space-y-4">
@@ -364,9 +364,9 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 
 			{/* Product Variants */}
 			{product.variants.length > 0 && (
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Product Variants</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Product Variants</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<Table>

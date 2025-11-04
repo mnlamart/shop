@@ -127,8 +127,8 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 	return (
 		<div className="space-y-8 animate-slide-top">
 			<div>
-				<h1 className="text-3xl font-bold tracking-tight">Create New Product</h1>
-				<p className="text-muted-foreground">
+				<h1 className="text-2xl font-normal tracking-tight text-foreground">Create New Product</h1>
+				<p className="text-sm text-muted-foreground mt-1">
 					Add a new product to your catalog
 				</p>
 			</div>
@@ -145,9 +145,9 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				*/}
 				<button type="submit" className="hidden" />
 				{/* Basic Information Card */}
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Basic Information</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Basic Information</CardTitle>
 						<CardDescription>Product name, slug, and description</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -228,9 +228,9 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				</Card>
 
 				{/* Pricing & Stock Card */}
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Pricing & Stock</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Pricing & Stock</CardTitle>
 						<CardDescription>SKU, pricing, and currency information</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -275,9 +275,9 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				</Card>
 
 				{/* Organization Card */}
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Organization</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Organization</CardTitle>
 						<CardDescription>Status, category, and tags</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -319,9 +319,9 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				</Card>
 
 				{/* Images Card */}
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Product Images</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Product Images</CardTitle>
 						<CardDescription>Upload up to 10 images for your product</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -371,9 +371,9 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				</Card>
 
 				{/* Product Variants Card */}
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Product Variants</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Product Variants</CardTitle>
 						<CardDescription>Add product variations with different attributes</CardDescription>
 					</CardHeader>
 					<CardContent>

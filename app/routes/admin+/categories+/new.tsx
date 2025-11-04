@@ -132,9 +132,9 @@ function CategoryForm({ categories, actionData }: { categories: any[], actionDat
 				className="space-y-8"
 				{...getFormProps(form)}
 			>
-				<Card className="transition-shadow duration-200 hover:shadow-md">
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle className="text-xl">Category Information</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Category Information</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-6">
 						<div className="grid gap-6 md:grid-cols-2">
@@ -239,8 +239,8 @@ export default function NewCategory({ loaderData, actionData }: Route.ComponentP
 	return (
 		<div className="space-y-8 animate-slide-top">
 			<div>
-				<h1 className="text-3xl font-bold tracking-tight">Create New Category</h1>
-				<p className="text-muted-foreground mt-2">
+				<h1 className="text-2xl font-normal tracking-tight text-foreground">Create New Category</h1>
+				<p className="text-sm text-muted-foreground mt-1">
 					Add a new category to organize your products
 				</p>
 			</div>

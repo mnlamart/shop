@@ -6,37 +6,53 @@
 :root {
 	--radius: 0.5rem;
 
-	--background: oklch(100% 0 0);
-	--foreground: oklch(13.71% 0.036 258.53);
+	--background: oklch(98.5% 0.003 247.86);
+	--foreground: oklch(6.5% 0.003 247.86);
 
 	--card: oklch(100% 0 0);
-	--card-foreground: oklch(13.71% 0.036 258.53);
+	--card-foreground: oklch(6.5% 0.003 247.86);
 
 	--popover: oklch(100% 0 0);
-	--popover-foreground: oklch(13.71% 0.036 258.53);
+	--popover-foreground: oklch(6.5% 0.003 247.86);
 
-	--primary: oklch(20.79% 0.0399 265.73);
-	--primary-foreground: oklch(98.38% 0.0035 247.86);
+	--primary: oklch(35% 0.025 260); /* Darker slate - used for branding and active navigation states */
+	--primary-foreground: oklch(100% 0 0);
 
-	--secondary: oklch(86.48% 0.0153 248);
-	--secondary-foreground: oklch(20.79% 0.0399 265.73);
+	--secondary: oklch(96% 0.015 260); /* Light blue-gray - used for active sidebar backgrounds */
+	--secondary-foreground: oklch(35% 0.025 260); /* Darker slate - used for active sidebar text */
 
-	--muted: oklch(94.32% 0.0123 247.96);
-	--muted-foreground: oklch(40.68% 0.0281 257.44);
+	--muted: oklch(96.5% 0.002 247.86);
+	--muted-foreground: oklch(52% 0.015 260);
 
-	--accent: oklch(91.87% 0.01770618193703561 248.02064625050508);
-	--accent-foreground: oklch(20.79% 0.0399 265.73);
+	--accent: oklch(96% 0.015 260);
+	--accent-foreground: oklch(35% 0.025 260);
 
-	--border: oklch(92.9% 0.0126 255.53);
-	--input: oklch(92.56% 0.0133 255.54);
+	--border: oklch(91% 0.003 247.86);
+	--border-card: rgba(0, 0, 0, 0.1); /* Card borders from Figma */
+	--input: oklch(96% 0.002 247.86);
 	--input-invalid: oklch(63.68% 0.2078 25.33);
 
-	--destructive: oklch(57.14% 0.2121 27.25);
-	--destructive-foreground: oklch(98.38% 0.0035 247.86);
+	--destructive: oklch(55% 0.22 25);
+	--destructive-foreground: oklch(100% 0 0);
 	/* prefixed with foreground because it should look good on the background */
-	--foreground-destructive: oklch(51.46% 0.1979 16.57);
+	--foreground-destructive: oklch(55% 0.22 25);
 
-	--ring: oklch(71.07% 0.0351 256.79);
+	--ring: oklch(35% 0.025 260);
+
+	/* Additional colors from Figma design */
+	--text-dark: oklch(18% 0.015 260); /* Dark text for values - also used for primary action buttons */
+	--text-medium: oklch(43% 0.018 260); /* Medium gray for secondary text */
+	--destructive-accent: oklch(58% 0.25 25); /* Slightly different red for icons */
+	
+	/* Action button color - primary actions use dark */
+	--action-button: oklch(18% 0.015 260); /* For primary action buttons (Update Status, etc.) */
+	--action-button-foreground: oklch(100% 0 0);
+
+	/* Shadow values from Figma design */
+	--shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* Subtle shadow for cards */
+	--shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Hover shadow */
+	--shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.1); /* Card default shadow */
+	--shadow-card-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Card hover shadow */
 }
 
 .dark {
@@ -94,11 +110,21 @@
 	--color-accent-foreground: var(--accent-foreground);
 	--color-destructive: var(--destructive);
 	--color-border: var(--border);
+	--color-border-card: var(--border-card);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
 	--color-input-invalid: var(--input-invalid);
 	--color-destructive-foreground: var(--destructive-foreground);
 	--color-foreground-destructive: var(--foreground-destructive);
+	--color-text-dark: var(--text-dark);
+	--color-text-medium: var(--text-medium);
+	--color-destructive-accent: var(--destructive-accent);
+	--color-action-button: var(--action-button);
+	--color-action-button-foreground: var(--action-button-foreground);
+	--shadow-sm: var(--shadow-sm);
+	--shadow-md: var(--shadow-md);
+	--shadow-card: var(--shadow-card);
+	--shadow-card-hover: var(--shadow-card-hover);
 }
 
 @theme {
