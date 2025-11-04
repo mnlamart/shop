@@ -284,7 +284,7 @@ test.describe('Checkout', () => {
 				const firstFrame = page.frameLocator('iframe').first()
 				
 				// Try to find card number input within iframe
-				const cardInput = firstFrame.locator('input').first()
+				const cardInput = firstFrame.getByRole('textbox').first()
 				const cardInputCount = await cardInput.count()
 				
 				if (cardInputCount > 0) {
@@ -292,7 +292,7 @@ test.describe('Checkout', () => {
 					await page.waitForTimeout(500)
 				}
 			}
-		} catch (error) {
+		} catch {
 			// If we can't interact with Stripe iframe, that's okay
 			// The test will still verify the redirect mechanism
 			console.log('Note: Could not interact with Stripe iframe - this is expected in some environments')

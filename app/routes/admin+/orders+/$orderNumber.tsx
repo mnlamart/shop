@@ -1,5 +1,5 @@
-import { invariantResponse } from '@epic-web/invariant'
 import { parseWithZod } from '@conform-to/zod/v4'
+import { invariantResponse } from '@epic-web/invariant'
 import { useEffect, useState } from 'react'
 import { data, Link, redirect, useFetcher } from 'react-router'
 import { z } from 'zod'
@@ -363,7 +363,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 												</>
 											) : (
 												<>
-													<Icon name="cross-2" className="mr-2 h-4 w-4" />
+													<Icon name="cross-1" className="mr-2 h-4 w-4" />
 													Cancel Order
 												</>
 											)}

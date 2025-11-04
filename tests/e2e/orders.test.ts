@@ -1,7 +1,7 @@
 import { prisma } from '#app/utils/db.server.ts'
+import { generateOrderNumber } from '#app/utils/order-number.server.ts'
 import { expect, test } from '#tests/playwright-utils.ts'
 import { createProductData } from '#tests/product-utils.ts'
-import { generateOrderNumber } from '#app/utils/order-number.server.ts'
 
 test.describe('Order History', () => {
 	let testCategory: Awaited<ReturnType<typeof prisma.category.create>>
@@ -60,7 +60,7 @@ test.describe('Order History', () => {
 		const orderNumber1 = await generateOrderNumber()
 		const orderNumber2 = await generateOrderNumber()
 
-		const order1 = await prisma.order.create({
+		await prisma.order.create({
 			data: {
 				orderNumber: orderNumber1,
 				userId: user.id,
@@ -87,7 +87,7 @@ test.describe('Order History', () => {
 		// Create second order slightly later (to test ordering)
 		await new Promise((resolve) => setTimeout(resolve, 10))
 
-		const order2 = await prisma.order.create({
+		await prisma.order.create({
 			data: {
 				orderNumber: orderNumber2,
 				userId: user.id,

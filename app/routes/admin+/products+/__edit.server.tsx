@@ -2,7 +2,6 @@ import { parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import { parseFormData } from '@mjackson/form-data-parser'
 import { data } from 'react-router'
-import { z } from 'zod'
 import { MAX_UPLOAD_SIZE } from '#app/schemas/constants'
 import { productSchema } from '#app/schemas/product.ts'
 import { prisma } from '#app/utils/db.server.ts'
@@ -115,8 +114,6 @@ export async function action({ request }: Route.ActionArgs) {
 			// Update product basic info
 			const { variants = [], tags, ...productDataWithoutVariants } = productData
 			
-			// Get existing tag connections
-			const existingTagConnections = existingProduct.tags
 			const newTagNames = tags || []
 
 			// Update the product

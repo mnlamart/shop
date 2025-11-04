@@ -286,7 +286,7 @@ export default function OrdersList({ loaderData }: Route.ComponentProps) {
 							disabled={currentPage === 1}
 							onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
 						>
-							<Icon name="chevron-left" className="h-4 w-4" />
+							<Icon name="arrow-left" className="h-4 w-4" />
 							Previous
 						</Button>
 						<div className="flex items-center gap-1">
@@ -320,7 +320,7 @@ export default function OrdersList({ loaderData }: Route.ComponentProps) {
 							onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
 						>
 							Next
-							<Icon name="chevron-right" className="h-4 w-4" />
+							<Icon name="arrow-right" className="h-4 w-4" />
 						</Button>
 					</div>
 				</div>

@@ -1,15 +1,14 @@
 import { invariant } from '@epic-web/invariant'
-import { invariantResponse } from '@epic-web/invariant'
 import { data } from 'react-router'
-import Stripe from 'stripe'
+import type Stripe from 'stripe'
 import { prisma } from '#app/utils/db.server.ts'
-import { getDomainUrl } from '#app/utils/misc.tsx'
 import { sendEmail } from '#app/utils/email.server.ts'
+import { getDomainUrl } from '#app/utils/misc.tsx'
+import { generateOrderNumber } from '#app/utils/order-number.server.ts'
 import {
 	getOrderByCheckoutSessionId,
 	StockUnavailableError,
 } from '#app/utils/order.server.ts'
-import { generateOrderNumber } from '#app/utils/order-number.server.ts'
 import { stripe } from '#app/utils/stripe.server.ts'
 import { type Route } from './+types/stripe.ts'
 
@@ -67,7 +66,7 @@ export async function action({ request }: Route.ActionArgs) {
 					}).catch(() => {
 						// Cart might already be deleted - that's fine
 					})
-				} catch (error) {
+				} catch {
 					// Cart might already be deleted or not exist - that's fine
 					// This is idempotent - we don't want to fail if cart is already gone
 				}

@@ -1,10 +1,9 @@
 import { invariant } from '@epic-web/invariant'
 import { type OrderStatus } from '@prisma/client'
-import Stripe from 'stripe'
+import type Stripe from 'stripe'
 import { prisma } from './db.server.ts'
 import { sendEmail } from './email.server.ts'
 import { getDomainUrl } from './misc.tsx'
-import { generateOrderNumber } from './order-number.server.ts'
 import { stripe } from './stripe.server.ts'
 
 /**
