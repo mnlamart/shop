@@ -2,7 +2,7 @@ import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import { useEffect } from 'react'
-import { data, Form, redirect, redirectDocument } from 'react-router'
+import { data, Form, Outlet, redirect, redirectDocument, useLocation } from 'react-router'
 import { z } from 'zod'
 import { ErrorList, Field } from '#app/components/forms.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
@@ -331,10 +331,23 @@ export default function Checkout({
 		}
 	}, [actionData])
 	
-	// If we're on the success page (cart is null from loader), don't render checkout form
-	// The success page component will handle rendering via React Router's outlet
+	const location = useLocation()
+	const isSuccessPage = location.pathname === '/shop/checkout/success'
+	
+	// If we're on the success page, render the outlet for the child route
+	if (isSuccessPage) {
+		return <Outlet />
+	}
+	
+	// If we don't have cart/currency data, show loading or error
 	if (!cart || !currency) {
-		return null
+		return (
+			<div className="container py-8">
+				<div className="text-center">
+					<p className="text-muted-foreground">Loading checkout...</p>
+				</div>
+			</div>
+		)
 	}
 
 	// Show loading overlay when redirecting
