@@ -103,7 +103,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 	// If user has session_id in URL but lands on checkout page, redirect to success page
 	const sessionId = url.searchParams.get('session_id')
 	if (sessionId) {
-		console.log('[CHECKOUT LOADER] Found session_id in URL, redirecting to success page')
 		return redirectDocument(`/shop/checkout/success?session_id=${sessionId}`)
 	}
 	
@@ -112,11 +111,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 	// If cart is empty or doesn't exist, redirect to cart page
 	// This handles cases where cart was deleted after successful checkout
 	if (!cart || cart.items.length === 0) {
-		console.log('[CHECKOUT LOADER] Cart is empty or missing, redirecting to /shop/cart')
 		return redirect('/shop/cart')
 	}
-
-	console.log('[CHECKOUT LOADER] Cart found with', cart.items.length, 'items')
 
 	// Check if user canceled Stripe checkout
 	const canceled = url.searchParams.get('canceled') === 'true'

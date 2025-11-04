@@ -425,6 +425,7 @@ model Order {
   
   // Status tracking
   status      OrderStatus @default(CONFIRMED) // Auto-confirmed on successful payment
+  trackingNumber String?  // Tracking number for shipped orders
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

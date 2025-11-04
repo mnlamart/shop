@@ -1,9 +1,11 @@
 import { invariant } from '@epic-web/invariant'
 import { type OrderStatus } from '@prisma/client'
+import Stripe from 'stripe'
 import { prisma } from './db.server.ts'
 import { sendEmail } from './email.server.ts'
 import { getDomainUrl } from './misc.tsx'
 import { generateOrderNumber } from './order-number.server.ts'
+import { stripe } from './stripe.server.ts'
 
 /**
  * Type for stock availability issues
@@ -258,21 +260,27 @@ export async function getGuestOrder(orderNumber: string, email: string) {
  * @param orderId - The ID of the order to update
  * @param status - The new status
  * @param request - Optional request object for getting domain URL (for email links)
+ * @param trackingNumber - Optional tracking number (required when status is SHIPPED)
  */
 export async function updateOrderStatus(
 	orderId: string,
 	status: OrderStatus,
 	request?: Request,
+	trackingNumber?: string | null,
 ): Promise<void> {
-	// Update order status
+	// Update order status and tracking number
 	const order = await prisma.order.update({
 		where: { id: orderId },
-		data: { status },
+		data: {
+			status,
+			...(status === 'SHIPPED' && trackingNumber ? { trackingNumber } : {}),
+		},
 		select: {
 			id: true,
 			orderNumber: true,
 			email: true,
 			status: true,
+			trackingNumber: true,
 		},
 	})
 
@@ -281,26 +289,39 @@ export async function updateOrderStatus(
 		const domainUrl = request ? getDomainUrl(request) : 'http://localhost:3000'
 		const statusLabel = getStatusLabel(status)
 		
-		await sendEmail({
-			to: order.email,
-			subject: `Order Status Update - ${order.orderNumber}`,
-			html: `
-				<h1>Order Status Update</h1>
-				<p>Your order status has been updated.</p>
-				<p><strong>Order Number:</strong> ${order.orderNumber}</p>
-				<p><strong>New Status:</strong> ${statusLabel}</p>
-				<p><a href="${domainUrl}/shop/orders/${order.orderNumber}">View Order Details</a></p>
-			`,
-			text: `
+		let emailBody = `
+			<h1>Order Status Update</h1>
+			<p>Your order status has been updated.</p>
+			<p><strong>Order Number:</strong> ${order.orderNumber}</p>
+			<p><strong>New Status:</strong> ${statusLabel}</p>
+		`
+		
+		if (status === 'SHIPPED' && order.trackingNumber) {
+			emailBody += `<p><strong>Tracking Number:</strong> ${order.trackingNumber}</p>`
+		}
+		
+		emailBody += `<p><a href="${domainUrl}/shop/orders/${order.orderNumber}">View Order Details</a></p>`
+		
+		let textBody = `
 Order Status Update
 
 Your order status has been updated.
 
 Order Number: ${order.orderNumber}
 New Status: ${statusLabel}
-
-View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
-			`,
+`
+		
+		if (status === 'SHIPPED' && order.trackingNumber) {
+			textBody += `Tracking Number: ${order.trackingNumber}\n`
+		}
+		
+		textBody += `View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}`
+		
+		await sendEmail({
+			to: order.email,
+			subject: `Order Status Update - ${order.orderNumber}`,
+			html: emailBody,
+			text: textBody,
 		})
 	} catch (emailError) {
 		// Log email error but don't fail status update
@@ -329,6 +350,102 @@ function getStatusLabel(status: OrderStatus): string {
 			return 'Cancelled'
 		default:
 			return status
+	}
+}
+
+/**
+ * Cancels an order and creates a Stripe refund (admin only).
+ * @param orderId - The ID of the order to cancel
+ * @param request - Optional request object for getting domain URL (for email links)
+ */
+export async function cancelOrder(orderId: string, request?: Request): Promise<void> {
+	const order = await prisma.order.findUnique({
+		where: { id: orderId },
+		select: {
+			id: true,
+			orderNumber: true,
+			email: true,
+			status: true,
+			stripePaymentIntentId: true,
+			stripeChargeId: true,
+			total: true,
+		},
+	})
+
+	invariant(order, 'Order not found')
+	invariant(order.status !== 'CANCELLED', 'Order is already cancelled')
+
+	// Create refund via Stripe if payment was processed
+	let refundId: string | null = null
+	if (order.stripePaymentIntentId || order.stripeChargeId) {
+		try {
+			const refundParams: Stripe.RefundCreateParams = {
+				amount: order.total,
+				reason: 'requested_by_customer',
+				metadata: {
+					orderNumber: order.orderNumber,
+					cancelledBy: 'admin',
+				},
+			}
+
+			// Use payment_intent if available, otherwise use charge
+			if (order.stripePaymentIntentId) {
+				refundParams.payment_intent = order.stripePaymentIntentId
+			} else if (order.stripeChargeId) {
+				refundParams.charge = order.stripeChargeId
+			}
+
+			const refund = await stripe.refunds.create(refundParams)
+			refundId = refund.id
+		} catch (refundError) {
+			// Log refund error but don't fail order cancellation
+			// Admin can manually process refund if needed
+			console.error(
+				`Failed to create refund for order ${order.orderNumber}:`,
+				refundError,
+			)
+			// Still proceed with order cancellation
+		}
+	}
+
+	// Update order status to CANCELLED
+	await prisma.order.update({
+		where: { id: orderId },
+		data: { status: 'CANCELLED' },
+	})
+
+	// Send cancellation email (non-blocking)
+	try {
+		const domainUrl = request ? getDomainUrl(request) : 'http://localhost:3000'
+		await sendEmail({
+			to: order.email,
+			subject: `Order Cancelled - ${order.orderNumber}`,
+			html: `
+				<h1>Order Cancelled</h1>
+				<p>Your order has been cancelled.</p>
+				<p><strong>Order Number:</strong> ${order.orderNumber}</p>
+				${refundId ? `<p><strong>Refund ID:</strong> ${refundId}</p>` : ''}
+				<p>${refundId ? 'A refund has been processed and will appear in your account within 5-10 business days.' : 'If you have already been charged, please contact support for a refund.'}</p>
+				<p><a href="${domainUrl}/shop/orders/${order.orderNumber}">View Order Details</a></p>
+			`,
+			text: `
+Order Cancelled
+
+Your order has been cancelled.
+
+Order Number: ${order.orderNumber}
+${refundId ? `Refund ID: ${refundId}` : ''}
+${refundId ? 'A refund has been processed and will appear in your account within 5-10 business days.' : 'If you have already been charged, please contact support for a refund.'}
+
+View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
+			`,
+		})
+	} catch (emailError) {
+		// Log email error but don't fail cancellation
+		console.error(
+			`Failed to send cancellation email for order ${order.orderNumber}:`,
+			emailError,
+		)
 	}
 }
 
