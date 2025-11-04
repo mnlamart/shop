@@ -66,7 +66,7 @@ export default function AdminDashboard() {
 				<div className="rounded-lg border bg-card p-6 shadow-sm">
 					<div className="flex items-center space-x-4">
 						<div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-							<Icon name="backpack" className="h-6 w-6 text-primary" />
+							<Icon name="tags" className="h-6 w-6 text-primary" />
 						</div>
 						<div className="flex-1">
 							<h3 className="text-lg font-semibold">Categories</h3>
@@ -89,7 +89,7 @@ export default function AdminDashboard() {
 				<div className="rounded-lg border bg-card p-6 shadow-sm">
 					<div className="flex items-center space-x-4">
 						<div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-							<Icon name="gear" className="h-6 w-6 text-primary" />
+							<Icon name="settings" className="h-6 w-6 text-primary" />
 						</div>
 						<div className="flex-1">
 							<h3 className="text-lg font-semibold">Attributes</h3>

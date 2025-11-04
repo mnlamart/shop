@@ -341,7 +341,7 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 			{categories.length === 0 && (
 				<div className="text-center py-16 animate-slide-top">
 					<div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
-						<Icon name="backpack" className="h-12 w-12 text-muted-foreground" />
+						<Icon name="tags" className="h-12 w-12 text-muted-foreground" />
 					</div>
 					<h3 className="text-xl font-semibold mb-2">No categories yet</h3>
 					<p className="text-muted-foreground mb-8 max-w-md mx-auto">
