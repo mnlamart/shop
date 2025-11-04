@@ -12,7 +12,7 @@ import { getDomainUrl, useIsPending } from '#app/utils/misc.tsx'
 import { validateStockAvailability } from '#app/utils/order.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
-import { handleStripeError, stripe } from '#app/utils/stripe.server.ts'
+import { createCheckoutSession, handleStripeError } from '#app/utils/stripe.server.ts'
 import { type Route } from './+types/checkout.ts'
 
 const ShippingFormSchema = z.object({
@@ -149,13 +149,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-	console.log('Checkout action called')
 	const formData = await request.formData()
-	console.log('Form data received:', Object.fromEntries(formData.entries()))
 	const submission = parseWithZod(formData, {
 		schema: ShippingFormSchema,
 	})
-	console.log('Submission status:', submission.status)
 
 	if (submission.status !== 'success') {
 		return data(
@@ -167,9 +164,7 @@ export async function action({ request }: Route.ActionArgs) {
 	const shippingData = submission.value
 
 	// Get cart and user
-	console.log('Getting cart...')
 	const { cart } = await getOrCreateCartFromRequest(request)
-	console.log('Cart found:', cart?.id, 'Items:', cart?.items.length)
 	invariantResponse(cart, 'Cart not found', { status: 404 })
 	invariantResponse(cart.items.length > 0, 'Cart is empty', { status: 400 })
 
@@ -188,9 +183,7 @@ export async function action({ request }: Route.ActionArgs) {
 	const userId = await getUserId(request)
 
 	// Validate stock availability BEFORE creating checkout session
-	console.log('Validating stock...')
 	await validateStockAvailability(cart.id)
-	console.log('Stock validated')
 
 	// Load cart with products and variants for checkout session
 	const cartWithItems = await prisma.cart.findUnique({
@@ -209,23 +202,13 @@ export async function action({ request }: Route.ActionArgs) {
 
 	// Create Stripe Checkout Session
 	let session
-	let startTime: number | undefined
 	try {
 		// Validate prices before creating checkout session
-		const lineItems = cartWithItems.items.map((item, index) => {
+		const lineItems = cartWithItems.items.map((item) => {
 				const unitAmount =
 					item.variantId && item.variant
 						? item.variant.price ?? item.product.price
 						: item.product.price
-
-				console.log(`[CHECKOUT ACTION] Line item ${index}:`, {
-					productName: item.product.name,
-					variantId: item.variantId,
-					variantPrice: item.variant?.price,
-					productPrice: item.product.price,
-					finalUnitAmount: unitAmount,
-					quantity: item.quantity,
-				})
 
 				invariantResponse(
 					unitAmount !== null && unitAmount !== undefined && unitAmount > 0,
@@ -233,7 +216,7 @@ export async function action({ request }: Route.ActionArgs) {
 					{ status: 400 },
 				)
 
-				const lineItem = {
+				return {
 					price_data: {
 						currency: currency.code.toLowerCase(),
 						product_data: {
@@ -244,10 +227,7 @@ export async function action({ request }: Route.ActionArgs) {
 					},
 					quantity: item.quantity,
 				}
-				console.log(`[CHECKOUT ACTION] Built line item ${index}:`, JSON.stringify(lineItem, null, 2))
-				return lineItem
 			})
-			console.log('[CHECKOUT ACTION] All line items prepared, count:', lineItems.length)
 
 		invariantResponse(
 			lineItems.length > 0,
@@ -255,41 +235,11 @@ export async function action({ request }: Route.ActionArgs) {
 			{ status: 400 },
 		)
 
-		console.log('[CHECKOUT ACTION] ===== CREATING STRIPE SESSION =====')
-		console.log('[CHECKOUT ACTION] Line items count:', lineItems.length)
-		console.log('[CHECKOUT ACTION] Currency:', currency.code)
-		console.log('[CHECKOUT ACTION] NODE_ENV:', process.env.NODE_ENV)
-		console.log('[CHECKOUT ACTION] MOCKS:', process.env.MOCKS)
-		console.log('[CHECKOUT ACTION] Stripe key starts with:', process.env.STRIPE_SECRET_KEY?.substring(0, 8))
-		console.log('[CHECKOUT ACTION] Stripe key length:', process.env.STRIPE_SECRET_KEY?.length)
-		console.log('[CHECKOUT ACTION] Stripe client initialized:', !!stripe)
-		console.log('[CHECKOUT ACTION] Success URL:', `${getDomainUrl(request)}/shop/orders?session_id={CHECKOUT_SESSION_ID}`)
-		console.log('[CHECKOUT ACTION] Cancel URL:', `${getDomainUrl(request)}/shop/checkout?canceled=true`)
-		console.log('[CHECKOUT ACTION] Customer email:', shippingData.email)
-		console.log('[CHECKOUT ACTION] Metadata:', {
-			cartId: cart.id,
-			userId: userId || '',
-			shippingName: shippingData.name,
-			shippingStreet: shippingData.street,
-			shippingCity: shippingData.city,
-			shippingState: shippingData.state || '',
-			shippingPostal: shippingData.postal,
-			shippingCountry: shippingData.country,
-		})
-
-		// Create Stripe checkout session with timeout protection
-		// Real Stripe API calls typically complete in < 2s
-		// If MSW intercepts, it completes in < 1s
-		// Timeout after 30s (Stripe's default timeout) to prevent indefinite hanging
-		// Note: MSW doesn't reliably intercept Stripe SDK in dev mode, so we use real test keys
-		console.log('[CHECKOUT ACTION] About to call stripe.checkout.sessions.create()')
-		console.log('[CHECKOUT ACTION] MSW status: If you see [MSW] logs, MSW intercepted. If not, using real Stripe API.')
-		startTime = Date.now()
-		console.log('[CHECKOUT ACTION] Start time:', startTime)
-		const createSessionPromise = stripe.checkout.sessions.create({
+		// Create Stripe checkout session
+		const sessionResult = await createCheckoutSession({
 			line_items: lineItems,
 			mode: 'payment',
-			success_url: `${getDomainUrl(request)}/shop/orders?session_id={CHECKOUT_SESSION_ID}`,
+			success_url: `${getDomainUrl(request)}/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
 			cancel_url: `${getDomainUrl(request)}/shop/checkout?canceled=true`,
 			customer_email: shippingData.email,
 			metadata: {
@@ -309,54 +259,13 @@ export async function action({ request }: Route.ActionArgs) {
 			},
 		})
 		
-		// Add timeout protection: Use Stripe's default 30s timeout
-		// Real Stripe API should respond in < 2s, so 30s gives plenty of buffer
-		// If this times out, it's likely a network/connectivity issue
-		const timeoutPromise = new Promise<never>((_, reject) => {
-			setTimeout(() => {
-				reject(
-					new Error(
-						'Stripe API request timed out after 30 seconds. ' +
-							'This usually indicates a network connectivity issue. ' +
-							'Check: 1) Internet connection, 2) Stripe API status, 3) Firewall/proxy settings. ' +
-							'If MSW is intercepting, you should see [MSW] logs in the terminal.',
-					),
-				)
-			}, 30000) // 30 second timeout (matching Stripe SDK default)
-		})
-
-		console.log('[CHECKOUT ACTION] Promise created, starting race with timeout...')
-		session = await Promise.race([createSessionPromise, timeoutPromise])
-		const duration = Date.now() - startTime
-		console.log('[CHECKOUT ACTION] ✅ Stripe session created successfully!')
-		console.log('[CHECKOUT ACTION] Session ID:', session.id)
-		console.log('[CHECKOUT ACTION] Session URL:', session.url)
-		console.log('[CHECKOUT ACTION] Duration:', duration, 'ms')
+		session = {
+			id: sessionResult.id,
+			url: sessionResult.url,
+		} as { id: string; url: string }
 	} catch (error) {
-		const errorDuration = startTime ? Date.now() - startTime : 'unknown'
-		console.error('[CHECKOUT ACTION] ❌ STRIPE SESSION CREATION FAILED ❌')
-		console.error('[CHECKOUT ACTION] Duration before error:', errorDuration, 'ms')
-		console.error('[CHECKOUT ACTION] Raw error:', error)
-		console.error('[CHECKOUT ACTION] Error type:', typeof error)
-		console.error('[CHECKOUT ACTION] Error constructor:', error?.constructor?.name)
-		
-		if (error instanceof Error) {
-			console.error('[CHECKOUT ACTION] Error name:', error.name)
-			console.error('[CHECKOUT ACTION] Error message:', error.message)
-			console.error('[CHECKOUT ACTION] Error stack:', error.stack)
-		}
-		
-		if (typeof error === 'object' && error !== null) {
-			console.error('[CHECKOUT ACTION] Error keys:', Object.keys(error))
-			try {
-				console.error('[CHECKOUT ACTION] Error JSON:', JSON.stringify(error, null, 2))
-			} catch (e) {
-				console.error('[CHECKOUT ACTION] Could not stringify error:', e)
-			}
-		}
-		
 		const stripeError = handleStripeError(error)
-		console.error('[CHECKOUT ACTION] Processed Stripe error:', stripeError)
+		console.error('Stripe checkout session creation failed:', stripeError)
 		return data(
 			{
 				result: submission.reply({
@@ -369,23 +278,11 @@ export async function action({ request }: Route.ActionArgs) {
 		)
 	}
 
-	console.log('[CHECKOUT ACTION] Validating session URL...')
-	console.log('[CHECKOUT ACTION] Session object:', {
-		id: session.id,
-		url: session.url,
-		status: session.status,
-		payment_intent: session.payment_intent,
-	})
-	
 	invariantResponse(
 		session.url,
 		'Failed to create checkout session',
 		{ status: 500 },
 	)
-
-	// Log the redirect for debugging
-	console.log('[CHECKOUT ACTION] ===== REDIRECTING TO STRIPE =====')
-	console.log('[CHECKOUT ACTION] Redirect URL:', session.url)
 
 	invariantResponse(
 		session.url &&

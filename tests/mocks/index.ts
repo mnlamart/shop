@@ -16,14 +16,9 @@ export const server = setupServer(
 
 server.listen({
 	onUnhandledRequest(request, print) {
-		// Log unhandled requests to help debug Stripe interception
+		// Stripe requests are handled by passthrough handlers (see stripe.ts)
+		// This check is a fallback in case a new Stripe endpoint is added
 		if (request.url.includes('api.stripe.com')) {
-			console.log('[MSW] ===== UNHANDLED STRIPE REQUEST =====')
-			console.log('[MSW] Method:', request.method)
-			console.log('[MSW] URL:', request.url)
-			console.log('[MSW] Headers:', Object.fromEntries(request.headers.entries()))
-			console.log('[MSW] This means MSW saw the request but no handler matched!')
-			print.warning()
 			return
 		}
 		// Do not print warnings on unhandled requests to https://<:userId>.ingest.us.sentry.io/api/

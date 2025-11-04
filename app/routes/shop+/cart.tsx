@@ -179,8 +179,8 @@ export default function Cart({ loaderData }: Route.ComponentProps) {
 							<span>Total:</span>
 							<span className="font-bold">{formatPrice(total, currency)}</span>
 						</div>
-						<Button className="w-full" size="lg">
-							Checkout
+						<Button className="w-full" size="lg" asChild>
+							<Link to="/shop/checkout">Checkout</Link>
 						</Button>
 					</div>
 				</div>

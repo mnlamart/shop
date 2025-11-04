@@ -34,10 +34,23 @@ export async function action({ request }: ActionFunctionArgs) {
 		return new Response(`Webhook Error: ${error.message}`, { status: 400 })
 	}
 
-	if (event.type === 'checkout.session.completed') {
+	// Handle both immediate and async payment events
+	if (
+		event.type === 'checkout.session.completed' ||
+		event.type === 'checkout.session.async_payment_succeeded'
+	) {
 		const session = event.data.object as Stripe.Checkout.Session
 
-		// Idempotency check
+		// CRITICAL: Only create orders when payment is confirmed paid
+		// checkout.session.completed fires when session completes, but payment may still be processing
+		// async_payment_succeeded fires when delayed payment methods (ACH, BACS) complete
+		if (session.payment_status !== 'paid') {
+			// Payment not yet confirmed - return success but don't create order
+			// Stripe will retry the webhook when payment_status changes to 'paid'
+			return Response.json({ received: true })
+		}
+
+		// Idempotency check - MUST happen before any database operations
 		const existingOrder = await prisma.order.findUnique({
 			where: { stripeCheckoutSessionId: session.id },
 		})
@@ -193,7 +206,8 @@ export async function action({ request }: ActionFunctionArgs) {
 					return newOrder
 				},
 				{
-					timeout: 30000, // 30 second timeout
+					maxWait: 5000, // 5 seconds to acquire transaction lock (prevents P2028 errors)
+					timeout: 30000, // 30 second timeout for transaction execution
 				},
 			)
 

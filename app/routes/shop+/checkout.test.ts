@@ -8,23 +8,18 @@ import { mergeGuestCartToUser } from '#app/utils/cart.server.ts'
 import { UNCATEGORIZED_CATEGORY_ID } from '#app/utils/category.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
-import { stripe } from '#app/utils/stripe.server.ts'
+import * as stripeServer from '#app/utils/stripe.server.ts'
 import { createProductData, createVariantData } from '#tests/product-utils.ts'
 import { consoleError } from '#tests/setup/setup-test-env.ts'
 import { getSessionCookieHeader } from '#tests/utils.ts'
 
-// Mock Stripe checkout sessions
+// Mock createCheckoutSession function
 vi.mock('#app/utils/stripe.server.ts', async () => {
 	const actual = await vi.importActual('#app/utils/stripe.server.ts')
 	return {
 		...actual,
-		stripe: {
-			checkout: {
-				sessions: {
-					create: vi.fn(),
-				},
-			},
-		} as any,
+		createCheckoutSession: vi.fn(),
+		handleStripeError: actual.handleStripeError,
 	}
 })
 
@@ -155,7 +150,7 @@ async function cleanupCheckoutTestData(data: {
 	cartId: string
 	productId: string
 }) {
-	vi.mocked(stripe.checkout.sessions.create).mockReset()
+	vi.mocked(stripeServer.createCheckoutSession).mockReset()
 	await prisma.cartItem.deleteMany({ where: { cartId: data.cartId } })
 	await prisma.cart.deleteMany({ where: { id: data.cartId } })
 	await prisma.productVariant.deleteMany({ where: { productId: data.productId } })
@@ -188,17 +183,14 @@ function createCheckoutFormData(shippingData: {
 }
 
 /**
- * Create mock Stripe checkout session
+ * Create mock checkout session result (what createCheckoutSession returns)
  */
-function createMockStripeSession(overrides?: Partial<Stripe.Checkout.Session>) {
+function createMockCheckoutSessionResult(overrides?: { id?: string; url?: string }) {
 	return {
 		id: 'cs_test_mock123',
-		object: 'checkout.session' as const,
 		url: 'https://checkout.stripe.com/test/mock123',
-		amount_total: 10000,
-		amount_subtotal: 10000,
 		...overrides,
-	} as Stripe.Checkout.Session
+	}
 }
 
 /**
@@ -249,14 +241,12 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 	test('should create Stripe Checkout Session with correct line items', async () => {
 		consoleError.mockImplementation(() => {})
 
-		const mockSession = createMockStripeSession({
+		const mockSession = createMockCheckoutSessionResult({
 			id: 'cs_test_mock123',
 			url: 'https://checkout.stripe.com/test/mock123',
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockResolvedValue(
-			mockSession as any,
-		)
+		vi.mocked(stripeServer.createCheckoutSession).mockResolvedValue(mockSession)
 
 		const formData = createCheckoutFormData({
 			name: 'Test User',
@@ -284,8 +274,8 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 			expect(result.init?.status).toBe(302)
 		}
 
-		// Verify Stripe session was created with correct params
-		expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+		// Verify createCheckoutSession was called with correct params
+		expect(stripeServer.createCheckoutSession).toHaveBeenCalledWith(
 			expect.objectContaining({
 				mode: 'payment',
 				customer_email: 'test@example.com',
@@ -326,14 +316,12 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 			country: 'US',
 		}
 
-		const mockSession = createMockStripeSession({
+		const mockSession = createMockCheckoutSessionResult({
 			id: 'cs_test_mock456',
 			url: 'https://checkout.stripe.com/test/mock456',
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockResolvedValue(
-			mockSession as any,
-		)
+		vi.mocked(stripeServer.createCheckoutSession).mockResolvedValue(mockSession)
 
 		const formData = createCheckoutFormData(shippingData)
 		const request = await createCheckoutRequest(
@@ -353,8 +341,8 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 			expect(result.init?.status).toBe(302)
 		}
 
-		// Verify Stripe session was created with shipping metadata
-		expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+		// Verify createCheckoutSession was called with shipping metadata
+		expect(stripeServer.createCheckoutSession).toHaveBeenCalledWith(
 			expect.objectContaining({
 				metadata: expect.objectContaining({
 					shippingName: shippingData.name,
@@ -395,16 +383,12 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 			0,
 		)
 
-		const mockSession = createMockStripeSession({
+		const mockSession = createMockCheckoutSessionResult({
 			id: 'cs_test_mock789',
 			url: 'https://checkout.stripe.com/test/mock789',
-			amount_total: expectedSubtotal,
-			amount_subtotal: expectedSubtotal,
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockResolvedValue(
-			mockSession as any,
-		)
+		vi.mocked(stripeServer.createCheckoutSession).mockResolvedValue(mockSession)
 
 		const formData = createCheckoutFormData({
 			name: 'Test User',
@@ -433,8 +417,8 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 		}
 
 		// Verify Stripe was called with correct line items
-		expect(stripe.checkout.sessions.create).toHaveBeenCalled()
-		const callArgs = vi.mocked(stripe.checkout.sessions.create).mock
+		expect(stripeServer.createCheckoutSession).toHaveBeenCalled()
+		const callArgs = vi.mocked(stripeServer.createCheckoutSession).mock
 			.calls[0]![0] as any
 		expect(callArgs.line_items).toBeDefined()
 		expect(Array.isArray(callArgs.line_items)).toBe(true)
@@ -465,14 +449,12 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 			select: { id: true },
 		})
 
-		const mockSession = createMockStripeSession({
+		const mockSession = createMockCheckoutSessionResult({
 			id: 'cs_test_mock456',
 			url: 'https://checkout.stripe.com/test/mock456',
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockResolvedValue(
-			mockSession as any,
-		)
+		vi.mocked(stripeServer.createCheckoutSession).mockResolvedValue(mockSession)
 
 		const formData = createCheckoutFormData({
 			name: 'Test User',
@@ -501,8 +483,8 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 			expect(result.init?.status).toBe(302)
 		}
 
-		// Verify Stripe session was created with userId in metadata
-		expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+		// Verify createCheckoutSession was called with userId in metadata
+		expect(stripeServer.createCheckoutSession).toHaveBeenCalledWith(
 			expect.objectContaining({
 				metadata: expect.objectContaining({
 					userId: user.id,
@@ -519,14 +501,12 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 		consoleError.mockImplementation(() => {})
 
 		const redirectUrl = 'https://checkout.stripe.com/test/redirect123'
-		const mockSession = createMockStripeSession({
+		const mockSession = createMockCheckoutSessionResult({
 			id: 'cs_test_redirect123',
 			url: redirectUrl,
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockResolvedValue(
-			mockSession as any,
-		)
+		vi.mocked(stripeServer.createCheckoutSession).mockResolvedValue(mockSession)
 
 		const formData = createCheckoutFormData({
 			name: 'Test User',
@@ -564,14 +544,12 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 	test('should include payment_intent_data with cartId in metadata', async () => {
 		consoleError.mockImplementation(() => {})
 
-		const mockSession = createMockStripeSession({
+		const mockSession = createMockCheckoutSessionResult({
 			id: 'cs_test_payment_intent',
 			url: 'https://checkout.stripe.com/test/payment_intent',
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockResolvedValue(
-			mockSession as any,
-		)
+		vi.mocked(stripeServer.createCheckoutSession).mockResolvedValue(mockSession)
 
 		const formData = createCheckoutFormData({
 			name: 'Test User',
@@ -599,7 +577,7 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 		}
 
 		// Verify payment_intent_data includes cartId in metadata
-		expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+		expect(stripeServer.createCheckoutSession).toHaveBeenCalledWith(
 			expect.objectContaining({
 				payment_intent_data: expect.objectContaining({
 					metadata: expect.objectContaining({
@@ -634,14 +612,12 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 			})
 		}
 
-		const mockSession = createMockStripeSession({
+		const mockSession = createMockCheckoutSessionResult({
 			id: 'cs_test_stock_validation',
 			url: 'https://checkout.stripe.com/test/stock_validation',
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockResolvedValue(
-			mockSession as any,
-		)
+		vi.mocked(stripeServer.createCheckoutSession).mockResolvedValue(mockSession)
 
 		const formData = createCheckoutFormData({
 			name: 'Test User',
@@ -670,7 +646,7 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 		}
 
 		// Verify Stripe session was created (means stock validation passed)
-		expect(stripe.checkout.sessions.create).toHaveBeenCalled()
+		expect(stripeServer.createCheckoutSession).toHaveBeenCalled()
 	})
 
 	test('should use store currency for checkout session', async () => {
@@ -679,14 +655,12 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 		const currency = await getStoreCurrency()
 		invariant(currency, 'Store currency not configured')
 
-		const mockSession = createMockStripeSession({
+		const mockSession = createMockCheckoutSessionResult({
 			id: 'cs_test_currency',
 			url: 'https://checkout.stripe.com/test/currency',
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockResolvedValue(
-			mockSession as any,
-		)
+		vi.mocked(stripeServer.createCheckoutSession).mockResolvedValue(mockSession)
 
 		const formData = createCheckoutFormData({
 			name: 'Test User',
@@ -713,8 +687,8 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 			expect(result.init?.status).toBe(302)
 		}
 
-		// Verify Stripe session was created with correct currency
-		expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+		// Verify createCheckoutSession was called with correct currency
+		expect(stripeServer.createCheckoutSession).toHaveBeenCalledWith(
 			expect.objectContaining({
 				line_items: expect.arrayContaining([
 					expect.objectContaining({
@@ -803,14 +777,12 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 			select: { id: true },
 		})
 
-		const mockSession = createMockStripeSession({
+		const mockSession = createMockCheckoutSessionResult({
 			id: 'cs_test_merged_cart',
 			url: 'https://checkout.stripe.com/test/merged_cart',
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockResolvedValue(
-			mockSession as any,
-		)
+		vi.mocked(stripeServer.createCheckoutSession).mockResolvedValue(mockSession)
 
 		const formData = createCheckoutFormData({
 			name: 'Test User',
@@ -838,8 +810,8 @@ describe('Checkout - Stripe Checkout Session Creation', () => {
 			expect(result.init?.status).toBe(302)
 		}
 
-		// Verify Stripe session was created with merged cart ID
-		expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+		// Verify createCheckoutSession was called with merged cart ID
+		expect(stripeServer.createCheckoutSession).toHaveBeenCalledWith(
 			expect.objectContaining({
 				metadata: expect.objectContaining({
 					cartId: userCart.id, // Should use user cart (after merge)
@@ -888,7 +860,7 @@ describe('Checkout - Stripe Error Handling', () => {
 			statusCode: 402,
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockRejectedValue(cardError)
+		vi.mocked(stripeServer.createCheckoutSession).mockRejectedValue(cardError)
 
 		const formData = createCheckoutFormData({
 			name: 'Test User',
@@ -946,7 +918,7 @@ describe('Checkout - Stripe Error Handling', () => {
 			},
 		)
 
-		vi.mocked(stripe.checkout.sessions.create).mockRejectedValue(
+		vi.mocked(stripeServer.createCheckoutSession).mockRejectedValue(
 			invalidRequestError,
 		)
 
@@ -1000,7 +972,7 @@ describe('Checkout - Stripe Error Handling', () => {
 			statusCode: 500,
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockRejectedValue(apiError)
+		vi.mocked(stripeServer.createCheckoutSession).mockRejectedValue(apiError)
 
 		const formData = createCheckoutFormData({
 			name: 'Test User',
@@ -1052,7 +1024,7 @@ describe('Checkout - Stripe Error Handling', () => {
 			statusCode: 0,
 		})
 
-		vi.mocked(stripe.checkout.sessions.create).mockRejectedValue(
+		vi.mocked(stripeServer.createCheckoutSession).mockRejectedValue(
 			connectionError,
 		)
 

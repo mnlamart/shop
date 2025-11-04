@@ -187,7 +187,6 @@ describe('Stripe Webhook - Handler Logic', () => {
 	let product: { id: string; price: number; name: string }
 	let variant: { id: string; price: number | null; stockQuantity: number }
 	let cart: { id: string }
-	let cartItem: { id: string }
 	let checkoutSessionId: string
 
 	beforeEach(async () => {
@@ -240,7 +239,7 @@ describe('Stripe Webhook - Handler Logic', () => {
 		})
 
 		// Add item to cart
-		cartItem = await prisma.cartItem.create({
+		await prisma.cartItem.create({
 			data: {
 				cartId: cart.id,
 				productId: product.id,
@@ -274,6 +273,7 @@ describe('Stripe Webhook - Handler Logic', () => {
 			id: checkoutSessionId,
 			object: 'checkout.session',
 			status: 'complete',
+			payment_status: 'paid', // Default to paid for successful payments
 			customer_email: 'test@example.com',
 			amount_subtotal: (variant.price ?? product.price) * 2,
 			amount_total: (variant.price ?? product.price) * 2,
@@ -813,6 +813,164 @@ describe('Stripe Webhook - Handler Logic', () => {
 		expect(response.status).toBe(200)
 		expect(data.received).toBe(true)
 		expect(data.orderId).toBeUndefined()
+	})
+
+	test('should reject checkout.session.completed when payment_status !== paid', async () => {
+		const session = createMockCheckoutSession({
+			payment_status: 'unpaid',
+			status: 'complete',
+		})
+		const event = createMockEvent(session)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		expect(response.status).toBe(200)
+		expect(data.received).toBe(true)
+		expect(data.orderId).toBeUndefined()
+
+		// Verify no order was created
+		const order = await prisma.order.findUnique({
+			where: { stripeCheckoutSessionId: session.id },
+		})
+		expect(order).toBeNull()
+	})
+
+	test('should only create order when payment_status === paid', async () => {
+		const session = createMockCheckoutSession({
+			payment_status: 'paid',
+			status: 'complete',
+		})
+		const event = createMockEvent(session)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+		vi.mocked(generateOrderNumber).mockResolvedValue('ORD-000005')
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		expect(response.status).toBe(200)
+		expect(data.received).toBe(true)
+		expect(data.orderId).toBeDefined()
+
+		// Verify order was created
+		const order = await prisma.order.findUnique({
+			where: { id: data.orderId },
+		})
+		expect(order).toBeDefined()
+	})
+
+	test('should handle checkout.session.async_payment_succeeded event', async () => {
+		const session = createMockCheckoutSession({
+			payment_status: 'paid',
+			status: 'complete',
+		})
+		const event = {
+			id: 'evt_test_async',
+			object: 'event',
+			type: 'checkout.session.async_payment_succeeded',
+			data: {
+				object: session,
+			},
+		} as Stripe.Event
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+		vi.mocked(generateOrderNumber).mockResolvedValue('ORD-000006')
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		expect(response.status).toBe(200)
+		expect(data.received).toBe(true)
+		expect(data.orderId).toBeDefined()
+
+		// Verify order was created
+		const order = await prisma.order.findUnique({
+			where: { id: data.orderId },
+		})
+		expect(order).toBeDefined()
+	})
+
+	test('should verify idempotency check happens BEFORE cart loading', async () => {
+		// Create existing order first
+		const existingOrder = await prisma.order.create({
+			data: {
+				orderNumber: 'ORD-000007',
+				email: 'test@example.com',
+				subtotal: 10000,
+				total: 10000,
+				shippingName: 'Test User',
+				shippingStreet: '123 Test St',
+				shippingCity: 'Test City',
+				shippingPostal: '12345',
+				shippingCountry: 'US',
+				stripeCheckoutSessionId: checkoutSessionId,
+				status: 'CONFIRMED',
+			},
+		})
+
+		const session = createMockCheckoutSession({
+			payment_status: 'paid',
+			// Use invalid cartId to test that idempotency check happens first
+			metadata: {
+				cartId: 'non-existent-cart',
+				userId: '',
+				shippingName: 'Test User',
+				shippingStreet: '123 Test St',
+				shippingCity: 'Test City',
+				shippingState: 'TS',
+				shippingPostal: '12345',
+				shippingCountry: 'US',
+			},
+		})
+		const event = createMockEvent(session)
+
+		vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event)
+
+		const request = new Request('http://localhost/webhooks/stripe', {
+			method: 'POST',
+			headers: {
+				'stripe-signature': 't=1234567890,v1=signature',
+			},
+			body: JSON.stringify(event),
+		})
+
+		// Should return early due to idempotency, not fail on cart lookup
+		const response = await action({ request, params: {}, context: {} })
+		const data = await response.json() as WebhookResponse
+
+		expect(response.status).toBe(200)
+		expect(data.received).toBe(true)
+		expect(data.orderId).toBe(existingOrder.id)
+
+		// Cleanup
+		await prisma.order.delete({ where: { id: existingOrder.id } })
 	})
 })
 
