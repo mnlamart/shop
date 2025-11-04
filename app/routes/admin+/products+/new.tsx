@@ -99,7 +99,6 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 	const newTagInputRef = useRef<HTMLInputElement>(null)
 
 	const tags = fields.tags.getFieldList()
-	const imageList = fields.images.getFieldList()
 	const variantList = fields.variants.getFieldList()
 
 	const handleTagKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {

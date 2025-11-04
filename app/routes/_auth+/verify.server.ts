@@ -1,7 +1,7 @@
 import { type Submission } from '@conform-to/react'
 import { parseWithZod } from '@conform-to/zod/v4'
 import { data } from 'react-router'
-import { z } from 'zod'
+import  { type z } from 'zod'
 import { handleVerification as handleChangeEmailVerification } from '#app/routes/settings+/profile.change-email.server.tsx'
 import { twoFAVerificationType } from '#app/routes/settings+/profile.two-factor.tsx'
 import { requireUserId } from '#app/utils/auth.server.ts'

@@ -1,5 +1,4 @@
 import z from "zod"
-import { SLUG_REGEX } from "./constants"
 
 /**
  * ID for the uncategorized category

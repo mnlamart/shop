@@ -1,8 +1,8 @@
-import { prisma } from '#app/utils/db.server.ts'
 import { getPasswordHash } from '#app/utils/auth.server.ts'
+import { prisma } from '#app/utils/db.server.ts'
+import { generateOrderNumber } from '#app/utils/order-number.server.ts'
 import { expect, test } from '#tests/playwright-utils.ts'
 import { createProductData } from '#tests/product-utils.ts'
-import { generateOrderNumber } from '#app/utils/order-number.server.ts'
 
 async function createAdminUser() {
 	const username = `admin${Date.now()}`
@@ -109,7 +109,7 @@ test.describe('Admin Order Management', () => {
 		await expect(page.getByRole('heading', { name: /orders/i })).toBeVisible()
 	})
 
-	test('should display all orders in the list', async ({ page, login, navigate }) => {
+	test('should display all orders in the list', async ({ page, navigate }) => {
 		// Create admin user
 		const { user, password } = await createAdminUser()
 		await loginAsAdmin(page, user.username, password)

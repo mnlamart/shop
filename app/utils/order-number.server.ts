@@ -1,5 +1,5 @@
+import { type Prisma } from '@prisma/client'
 import { prisma } from './db.server.ts'
-import type { Prisma } from '@prisma/client'
 
 /**
  * Generates a unique order number in the format "ORD-XXXXXX" where XXXXXX is a zero-padded 6-digit number.
