@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
 import { createProductData, createVariantData } from '#tests/product-utils.ts'
 import { UNCATEGORIZED_CATEGORY_ID } from './category.ts'
 import { prisma } from './db.server.ts'
+import { sendEmail } from './email.server.ts'
 import { validateStockAvailability, updateOrderStatus } from './order.server.ts'
 
 // Mock email service
@@ -18,7 +19,7 @@ vi.mock('./misc.tsx', () => ({
 }))
 
 // Import after mocking
-import { sendEmail } from './email.server.ts'
+// sendEmail is already imported above
 
 describe('validateStockAvailability', () => {
 	let categoryId: string

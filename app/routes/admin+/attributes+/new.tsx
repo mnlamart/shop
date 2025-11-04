@@ -108,9 +108,9 @@ function AttributeForm({ actionData }: { actionData?: any }) {
 				method="POST"
 				{...getFormProps(form)}
 			>
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Attribute Information</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Attribute Information</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<div className="grid gap-6">
@@ -177,8 +177,8 @@ export default function NewVariantAttribute({ actionData }: Route.ComponentProps
 			{/* Header */}
 			<div className="flex items-center justify-between">
 				<div>
-					<h1 className="text-3xl font-bold tracking-tight">Create New Attribute</h1>
-					<p className="text-muted-foreground">
+					<h1 className="text-2xl font-normal tracking-tight text-foreground">Create New Attribute</h1>
+					<p className="text-sm text-muted-foreground mt-1">
 						Add a new attribute for product variants (e.g., Size, Color, Material)
 					</p>
 				</div>

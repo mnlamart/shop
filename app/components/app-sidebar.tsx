@@ -137,7 +137,7 @@ export function AppSidebar() {
 		<div className={`flex flex-col h-full bg-sidebar border-r transition-all duration-300 relative ${isCollapsed ? 'w-16' : 'w-64'}`}>
 			<div className={`flex h-16 shrink-0 items-center border-b ${isCollapsed ? 'px-2 justify-center' : 'px-4 justify-between'}`}>
 				{isCollapsed ? (
-					<div className="flex aspect-square size-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+					<div className="flex aspect-square size-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
 						<span className="text-sm font-semibold">
 							{user?.name?.charAt(0) || 'U'}
 						</span>
@@ -154,7 +154,7 @@ export function AppSidebar() {
 							</div>
 						</div>
 						<div className="flex items-center gap-2">
-							<div className="flex aspect-square size-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+							<div className="flex aspect-square size-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
 								<span className="text-sm font-semibold">
 									{user?.name?.charAt(0) || 'U'}
 								</span>

@@ -26,14 +26,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '#app/components/ui/select.tsx'
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from '#app/components/ui/table.tsx'
 import { getOrderByOrderNumber, updateOrderStatus, cancelOrder } from '#app/utils/order.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
@@ -184,312 +176,361 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 	const canCancel = order.status !== 'CANCELLED'
 
 	return (
-		<div className="space-y-8 animate-slide-top">
+		<div className="space-y-6 animate-slide-top">
 			{/* Header */}
 			<div className="flex items-center justify-between">
-				<div>
-					<div className="flex items-center gap-3 mb-2">
-						<h1 className="text-3xl font-bold tracking-tight">Order {order.orderNumber}</h1>
-						<Badge variant={getStatusBadgeVariant(order.status)} className="text-sm">
-							{getStatusLabel(order.status)}
-						</Badge>
-					</div>
-					<p className="text-muted-foreground">
-						Placed on{' '}
-						{new Date(order.createdAt).toLocaleDateString('en-US', {
-							year: 'numeric',
-							month: 'long',
-							day: 'numeric',
-							hour: '2-digit',
-							minute: '2-digit',
-						})}
-					</p>
-				</div>
-				<div className="flex items-center space-x-3">
-					<Button asChild variant="outline" className="transition-all duration-200 hover:shadow-sm">
+				<div className="flex items-center gap-4">
+					<Button
+						asChild
+						variant="ghost"
+						size="icon"
+						className="h-9 w-9 rounded-lg transition-all duration-200 hover:bg-muted"
+					>
 						<Link to="/admin/orders">
-							<Icon name="arrow-left" className="mr-2 h-4 w-4" />
-							Back to Orders
+							<Icon name="arrow-left" className="h-5 w-5" />
 						</Link>
 					</Button>
+					<div>
+						<div className="flex items-center gap-4 mb-1">
+							<h1 className="text-2xl font-normal tracking-tight text-foreground">
+								Order {order.orderNumber}
+							</h1>
+							<Badge
+								variant={getStatusBadgeVariant(order.status)}
+								className="text-xs font-medium px-2 py-0.5 rounded-lg"
+							>
+								{getStatusLabel(order.status)}
+							</Badge>
+						</div>
+						<p className="text-sm text-muted-foreground">
+							Placed on{' '}
+							{new Date(order.createdAt).toLocaleDateString('en-US', {
+								year: 'numeric',
+								month: 'long',
+								day: 'numeric',
+								hour: '2-digit',
+								minute: '2-digit',
+							})}
+						</p>
+					</div>
 				</div>
+				<Button
+					asChild
+					variant="outline"
+					className="h-9 px-4 rounded-lg transition-all duration-200"
+				>
+					<Link to="/admin/orders">Back to Orders</Link>
+				</Button>
 			</div>
 
 			<div className="grid gap-8 lg:grid-cols-2">
 				{/* Order Information */}
-				<div className="space-y-8">
+				<div className="space-y-6">
 					{/* Order Details */}
-					<Card className="transition-shadow duration-200 hover:shadow-md">
-						<CardHeader>
-							<CardTitle className="text-xl">Order Information</CardTitle>
+					<Card className="rounded-[14px]">
+						<CardHeader className="pb-6 px-6 pt-6">
+							<CardTitle className="text-base font-normal text-foreground">
+								Order Information
+							</CardTitle>
 						</CardHeader>
-						<CardContent className="space-y-4">
-							<div>
-								<label className="text-sm font-medium text-muted-foreground">
-									Order Number
-								</label>
-								<p className="text-lg font-medium mt-1 font-mono">{order.orderNumber}</p>
-							</div>
-							<div>
-								<label className="text-sm font-medium text-muted-foreground">Customer</label>
-								<p className="text-lg mt-1">
-									{order.user ? (
-										<Link
-											to={`/admin/users/${order.user.id}`}
-											className="text-primary hover:underline transition-colors duration-200"
-										>
-											{order.user.name || order.user.username}
-										</Link>
-									) : (
-										<span className="text-muted-foreground">Guest</span>
-									)}
-								</p>
-							</div>
-							<div>
-								<label className="text-sm font-medium text-muted-foreground">Email</label>
-								<p className="text-lg mt-1">{order.email}</p>
-							</div>
-							{order.trackingNumber && (
-								<div>
-									<label className="text-sm font-medium text-muted-foreground">
-										Tracking Number
-									</label>
-									<p className="text-lg mt-1 font-mono">{order.trackingNumber}</p>
+						<CardContent className="px-6 pb-6">
+							<div className="grid grid-cols-2 gap-6">
+								{/* Customer */}
+								<div className="flex items-start gap-3">
+									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0">
+										<Icon name="user" className="h-5 w-5 text-muted-foreground" />
+									</div>
+									<div className="flex flex-col gap-1 min-w-0">
+										<label className="text-sm text-muted-foreground">Customer</label>
+										<p className="text-base font-normal text-[var(--text-dark)]">
+											{order.user ? (
+												<Link
+													to={`/admin/users/${order.user.id}`}
+													className="hover:underline transition-colors duration-200 text-[var(--text-dark)]"
+												>
+													{order.user.name || order.user.username}
+												</Link>
+											) : (
+												<span className="text-muted-foreground">Guest</span>
+											)}
+										</p>
+									</div>
 								</div>
-							)}
-							<div>
-								<label className="text-sm font-medium text-muted-foreground">
-									Payment Status
-								</label>
-								<div className="mt-1">
-									<Badge variant="success" className="text-sm">
-										Paid
-									</Badge>
+
+								{/* Order Number */}
+								<div className="flex items-start gap-3">
+									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0">
+										<Icon name="file-text" className="h-5 w-5 text-muted-foreground" />
+									</div>
+									<div className="flex flex-col gap-1 min-w-0">
+										<label className="text-sm text-muted-foreground">Order Number</label>
+										<p className="text-base font-normal font-mono text-[var(--text-dark)]">
+											{order.orderNumber}
+										</p>
+									</div>
 								</div>
+
+								{/* Email */}
+								<div className="flex items-start gap-3">
+									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0">
+										<Icon name="envelope-closed" className="h-5 w-5 text-muted-foreground" />
+									</div>
+									<div className="flex flex-col gap-1 min-w-0">
+										<label className="text-sm text-muted-foreground">Email</label>
+										<p className="text-base font-normal text-[var(--text-dark)]">{order.email}</p>
+									</div>
+								</div>
+
+								{/* Phone - Not available in schema, skip for now */}
 							</div>
 						</CardContent>
 					</Card>
 
-					{/* Status Update */}
-					<Card className="transition-shadow duration-200 hover:shadow-md">
-						<CardHeader>
-							<CardTitle className="text-xl">Update Status</CardTitle>
+					{/* Order Management */}
+					<Card className="rounded-[14px]">
+						<CardHeader className="pb-6 px-6 pt-6">
+							<CardTitle className="text-base font-normal text-foreground">
+								Order Management
+							</CardTitle>
 						</CardHeader>
-						<CardContent>
-							<statusFetcher.Form method="POST" className="space-y-4">
-								<input type="hidden" name="status" value={status} />
-								<div>
-									<label
-										htmlFor="status-select"
-										className="text-sm font-medium text-muted-foreground block mb-2"
-									>
-										Order Status
-									</label>
-									<Select
-										value={status}
-										disabled={isUpdating}
-										onValueChange={(value) => setStatus(value as typeof status)}
-									>
-										<SelectTrigger id="status-select" className="w-full">
-											<SelectValue placeholder="Select status" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="PENDING">Pending</SelectItem>
-											<SelectItem value="CONFIRMED">Confirmed</SelectItem>
-											<SelectItem value="SHIPPED">Shipped</SelectItem>
-											<SelectItem value="DELIVERED">Delivered</SelectItem>
-											<SelectItem value="CANCELLED">Cancelled</SelectItem>
-										</SelectContent>
-									</Select>
+						<CardContent className="px-6 pb-6">
+							<div className="space-y-6">
+								{/* Update Status Section */}
+								<div className="space-y-4">
+									<h3 className="text-sm font-normal text-foreground">Update Status</h3>
+									<div className="space-y-4">
+										<statusFetcher.Form method="POST" className="space-y-4">
+											<input type="hidden" name="status" value={status} />
+											<div className="space-y-2">
+												<label
+													htmlFor="status-select"
+													className="text-sm font-medium flex items-center gap-2 text-foreground"
+												>
+													Order Status
+												</label>
+												<Select
+													value={status}
+													disabled={isUpdating}
+													onValueChange={(value) => setStatus(value as typeof status)}
+												>
+													<SelectTrigger
+														id="status-select"
+														className="w-full h-10 rounded-lg border bg-input px-3"
+													>
+														<SelectValue placeholder="Select status" />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value="PENDING">Pending</SelectItem>
+														<SelectItem value="CONFIRMED">Confirmed</SelectItem>
+														<SelectItem value="SHIPPED">Shipped</SelectItem>
+														<SelectItem value="DELIVERED">Delivered</SelectItem>
+														<SelectItem value="CANCELLED">Cancelled</SelectItem>
+													</SelectContent>
+												</Select>
+											</div>
+											{showTrackingNumber && (
+												<div className="space-y-2">
+													<label
+														htmlFor="tracking-number"
+														className="text-sm font-medium flex items-center gap-2 text-foreground"
+													>
+														Tracking Number
+													</label>
+													<Input
+														id="tracking-number"
+														name="trackingNumber"
+														type="text"
+														value={trackingNumber}
+														onChange={(e) => setTrackingNumber(e.target.value)}
+														disabled={isUpdating}
+														placeholder="Enter tracking number"
+														className="h-10 rounded-lg bg-input"
+													/>
+												</div>
+											)}
+											<Button
+												type="submit"
+												disabled={isUpdating}
+												className="w-full h-9 rounded-lg font-medium transition-all duration-200 bg-[var(--action-button)] text-[var(--action-button-foreground)] hover:bg-[var(--action-button)]/90"
+											>
+												{isUpdating ? (
+													<>
+														<Icon name="update" className="mr-2 h-4 w-4 animate-spin" />
+														Updating...
+													</>
+												) : (
+													<>Update Status</>
+												)}
+											</Button>
+										</statusFetcher.Form>
+									</div>
 								</div>
-								{showTrackingNumber && (
-									<div>
-										<label
-											htmlFor="tracking-number"
-											className="text-sm font-medium text-muted-foreground block mb-2"
-										>
-											Tracking Number
-										</label>
-										<Input
-											id="tracking-number"
-											name="trackingNumber"
-											type="text"
-											value={trackingNumber}
-											onChange={(e) => setTrackingNumber(e.target.value)}
-											disabled={isUpdating}
-											placeholder="Enter tracking number"
-										/>
+
+								{/* Divider */}
+								<div className="border-t border-border" />
+
+								{/* Cancel Order Section */}
+								{canCancel && (
+									<div className="space-y-4">
+										<div className="flex items-start gap-3">
+											<Icon
+												name="cross-1"
+												className="h-5 w-5 flex-shrink-0 mt-0.5 text-[var(--destructive-accent)]"
+											/>
+											<div className="space-y-1">
+												<h3 className="text-sm font-normal text-foreground">Cancel Order</h3>
+												<p className="text-sm text-muted-foreground">
+													This action cannot be undone. The order will be permanently
+													cancelled.
+												</p>
+											</div>
+										</div>
+										<AlertDialog>
+											<AlertDialogTrigger asChild>
+												<Button
+													variant="destructive"
+													disabled={isCancelling}
+													className="w-full h-9 rounded-lg font-medium transition-all duration-200"
+												>
+													{isCancelling ? (
+														<>
+															<Icon name="update" className="mr-2 h-4 w-4 animate-spin" />
+															Cancelling...
+														</>
+													) : (
+														<>Cancel Order</>
+													)}
+												</Button>
+											</AlertDialogTrigger>
+											<AlertDialogContent>
+												<AlertDialogHeader>
+													<AlertDialogTitle>Cancel Order?</AlertDialogTitle>
+													<AlertDialogDescription>
+														Are you sure you want to cancel order {order.orderNumber}? This
+														will create a refund for the customer and send them a cancellation
+														email. This action cannot be undone.
+													</AlertDialogDescription>
+												</AlertDialogHeader>
+												<AlertDialogFooter>
+													<AlertDialogCancel>Keep Order</AlertDialogCancel>
+													<cancelFetcher.Form method="POST">
+														<input type="hidden" name="intent" value="cancel" />
+														<AlertDialogAction
+															type="submit"
+															disabled={isCancelling}
+															className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+														>
+															Yes, Cancel Order
+														</AlertDialogAction>
+													</cancelFetcher.Form>
+												</AlertDialogFooter>
+											</AlertDialogContent>
+										</AlertDialog>
 									</div>
 								)}
-								<Button
-									type="submit"
-									disabled={isUpdating}
-									className="w-full transition-all duration-200 hover:shadow-sm"
-								>
-									{isUpdating ? (
-										<>
-											<Icon name="update" className="mr-2 h-4 w-4 animate-spin" />
-											Updating...
-										</>
-									) : (
-										<>
-											<Icon name="check" className="mr-2 h-4 w-4" />
-											Update Status
-										</>
-									)}
-								</Button>
-							</statusFetcher.Form>
+							</div>
 						</CardContent>
 					</Card>
 
-					{/* Cancel Order */}
-					{canCancel && (
-						<Card className="transition-shadow duration-200 hover:shadow-md border-destructive/50">
-							<CardHeader>
-								<CardTitle className="text-xl text-destructive">Cancel Order</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<AlertDialog>
-									<AlertDialogTrigger asChild>
-										<Button
-											variant="destructive"
-											disabled={isCancelling}
-											className="w-full transition-all duration-200 hover:shadow-sm"
-										>
-											{isCancelling ? (
-												<>
-													<Icon name="update" className="mr-2 h-4 w-4 animate-spin" />
-													Cancelling...
-												</>
-											) : (
-												<>
-													<Icon name="cross-1" className="mr-2 h-4 w-4" />
-													Cancel Order
-												</>
-											)}
-										</Button>
-									</AlertDialogTrigger>
-									<AlertDialogContent>
-										<AlertDialogHeader>
-											<AlertDialogTitle>Cancel Order?</AlertDialogTitle>
-											<AlertDialogDescription>
-												Are you sure you want to cancel order {order.orderNumber}? This will
-												create a refund for the customer and send them a cancellation email.
-												This action cannot be undone.
-											</AlertDialogDescription>
-										</AlertDialogHeader>
-										<AlertDialogFooter>
-											<AlertDialogCancel>Keep Order</AlertDialogCancel>
-											<cancelFetcher.Form method="POST">
-												<input type="hidden" name="intent" value="cancel" />
-												<AlertDialogAction
-													type="submit"
-													disabled={isCancelling}
-													className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-												>
-													Yes, Cancel Order
-												</AlertDialogAction>
-											</cancelFetcher.Form>
-										</AlertDialogFooter>
-									</AlertDialogContent>
-								</AlertDialog>
-							</CardContent>
-						</Card>
-					)}
-
 					{/* Shipping Address */}
-					<Card className="transition-shadow duration-200 hover:shadow-md">
-						<CardHeader>
-							<CardTitle className="text-xl">Shipping Address</CardTitle>
+					<Card className="rounded-[14px]">
+						<CardHeader className="pb-6 px-6 pt-6">
+							<CardTitle className="text-base font-normal text-foreground">
+								Shipping Address
+							</CardTitle>
 						</CardHeader>
-						<CardContent className="space-y-2">
-							<p className="font-semibold">{order.shippingName}</p>
-							<p className="text-muted-foreground">{order.shippingStreet}</p>
-							<p className="text-muted-foreground">
-								{order.shippingCity}
-								{order.shippingState && `, ${order.shippingState}`} {order.shippingPostal}
-							</p>
-							<p className="text-muted-foreground">{order.shippingCountry}</p>
+						<CardContent className="px-6 pb-6">
+							<div className="flex items-start gap-3">
+								<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0">
+									<Icon name="map-pin" className="h-5 w-5 text-muted-foreground" />
+								</div>
+								<div className="flex flex-col gap-2">
+									<p className="text-base font-normal text-[var(--text-dark)]">
+										{order.shippingName}
+									</p>
+									<p className="text-sm text-[var(--text-medium)]">{order.shippingStreet}</p>
+									<p className="text-sm text-[var(--text-medium)]">
+										{order.shippingCity}
+										{order.shippingState && `, ${order.shippingState}`} {order.shippingPostal}
+									</p>
+									<p className="text-sm text-[var(--text-medium)]">{order.shippingCountry}</p>
+								</div>
+							</div>
 						</CardContent>
 					</Card>
 				</div>
 
 				{/* Order Items and Summary */}
-				<div className="space-y-8">
+				<div className="space-y-6">
 					{/* Order Items */}
-					<Card className="transition-shadow duration-200 hover:shadow-md">
-						<CardHeader>
-							<CardTitle className="text-xl">Order Items</CardTitle>
+					<Card className="rounded-[14px]">
+						<CardHeader className="pb-6 px-6 pt-6">
+							<CardTitle className="text-base font-normal text-foreground">Order Items</CardTitle>
 						</CardHeader>
-						<CardContent>
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>Product</TableHead>
-										<TableHead className="text-right">Quantity</TableHead>
-										<TableHead className="text-right">Price</TableHead>
-										<TableHead className="text-right">Total</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
+						<CardContent className="px-6 pb-6">
+							<div className="space-y-6">
+								{/* Items List */}
+								<div className="space-y-4">
 									{order.items.map((item) => (
-										<TableRow key={item.id}>
-											<TableCell>
-												<div className="flex items-center gap-4">
-													{item.product.images[0] && (
-														<img
-															src={`/resources/images?objectKey=${encodeURIComponent(item.product.images[0].objectKey)}`}
-															alt={item.product.images[0].altText || item.product.name}
-															className="w-12 h-12 object-cover rounded"
-														/>
-													)}
-													<div>
-														<Link
-															to={`/admin/products/${item.product.slug}`}
-															className="font-medium text-primary hover:underline transition-colors duration-200"
-														>
-															{item.product.name}
-														</Link>
-														{item.variant && (
-															<p className="text-sm text-muted-foreground">
-																{item.variant.attributeValues
-																	.map(
-																		(av) =>
-																			`${av.attributeValue.attribute.name}: ${av.attributeValue.value}`,
-																	)
-																	.join(', ')}
-															</p>
-														)}
-													</div>
+										<div key={item.id} className="flex items-start gap-4">
+											{item.product.images[0] && (
+												<img
+													src={`/resources/images?objectKey=${encodeURIComponent(item.product.images[0].objectKey)}`}
+													alt={item.product.images[0].altText || item.product.name}
+													className="w-16 h-16 object-cover flex-shrink-0 rounded-[10px]"
+												/>
+											)}
+											<div className="flex-1 min-w-0">
+												<Link
+													to={`/admin/products/${item.product.slug}`}
+													className="text-sm font-normal hover:underline transition-colors duration-200 block mb-2 text-[var(--text-dark)]"
+												>
+													{item.product.name}
+												</Link>
+												{item.variant && (
+													<p className="text-sm mb-2 text-muted-foreground">
+														{item.variant.attributeValues
+															.map(
+																(av) =>
+																	`${av.attributeValue.attribute.name}: ${av.attributeValue.value}`,
+															)
+															.join(', ')}
+													</p>
+												)}
+												<div className="flex items-center justify-between">
+													<span className="text-sm text-muted-foreground">
+														Qty: {item.quantity}
+													</span>
+													<span className="text-sm font-normal text-foreground">
+														{formatPrice(item.price * item.quantity, currency)}
+													</span>
 												</div>
-											</TableCell>
-											<TableCell className="text-right">{item.quantity}</TableCell>
-											<TableCell className="text-right">
-												{formatPrice(item.price, currency)}
-											</TableCell>
-											<TableCell className="text-right font-semibold">
-												{formatPrice(item.price * item.quantity, currency)}
-											</TableCell>
-										</TableRow>
+											</div>
+										</div>
 									))}
-								</TableBody>
-							</Table>
-						</CardContent>
-					</Card>
+								</div>
 
-					{/* Order Summary */}
-					<Card className="transition-shadow duration-200 hover:shadow-md">
-						<CardHeader>
-							<CardTitle className="text-xl">Order Summary</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							<div className="flex justify-between">
-								<span className="text-muted-foreground">Subtotal</span>
-								<span className="font-medium">{formatPrice(order.subtotal, currency)}</span>
-							</div>
-							<div className="border-t pt-4 flex justify-between text-lg font-bold">
-								<span>Total</span>
-								<span>{formatPrice(order.total, currency)}</span>
+								{/* Divider */}
+								<div className="border-t border-border" />
+
+								{/* Order Summary */}
+								<div className="space-y-3">
+									<h3 className="text-sm font-normal text-foreground">Order Summary</h3>
+									<div className="space-y-2">
+										<div className="flex items-center justify-between">
+											<span className="text-sm text-[var(--text-medium)]">Subtotal</span>
+											<span className="text-sm font-normal text-[var(--text-dark)]">
+												{formatPrice(order.subtotal, currency)}
+											</span>
+										</div>
+										<div className="flex items-center justify-between pt-2">
+											<span className="text-base font-normal text-foreground">Total</span>
+											<span className="text-lg font-normal text-foreground">
+												{formatPrice(order.total, currency)}
+											</span>
+										</div>
+									</div>
+								</div>
 							</div>
 						</CardContent>
 					</Card>

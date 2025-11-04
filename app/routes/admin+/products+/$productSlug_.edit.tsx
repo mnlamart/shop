@@ -162,8 +162,8 @@ export default function EditProduct({ loaderData, actionData }: Route.ComponentP
 	return (
 		<div className="space-y-8 animate-slide-top">
 			<div>
-				<h1 className="text-3xl font-bold tracking-tight">Edit Product</h1>
-				<p className="text-muted-foreground">
+				<h1 className="text-2xl font-normal tracking-tight text-foreground">Edit Product</h1>
+				<p className="text-sm text-muted-foreground mt-1">
 					Update product: {product.name}
 				</p>
 			</div>
@@ -177,9 +177,9 @@ export default function EditProduct({ loaderData, actionData }: Route.ComponentP
 				<input type="hidden" name="id" value={product.id} />
 				
 				{/* Basic Information, Organization & Pricing Card */}
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Basic Information, Organization & Pricing</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Basic Information, Organization & Pricing</CardTitle>
 						<CardDescription>Product details, status, categorization, and pricing information</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -346,9 +346,9 @@ export default function EditProduct({ loaderData, actionData }: Route.ComponentP
 					</Card>
 
 				{/* Product Images Card */}
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Product Images</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Product Images</CardTitle>
 						<CardDescription>Upload up to 10 images for your product</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -401,9 +401,9 @@ export default function EditProduct({ loaderData, actionData }: Route.ComponentP
 				</Card>
 
 				{/* Product Variants Card */}
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle>Product Variants</CardTitle>
+						<CardTitle className="text-base font-normal text-foreground">Product Variants</CardTitle>
 						<CardDescription>Add product variations with different attributes</CardDescription>
 					</CardHeader>
 					<CardContent>

@@ -86,18 +86,18 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 			{/* Header */}
 			<div className="flex items-center justify-between">
 				<div>
-					<div className="flex items-center gap-3 mb-2">
-						<h1 className="text-3xl font-bold tracking-tight">{attribute.name}</h1>
+					<div className="flex items-center gap-3 mb-1">
+						<h1 className="text-2xl font-normal tracking-tight text-foreground">{attribute.name}</h1>
 						<Badge variant={hasVariants ? 'success' : 'secondary'}>
 							{hasVariants ? 'In Use' : 'Unused'}
 						</Badge>
 					</div>
-					<p className="text-muted-foreground">
+					<p className="text-sm text-muted-foreground">
 						Attribute for product variants with {attribute._count.values} values
 					</p>
 				</div>
 				<div className="flex gap-2">
-					<Button variant="outline" asChild>
+					<Button variant="outline" asChild className="h-9 rounded-lg font-medium">
 						<Link to="edit">
 							<Icon name="pencil-1" className="h-4 w-4 mr-2" />
 							Edit
@@ -108,35 +108,35 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 
 			{/* Statistics cards in grid */}
 			<div className="grid gap-6 md:grid-cols-3">
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader className="pb-2">
 						<CardTitle className="text-sm font-medium text-muted-foreground">
 							Total Values
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="text-3xl font-bold">{attribute._count.values}</div>
+						<div className="text-2xl font-normal text-foreground">{attribute._count.values}</div>
 						<p className="text-xs text-muted-foreground">
 							Available values for this attribute
 						</p>
 					</CardContent>
 				</Card>
 				
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader className="pb-2">
 						<CardTitle className="text-sm font-medium text-muted-foreground">
 							Product Variants
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="text-3xl font-bold">{totalVariants}</div>
+						<div className="text-2xl font-normal text-foreground">{totalVariants}</div>
 						<p className="text-xs text-muted-foreground">
 							Variants using this attribute
 						</p>
 					</CardContent>
 				</Card>
 				
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader className="pb-2">
 						<CardTitle className="text-sm font-medium text-muted-foreground">
 							Created
@@ -154,9 +154,9 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 			</div>
 
 			{/* Values section */}
-			<Card>
+			<Card className="rounded-[14px]">
 				<CardHeader>
-					<CardTitle>Attribute Values</CardTitle>
+					<CardTitle className="text-base font-normal text-foreground">Attribute Values</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -179,10 +179,10 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 
 			{/* Products using this attribute */}
 			{products.length > 0 && (
-				<Card>
+				<Card className="rounded-[14px]">
 					<CardHeader>
 						<div className="flex items-center justify-between">
-							<CardTitle>Products Using This Attribute</CardTitle>
+							<CardTitle className="text-base font-normal text-foreground">Products Using This Attribute</CardTitle>
 							<Button variant="outline" size="sm" asChild>
 								<Link to={`/admin/products?attribute=${attribute.id}`}>
 									View All
