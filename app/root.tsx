@@ -239,7 +239,10 @@ function App() {
 						<div className="ml-auto hidden max-w-sm flex-1 sm:block">
 							{searchBar}
 						</div>
-						<div className="flex items-center gap-10">
+						<div className="flex items-center gap-6">
+							<Button variant="ghost" asChild>
+								<Link to="/shop">Shop</Link>
+							</Button>
 							<CartBadge count={data.cartCount} />
 							{user ? (
 								<UserDropdown />

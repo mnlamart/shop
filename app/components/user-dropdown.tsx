@@ -51,6 +51,27 @@ export function UserDropdown() {
 							</Icon>
 						</Link>
 					</DropdownMenuItem>
+					<DropdownMenuItem asChild>
+						<Link prefetch="intent" to="/shop/orders">
+							<Icon className="text-body-md" name="file-text">
+								My Orders
+							</Icon>
+						</Link>
+					</DropdownMenuItem>
+					<DropdownMenuItem asChild>
+						<Link prefetch="intent" to="/shop/cart">
+							<Icon className="text-body-md" name="shopping-cart">
+								Cart
+							</Icon>
+						</Link>
+					</DropdownMenuItem>
+					<DropdownMenuItem asChild>
+						<Link prefetch="intent" to="/settings/profile">
+							<Icon className="text-body-md" name="gear">
+								Settings
+							</Icon>
+						</Link>
+					</DropdownMenuItem>
 					{isAdmin && (
 						<DropdownMenuItem asChild>
 							<Link prefetch="intent" to={`/admin`}>

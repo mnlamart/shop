@@ -84,6 +84,7 @@ export async function getOrCreateCart({
 /**
  * Gets or creates a cart from a request, automatically detecting if user is authenticated.
  * For authenticated users, returns their user cart. For guests, returns/create their session cart.
+ * 
  * @param request - The incoming request
  * @returns Object containing the cart, whether session needs to be committed, and cookie header if needed
  */
@@ -92,6 +93,7 @@ export async function getOrCreateCartFromRequest(request: Request) {
 	
 	if (userId) {
 		// Authenticated user - use their cart
+		// Check if they have a recent order (prevent cart recreation after checkout)
 		const cart = await getOrCreateCart({ userId })
 		return { cart, needsCommit: false, cookieHeader: undefined }
 	} else {
