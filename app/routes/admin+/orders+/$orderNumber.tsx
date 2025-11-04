@@ -3,10 +3,22 @@ import { parseWithZod } from '@conform-to/zod/v4'
 import { useEffect, useState } from 'react'
 import { data, Link, redirect, useFetcher } from 'react-router'
 import { z } from 'zod'
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from '#app/components/ui/alert-dialog.tsx'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
+import { Input } from '#app/components/ui/input.tsx'
 import {
 	Select,
 	SelectContent,
@@ -22,7 +34,7 @@ import {
 	TableHeader,
 	TableRow,
 } from '#app/components/ui/table.tsx'
-import { getOrderByOrderNumber, updateOrderStatus } from '#app/utils/order.server.ts'
+import { getOrderByOrderNumber, updateOrderStatus, cancelOrder } from '#app/utils/order.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
@@ -30,6 +42,11 @@ import { type Route } from './+types/$orderNumber.ts'
 
 const StatusUpdateSchema = z.object({
 	status: z.enum(['PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED']),
+	trackingNumber: z.string().optional(),
+})
+
+const CancelOrderSchema = z.object({
+	intent: z.literal('cancel'),
 })
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -53,6 +70,32 @@ export async function action({ params, request }: Route.ActionArgs) {
 	await requireUserWithRole(request, 'admin')
 
 	const formData = await request.formData()
+	const intent = formData.get('intent')
+
+	// Handle order cancellation
+	if (intent === 'cancel') {
+		const submission = parseWithZod(formData, {
+			schema: CancelOrderSchema,
+		})
+
+		if (submission.status !== 'success') {
+			return data(
+				{ result: submission.reply() },
+				{ status: submission.status === 'error' ? 400 : 200 },
+			)
+		}
+
+		const { orderNumber } = params
+		const order = await getOrderByOrderNumber(orderNumber)
+
+		invariantResponse(order, 'Order not found', { status: 404 })
+
+		await cancelOrder(order.id, request)
+
+		return redirect(`/admin/orders/${orderNumber}`)
+	}
+
+	// Handle status update
 	const submission = parseWithZod(formData, {
 		schema: StatusUpdateSchema,
 	})
@@ -69,9 +112,9 @@ export async function action({ params, request }: Route.ActionArgs) {
 
 	invariantResponse(order, 'Order not found', { status: 404 })
 
-	const { status } = submission.value
+	const { status, trackingNumber } = submission.value
 
-	await updateOrderStatus(order.id, status, request)
+	await updateOrderStatus(order.id, status, request, trackingNumber || null)
 
 	return redirect(`/admin/orders/${orderNumber}`)
 }
@@ -125,14 +168,20 @@ function getStatusLabel(status: string) {
 export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 	const { order, currency } = loaderData
 	const statusFetcher = useFetcher()
+	const cancelFetcher = useFetcher()
 	const [status, setStatus] = useState(order.status)
+	const [trackingNumber, setTrackingNumber] = useState(order.trackingNumber || '')
 
 	// Sync status state when order data changes
 	useEffect(() => {
 		setStatus(order.status)
-	}, [order.status])
+		setTrackingNumber(order.trackingNumber || '')
+	}, [order.status, order.trackingNumber])
 
 	const isUpdating = statusFetcher.state !== 'idle'
+	const isCancelling = cancelFetcher.state !== 'idle'
+	const showTrackingNumber = status === 'SHIPPED' || status === 'DELIVERED'
+	const canCancel = order.status !== 'CANCELLED'
 
 	return (
 		<div className="space-y-8 animate-slide-top">
@@ -200,6 +249,14 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 								<label className="text-sm font-medium text-muted-foreground">Email</label>
 								<p className="text-lg mt-1">{order.email}</p>
 							</div>
+							{order.trackingNumber && (
+								<div>
+									<label className="text-sm font-medium text-muted-foreground">
+										Tracking Number
+									</label>
+									<p className="text-lg mt-1 font-mono">{order.trackingNumber}</p>
+								</div>
+							)}
 							<div>
 								<label className="text-sm font-medium text-muted-foreground">
 									Payment Status
@@ -245,6 +302,25 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 										</SelectContent>
 									</Select>
 								</div>
+								{showTrackingNumber && (
+									<div>
+										<label
+											htmlFor="tracking-number"
+											className="text-sm font-medium text-muted-foreground block mb-2"
+										>
+											Tracking Number
+										</label>
+										<Input
+											id="tracking-number"
+											name="trackingNumber"
+											type="text"
+											value={trackingNumber}
+											onChange={(e) => setTrackingNumber(e.target.value)}
+											disabled={isUpdating}
+											placeholder="Enter tracking number"
+										/>
+									</div>
+								)}
 								<Button
 									type="submit"
 									disabled={isUpdating}
@@ -265,6 +341,61 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 							</statusFetcher.Form>
 						</CardContent>
 					</Card>
+
+					{/* Cancel Order */}
+					{canCancel && (
+						<Card className="transition-shadow duration-200 hover:shadow-md border-destructive/50">
+							<CardHeader>
+								<CardTitle className="text-xl text-destructive">Cancel Order</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<AlertDialog>
+									<AlertDialogTrigger asChild>
+										<Button
+											variant="destructive"
+											disabled={isCancelling}
+											className="w-full transition-all duration-200 hover:shadow-sm"
+										>
+											{isCancelling ? (
+												<>
+													<Icon name="update" className="mr-2 h-4 w-4 animate-spin" />
+													Cancelling...
+												</>
+											) : (
+												<>
+													<Icon name="cross-2" className="mr-2 h-4 w-4" />
+													Cancel Order
+												</>
+											)}
+										</Button>
+									</AlertDialogTrigger>
+									<AlertDialogContent>
+										<AlertDialogHeader>
+											<AlertDialogTitle>Cancel Order?</AlertDialogTitle>
+											<AlertDialogDescription>
+												Are you sure you want to cancel order {order.orderNumber}? This will
+												create a refund for the customer and send them a cancellation email.
+												This action cannot be undone.
+											</AlertDialogDescription>
+										</AlertDialogHeader>
+										<AlertDialogFooter>
+											<AlertDialogCancel>Keep Order</AlertDialogCancel>
+											<cancelFetcher.Form method="POST">
+												<input type="hidden" name="intent" value="cancel" />
+												<AlertDialogAction
+													type="submit"
+													disabled={isCancelling}
+													className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+												>
+													Yes, Cancel Order
+												</AlertDialogAction>
+											</cancelFetcher.Form>
+										</AlertDialogFooter>
+									</AlertDialogContent>
+								</AlertDialog>
+							</CardContent>
+						</Card>
+					)}
 
 					{/* Shipping Address */}
 					<Card className="transition-shadow duration-200 hover:shadow-md">

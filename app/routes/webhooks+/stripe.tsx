@@ -47,12 +47,9 @@ export async function action({ request }: Route.ActionArgs) {
 	if (event.type === 'checkout.session.completed') {
 		const session = event.data.object as Stripe.Checkout.Session
 
-		console.log('[WEBHOOK] Processing checkout.session.completed event for session:', session.id)
-
 		// Idempotency check - prevent duplicate order creation
 		const existingOrder = await getOrderByCheckoutSessionId(session.id)
 		if (existingOrder) {
-			console.log('[WEBHOOK] Order already exists (idempotency check):', existingOrder.orderNumber)
 			// Order already exists - ensure cart is deleted (idempotent operation)
 			// This handles webhook retries and ensures cart is cleaned up even if
 			// the first webhook call deleted the cart but a retry comes in
@@ -61,7 +58,6 @@ export async function action({ request }: Route.ActionArgs) {
 			const cartId = fullSession.metadata?.cartId
 			if (cartId) {
 				try {
-					console.log('[WEBHOOK] Deleting cart (idempotency):', cartId)
 					// Try to delete cart items first, then cart
 					await prisma.cartItem.deleteMany({
 						where: { cartId },
@@ -71,11 +67,9 @@ export async function action({ request }: Route.ActionArgs) {
 					}).catch(() => {
 						// Cart might already be deleted - that's fine
 					})
-					console.log('[WEBHOOK] Cart deleted successfully (idempotency)')
 				} catch (error) {
 					// Cart might already be deleted or not exist - that's fine
 					// This is idempotent - we don't want to fail if cart is already gone
-					console.log('[WEBHOOK] Cart already deleted or not found (idempotency)')
 				}
 			}
 			return data({ received: true, orderId: existingOrder.id })
@@ -272,8 +266,6 @@ export async function action({ request }: Route.ActionArgs) {
 					timeout: 30000, // 30 second timeout
 				},
 			)
-
-			console.log('[WEBHOOK] Order created successfully:', order.orderNumber)
 
 			// Send confirmation email (non-blocking - don't fail order creation if email fails)
 			try {

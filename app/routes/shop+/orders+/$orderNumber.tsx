@@ -170,6 +170,12 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 								<p className="text-sm text-muted-foreground">Email</p>
 								<p>{order.email}</p>
 							</div>
+							{order.trackingNumber && (
+								<div>
+									<p className="text-sm text-muted-foreground">Tracking Number</p>
+									<p className="font-mono font-semibold">{order.trackingNumber}</p>
+								</div>
+							)}
 						</CardContent>
 					</Card>
 				</div>

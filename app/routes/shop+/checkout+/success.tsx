@@ -11,24 +11,18 @@ export async function loader({ request }: Route.LoaderArgs) {
 	const url = new URL(request.url)
 	const sessionId = url.searchParams.get('session_id')
 
-	console.log('[CHECKOUT SUCCESS] Loader called with session_id:', sessionId)
-
 	if (!sessionId) {
 		// No session_id - redirect to shop
-		console.log('[CHECKOUT SUCCESS] No session_id, redirecting to /shop')
 		return redirect('/shop')
 	}
 
 	// Wait 1-2 seconds for webhook to process (webhooks are usually very fast)
-	console.log('[CHECKOUT SUCCESS] Waiting 1.5 seconds for webhook to process...')
 	await new Promise((resolve) => setTimeout(resolve, 1500))
 
 	// Check database for order by session_id (webhook creates it)
-	console.log('[CHECKOUT SUCCESS] Checking for order with session_id:', sessionId)
 	let order
 	try {
 		order = await getOrderByCheckoutSessionId(sessionId)
-		console.log('[CHECKOUT SUCCESS] Order lookup result:', order ? `Found order ${order.orderNumber}` : 'Not found')
 	} catch (error) {
 		console.error('[CHECKOUT SUCCESS] Error looking up order:', error)
 		// If there's an error, still show processing state
@@ -36,23 +30,18 @@ export async function loader({ request }: Route.LoaderArgs) {
 	}
 
 	if (order) {
-		console.log('[CHECKOUT SUCCESS] Order found:', order.orderNumber, 'Redirecting to order detail')
 		// Order exists - redirect to order detail using redirectDocument to replace history
 		const userId = await getUserId(request)
 		// For authenticated users, redirect directly
 		if (userId) {
 			const redirectUrl = `/shop/orders/${order.orderNumber}`
-			console.log('[CHECKOUT SUCCESS] Redirecting authenticated user to:', redirectUrl)
 			return redirectDocument(redirectUrl)
 		}
 		// For guests, redirect with email parameter
 		const redirectUrl = `/shop/orders/${order.orderNumber}?email=${encodeURIComponent(order.email)}`
-		console.log('[CHECKOUT SUCCESS] Redirecting guest user to:', redirectUrl)
 		return redirectDocument(redirectUrl)
 	}
 
-	console.log('[CHECKOUT SUCCESS] Order not found yet, showing processing state')
-	console.log('[CHECKOUT SUCCESS] NOTE: If order doesn\'t appear, ensure Stripe CLI is running: stripe listen --forward-to localhost:3000/webhooks/stripe')
 	// Order doesn't exist yet - return processing state
 	// DO NOT redirect - let the component handle the processing state
 	return {
