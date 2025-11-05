@@ -217,7 +217,7 @@ export default function ProductsList({ loaderData }: Route.ComponentProps) {
 				</div>
 				<div className="sm:w-48">
 					<Select value={statusFilter} onValueChange={setStatusFilter}>
-						<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+						<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label={`Filter by status: ${statusFilter === 'all' ? 'All Status' : statusFilter.charAt(0) + statusFilter.slice(1).toLowerCase()}`}>
 							<SelectValue placeholder="Filter by status" />
 						</SelectTrigger>
 						<SelectContent>
@@ -230,7 +230,7 @@ export default function ProductsList({ loaderData }: Route.ComponentProps) {
 				</div>
 				<div className="sm:w-48">
 					<Select value={categoryFilter} onValueChange={setCategoryFilter}>
-						<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+						<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label={`Filter by category: ${categoryFilter === 'all' ? 'All Categories' : categories.find(c => c.id === categoryFilter)?.name || 'Filter by category'}`}>
 							<SelectValue placeholder="Filter by category" />
 						</SelectTrigger>
 						<SelectContent>
@@ -344,13 +344,13 @@ export default function ProductsList({ loaderData }: Route.ComponentProps) {
 									<TableCell>
 										<div className="flex items-center gap-2">
 											<Button variant="ghost" size="sm" asChild>
-												<Link to={`/admin/products/${product.slug}`}>
-													<Icon name="eye-open" className="h-4 w-4" />
+												<Link to={`/admin/products/${product.slug}`} aria-label={`View ${product.name}`}>
+													<Icon name="eye-open" className="h-4 w-4" aria-hidden="true" />
 												</Link>
 											</Button>
 											<Button variant="ghost" size="sm" asChild>
-												<Link to={`/admin/products/${product.slug}/edit`}>
-													<Icon name="pencil-1" className="h-4 w-4" />
+												<Link to={`/admin/products/${product.slug}/edit`} aria-label={`Edit ${product.name}`}>
+													<Icon name="pencil-1" className="h-4 w-4" aria-hidden="true" />
 												</Link>
 											</Button>
 											<DeleteProductButton product={product} />

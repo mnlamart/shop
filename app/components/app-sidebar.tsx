@@ -134,7 +134,7 @@ export function AppSidebar() {
 	}, [isCollapsed])
 
 	return (
-		<div className={`flex flex-col h-full bg-sidebar border-r transition-all duration-300 relative ${isCollapsed ? 'w-16' : 'w-64'}`}>
+		<nav className={`flex flex-col h-full bg-sidebar border-r transition-all duration-300 relative ${isCollapsed ? 'w-16' : 'w-64'}`}>
 			<div className={`flex h-16 shrink-0 items-center border-b ${isCollapsed ? 'px-2 justify-center' : 'px-4 justify-between'}`}>
 				{isCollapsed ? (
 					<div className="flex aspect-square size-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -146,7 +146,7 @@ export function AppSidebar() {
 					<>
 						<div className="flex items-center gap-2">
 							<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-								<Icon name="settings" className="size-4" />
+								<Icon name="settings" className="size-4" aria-hidden="true" />
 							</div>
 							<div className="grid text-left text-sm leading-tight">
 								<span className="truncate font-semibold">Epic Shop</span>
@@ -180,14 +180,16 @@ export function AppSidebar() {
 												<Button
 													variant={location.pathname.startsWith(item.url) ? "secondary" : "ghost"}
 													className={`${isCollapsed ? 'w-12 h-12 p-0 justify-center' : 'w-full justify-start px-3'}`}
+													aria-label={isCollapsed ? item.title : undefined}
 												>
-													<Icon name={item.icon} className="size-4" />
+													<Icon name={item.icon} className="size-4" aria-hidden="true" />
 													{!isCollapsed && (
 														<>
 															<span className="ml-2">{item.title}</span>
 															<Icon 
 																name="chevron-down" 
 																className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-180" 
+																aria-hidden="true"
 															/>
 														</>
 													)}
@@ -218,8 +220,8 @@ export function AppSidebar() {
 											asChild
 											className={`${isCollapsed ? 'w-12 h-12 p-0 justify-center' : 'w-full justify-start px-3'}`}
 										>
-											<Link to={item.url}>
-												<Icon name={item.icon} className="size-4" />
+											<Link to={item.url} aria-label={isCollapsed ? item.title : undefined}>
+												<Icon name={item.icon} className="size-4" aria-hidden="true" />
 												{!isCollapsed && <span className="ml-2">{item.title}</span>}
 											</Link>
 										</Button>
@@ -233,6 +235,6 @@ export function AppSidebar() {
 			
 			{/* Custom SidebarRail for clickable border area */}
 			<CustomSidebarRail isCollapsed={isCollapsed} />
-		</div>
+		</nav>
 	)
 }

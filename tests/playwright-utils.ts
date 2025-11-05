@@ -1,4 +1,4 @@
-import { test as base, type Response } from '@playwright/test'
+import { test as base, type Response, type Page } from '@playwright/test'
 import { type User as UserModel } from '@prisma/client'
 import { href, type Register } from 'react-router'
 import * as setCookieParser from 'set-cookie-parser'
@@ -17,14 +17,17 @@ import {
 	deleteGitHubUser,
 	insertGitHubUser,
 } from './mocks/github.ts'
+import { checkAccessibility, type A11yOptions } from './utils/a11y.ts'
 
 export * from './db-utils.ts'
+export * from './utils/a11y.ts'
 
 type GetOrInsertUserOptions = {
 	id?: string
 	username?: UserModel['username']
 	password?: string
 	email?: UserModel['email']
+	roles?: { connect: { name: string } }
 }
 
 type User = {
@@ -39,6 +42,7 @@ async function getOrInsertUser({
 	username,
 	password,
 	email,
+	roles,
 }: GetOrInsertUserOptions = {}): Promise<User> {
 	const select = { id: true, email: true, username: true, name: true }
 	if (id) {
@@ -57,7 +61,7 @@ async function getOrInsertUser({
 				...userData,
 				email,
 				username,
-				roles: { connect: { name: 'user' } },
+				roles: roles || { connect: { name: 'user' } },
 				password: { create: { hash: await getPasswordHash(password) } },
 			},
 		})
@@ -154,6 +158,40 @@ logout: async ({ page }, use) => {
 	},
 })
 export const { expect } = test
+
+/**
+ * Helper function to check page accessibility
+ * 
+ * @param page - Playwright page object
+ * @param options - Accessibility scan options
+ * @returns Promise that resolves when accessibility check passes
+ * 
+ * @example
+ * ```typescript
+ * await expectPageToBeAccessible(page, {
+ *   tags: ['wcag2a', 'wcag2aa']
+ * })
+ * ```
+ */
+export async function expectPageToBeAccessible(
+	page: Page,
+	options?: A11yOptions,
+) {
+	const results = await checkAccessibility(page, options)
+	
+	if (results.violations.length > 0) {
+		const violations = results.violations.map((v) => {
+			const nodes = v.nodes.map((n: any) => `  - ${n.target.join(', ')}`).join('\n')
+			return `- ${v.id}: ${v.description}\n${nodes}`
+		}).join('\n\n')
+		
+		throw new Error(
+			`Found ${results.violations.length} accessibility violation(s):\n\n${violations}`,
+		)
+	}
+	
+	expect(results.violations).toEqual([])
+}
 
 /**
  * This allows you to wait for something (like an email to be available).

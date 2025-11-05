@@ -96,6 +96,7 @@ function CategoryRow({ category, level = 0 }: { category: any; level?: number })
 								<Link 
 									to={`/admin/categories/${category.slug}`}
 									className="font-medium text-primary hover:underline transition-colors duration-200"
+									aria-label={`View ${category.name} category`}
 								>
 									{category.name}
 								</Link>
@@ -129,7 +130,7 @@ function CategoryRow({ category, level = 0 }: { category: any; level?: number })
 				</TableCell>
 				<TableCell className="text-muted-foreground hidden md:table-cell">
 					{category.parent?.name || (
-						<span className="text-muted-foreground/70">Root Category</span>
+						<span className="text-muted-foreground">Root Category</span>
 					)}
 				</TableCell>
 				<TableCell className="text-muted-foreground hidden lg:table-cell">
@@ -142,16 +143,16 @@ function CategoryRow({ category, level = 0 }: { category: any; level?: number })
 						{category._count.products} products
 					</Badge>
 				</TableCell>
-				<TableCell className="text-right">
+								<TableCell className="text-right">
 					<div className="flex items-center justify-end space-x-1">
 						<Button asChild variant="ghost" size="sm" className="transition-colors duration-200">
-							<Link to={`/admin/categories/${category.slug}`}>
-								<Icon name="eye-open" className="h-4 w-4" />
+							<Link to={`/admin/categories/${category.slug}`} aria-label={`View ${category.name}`}>
+								<Icon name="eye-open" className="h-4 w-4" aria-hidden="true" />
 							</Link>
 						</Button>
 						<Button asChild variant="ghost" size="sm" className="transition-colors duration-200">
-							<Link to={`/admin/categories/${category.slug}/edit`}>
-								<Icon name="pencil-1" className="h-4 w-4" />
+							<Link to={`/admin/categories/${category.slug}/edit`} aria-label={`Edit ${category.name}`}>
+								<Icon name="pencil-1" className="h-4 w-4" aria-hidden="true" />
 							</Link>
 						</Button>
 						
@@ -162,8 +163,9 @@ function CategoryRow({ category, level = 0 }: { category: any; level?: number })
 										variant="ghost"
 										size="sm"
 										className="text-destructive hover:text-destructive transition-colors duration-200"
+										aria-label={`Delete ${category.name}`}
 									>
-										<Icon name="trash" className="h-4 w-4" />
+										<Icon name="trash" className="h-4 w-4" aria-hidden="true" />
 									</Button>
 								</AlertDialogTrigger>
 								<AlertDialogContent>
@@ -303,7 +305,7 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 				</div>
 				<div className="sm:w-48">
 					<Select value={filterType} onValueChange={setFilterType}>
-						<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+						<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label="Filter by type">
 							<SelectValue placeholder="Filter by type" />
 						</SelectTrigger>
 					<SelectContent>
@@ -344,7 +346,7 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 					<div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
 						<Icon name="tags" className="h-12 w-12 text-muted-foreground" />
 					</div>
-					<h3 className="text-xl font-semibold mb-2">No categories yet</h3>
+					<h2 className="text-xl font-semibold mb-2">No categories yet</h2>
 					<p className="text-muted-foreground mb-8 max-w-md mx-auto">
 						Get started by creating your first category to organize your products.
 					</p>
@@ -363,7 +365,7 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 					<div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
 						<Icon name="magnifying-glass" className="h-12 w-12 text-muted-foreground" />
 					</div>
-					<h3 className="text-xl font-semibold mb-2">No categories found</h3>
+					<h2 className="text-xl font-semibold mb-2">No categories found</h2>
 					<p className="text-muted-foreground mb-8 max-w-md mx-auto">
 						{searchTerm ? (
 							<>No categories match your search for "<strong>{searchTerm}</strong>".</>

@@ -4,7 +4,7 @@ import { useRef, useState, useCallback } from 'react'
 import { Form, Link } from 'react-router'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
+import { Card, CardContent, CardDescription, CardHeader } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
@@ -147,7 +147,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				{/* Basic Information Card */}
 				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Basic Information</CardTitle>
+						<h2 className="text-base font-normal text-foreground">Basic Information</h2>
 						<CardDescription>Product name, slug, and description</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -230,7 +230,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				{/* Pricing & Stock Card */}
 				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Pricing & Stock</CardTitle>
+						<h2 className="text-base font-normal text-foreground">Pricing & Stock</h2>
 						<CardDescription>SKU, pricing, and currency information</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -257,7 +257,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 							<div className="space-y-2">
 								<Label htmlFor={fields.currency.id}>Currency</Label>
 								<Select {...getInputProps(fields.currency, { type: 'text' })}>
-									<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+									<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label="Currency">
 										<SelectValue placeholder="Select currency" />
 									</SelectTrigger>
 									<SelectContent>
@@ -277,7 +277,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				{/* Organization Card */}
 				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Organization</CardTitle>
+						<h2 className="text-base font-normal text-foreground">Organization</h2>
 						<CardDescription>Status, category, and tags</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -285,7 +285,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 							<div className="space-y-2">
 								<Label htmlFor={fields.status.id}>Status</Label>
 								<Select {...getInputProps(fields.status, { type: 'text' })}>
-									<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+									<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label="Product status">
 										<SelectValue placeholder="Select status" />
 									</SelectTrigger>
 									<SelectContent>
@@ -301,7 +301,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 							<div className="space-y-2">
 								<Label htmlFor={fields.categoryId.id}>Category</Label>
 								<Select {...getInputProps(fields.categoryId, { type: 'text' })}>
-									<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+									<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label="Product category">
 										<SelectValue placeholder="Select category" />
 									</SelectTrigger>
 									<SelectContent>
@@ -321,7 +321,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				{/* Images Card */}
 				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Product Images</CardTitle>
+						<h2 className="text-base font-normal text-foreground">Product Images</h2>
 						<CardDescription>Upload up to 10 images for your product</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -373,7 +373,7 @@ export default function NewProduct({ loaderData, actionData }: Route.ComponentPr
 				{/* Product Variants Card */}
 				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Product Variants</CardTitle>
+						<h2 className="text-base font-normal text-foreground">Product Variants</h2>
 						<CardDescription>Add product variations with different attributes</CardDescription>
 					</CardHeader>
 					<CardContent>
@@ -622,7 +622,7 @@ function VariantRow({ meta, attributes }: VariantRowProps) {
 								name={`${fields.attributeValueIds.name}[${attrIndex}]`}
 								defaultValue="none"
 							>
-								<SelectTrigger>
+								<SelectTrigger aria-label={`Select ${attr.name}`}>
 									<SelectValue placeholder={`Select ${attr.name} (optional)`} />
 								</SelectTrigger>
 								<SelectContent>

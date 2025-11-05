@@ -5,7 +5,7 @@ import { Form  } from 'react-router'
 import { z } from 'zod'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
+import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#app/components/ui/select.tsx'
@@ -134,7 +134,7 @@ function CategoryForm({ categories, actionData }: { categories: any[], actionDat
 			>
 				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Category Information</CardTitle>
+						<h2 className="text-base font-normal text-foreground">Category Information</h2>
 					</CardHeader>
 					<CardContent className="space-y-6">
 						<div className="grid gap-6 md:grid-cols-2">
@@ -220,7 +220,7 @@ function CategorySelect({
 				input.change(value === 'none' ? '' : value)
 			}}
 		>
-			<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+			<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label="Parent category">
 				<SelectValue placeholder="No parent (root category)" />
 			</SelectTrigger>
 			<SelectContent>

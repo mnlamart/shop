@@ -256,14 +256,14 @@ function App() {
 					</nav>
 				</header>
 
-				<div className="flex flex-1 flex-col">
-					<Outlet />
-				</div>
+			<main className="flex flex-1 flex-col">
+				<Outlet />
+			</main>
 
-				<div className="container flex justify-between pb-5">
-					<Logo />
-					<ThemeSwitch userPreference={data.requestInfo.userPrefs.theme} />
-				</div>
+			<footer className="container flex justify-between pb-5">
+				<Logo />
+				<ThemeSwitch userPreference={data.requestInfo.userPrefs.theme} />
+			</footer>
 			</div>
 			<EpicToaster closeButton position="bottom-center" theme={theme} />
 			<EpicProgress />

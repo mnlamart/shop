@@ -161,7 +161,7 @@ export default function OrdersList({ loaderData }: Route.ComponentProps) {
 				</div>
 				<div className="sm:w-48">
 					<Select value={statusFilter} onValueChange={setStatusFilter}>
-						<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+						<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label="Filter by status">
 							<SelectValue placeholder="Filter by status" />
 						</SelectTrigger>
 						<SelectContent>
@@ -228,6 +228,7 @@ export default function OrdersList({ loaderData }: Route.ComponentProps) {
 										<Link
 											to={`/admin/orders/${order.orderNumber}`}
 											className="font-medium text-primary hover:underline transition-colors duration-200"
+											aria-label={`View order ${order.orderNumber}`}
 										>
 											{order.orderNumber}
 										</Link>
@@ -259,8 +260,8 @@ export default function OrdersList({ loaderData }: Route.ComponentProps) {
 									<TableCell>
 										<div className="flex items-center gap-2">
 											<Button variant="ghost" size="sm" asChild>
-												<Link to={`/admin/orders/${order.orderNumber}`}>
-													<Icon name="eye-open" className="h-4 w-4" />
+												<Link to={`/admin/orders/${order.orderNumber}`} aria-label={`View order ${order.orderNumber}`}>
+													<Icon name="eye-open" className="h-4 w-4" aria-hidden="true" />
 												</Link>
 											</Button>
 										</div>

@@ -6,7 +6,7 @@ import { Form, Link, data } from 'react-router'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
+import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#app/components/ui/select.tsx'
@@ -179,7 +179,7 @@ export default function EditCategory({ loaderData, actionData }: Route.Component
 					
 					<Card className="transition-shadow duration-200 hover:shadow-md">
 						<CardHeader>
-							<CardTitle className="text-xl">Category Information</CardTitle>
+							<h2 className="text-xl">Category Information</h2>
 						</CardHeader>
 						<CardContent className="space-y-6">
 							<div className="grid gap-6 md:grid-cols-2">
@@ -270,7 +270,7 @@ function CategorySelect({
 				input.change(value === 'none' ? '' : value)
 			}}
 		>
-			<SelectTrigger>
+			<SelectTrigger aria-label="Parent category">
 				<SelectValue placeholder="No parent (root category)" />
 			</SelectTrigger>
 			<SelectContent>
