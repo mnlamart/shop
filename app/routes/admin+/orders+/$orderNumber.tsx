@@ -1,7 +1,7 @@
 import { parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import { useEffect, useState } from 'react'
-import { data, Link, redirect, useFetcher } from 'react-router'
+import { data, Link, useFetcher } from 'react-router'
 import { z } from 'zod'
 import {
 	AlertDialog,
@@ -30,6 +30,7 @@ import { getOrderByOrderNumber, updateOrderStatus, cancelOrder } from '#app/util
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
+import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { type Route } from './+types/$orderNumber.ts'
 
 const StatusUpdateSchema = z.object({
@@ -40,6 +41,23 @@ const StatusUpdateSchema = z.object({
 const CancelOrderSchema = z.object({
 	intent: z.literal('cancel'),
 })
+
+function getStatusLabel(status: string): string {
+	switch (status) {
+		case 'PENDING':
+			return 'Pending'
+		case 'CONFIRMED':
+			return 'Confirmed'
+		case 'SHIPPED':
+			return 'Shipped'
+		case 'DELIVERED':
+			return 'Delivered'
+		case 'CANCELLED':
+			return 'Cancelled'
+		default:
+			return status
+	}
+}
 
 export async function loader({ params, request }: Route.LoaderArgs) {
 	await requireUserWithRole(request, 'admin')
@@ -84,7 +102,11 @@ export async function action({ params, request }: Route.ActionArgs) {
 
 		await cancelOrder(order.id, request)
 
-		return redirect(`/admin/orders/${orderNumber}`)
+		return redirectWithToast(`/admin/orders/${orderNumber}`, {
+			type: 'success',
+			title: 'Order Cancelled',
+			description: `Order ${orderNumber} has been cancelled successfully`,
+		})
 	}
 
 	// Handle status update
@@ -108,7 +130,16 @@ export async function action({ params, request }: Route.ActionArgs) {
 
 	await updateOrderStatus(order.id, status, request, trackingNumber || null)
 
-	return redirect(`/admin/orders/${orderNumber}`)
+	const statusLabel = getStatusLabel(status)
+	const description = trackingNumber
+		? `Order status updated to ${statusLabel} (Tracking: ${trackingNumber})`
+		: `Order status updated to ${statusLabel}`
+
+	return redirectWithToast(`/admin/orders/${orderNumber}`, {
+		type: 'success',
+		title: 'Order Updated',
+		description,
+	})
 }
 
 export const meta: Route.MetaFunction = ({ data }) => {
@@ -140,23 +171,6 @@ function getStatusBadgeVariant(status: string) {
 	}
 }
 
-function getStatusLabel(status: string) {
-	switch (status) {
-		case 'PENDING':
-			return 'Pending'
-		case 'CONFIRMED':
-			return 'Confirmed'
-		case 'SHIPPED':
-			return 'Shipped'
-		case 'DELIVERED':
-			return 'Delivered'
-		case 'CANCELLED':
-			return 'Cancelled'
-		default:
-			return status
-	}
-}
-
 export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 	const { order, currency } = loaderData
 	const statusFetcher = useFetcher()
@@ -185,9 +199,10 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 						variant="ghost"
 						size="icon"
 						className="h-9 w-9 rounded-lg transition-all duration-200 hover:bg-muted"
+						aria-label="Back to orders"
 					>
 						<Link to="/admin/orders">
-							<Icon name="arrow-left" className="h-5 w-5" />
+							<Icon name="arrow-left" className="h-5 w-5" aria-hidden="true" />
 						</Link>
 					</Button>
 					<div>
@@ -237,7 +252,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 							<div className="grid grid-cols-2 gap-6">
 								{/* Customer */}
 								<div className="flex items-start gap-3">
-									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0">
+									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0" aria-hidden="true">
 										<Icon name="user" className="h-5 w-5 text-muted-foreground" />
 									</div>
 									<div className="flex flex-col gap-1 min-w-0">
@@ -259,7 +274,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 
 								{/* Order Number */}
 								<div className="flex items-start gap-3">
-									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0">
+									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0" aria-hidden="true">
 										<Icon name="file-text" className="h-5 w-5 text-muted-foreground" />
 									</div>
 									<div className="flex flex-col gap-1 min-w-0">
@@ -272,7 +287,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 
 								{/* Email */}
 								<div className="flex items-start gap-3">
-									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0">
+									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0" aria-hidden="true">
 										<Icon name="envelope-closed" className="h-5 w-5 text-muted-foreground" />
 									</div>
 									<div className="flex flex-col gap-1 min-w-0">
@@ -351,15 +366,16 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 											<Button
 												type="submit"
 												disabled={isUpdating}
+												aria-busy={isUpdating}
 												className="w-full h-9 rounded-lg font-medium transition-all duration-200 bg-[var(--action-button)] text-[var(--action-button-foreground)] hover:bg-[var(--action-button)]/90"
 											>
 												{isUpdating ? (
 													<>
-														<Icon name="update" className="mr-2 h-4 w-4 animate-spin" />
-														Updating...
+														<Icon name="update" className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+														<span>Updating...</span>
 													</>
 												) : (
-													<>Update Status</>
+													<span>Update Status</span>
 												)}
 											</Button>
 										</statusFetcher.Form>
@@ -376,6 +392,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 											<Icon
 												name="cross-1"
 												className="h-5 w-5 flex-shrink-0 mt-0.5 text-[var(--destructive-accent)]"
+												aria-hidden="true"
 											/>
 											<div className="space-y-1">
 												<h3 className="text-sm font-normal text-foreground">Cancel Order</h3>
@@ -390,15 +407,16 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 												<Button
 													variant="destructive"
 													disabled={isCancelling}
+													aria-busy={isCancelling}
 													className="w-full h-9 rounded-lg font-medium transition-all duration-200"
 												>
 													{isCancelling ? (
 														<>
-															<Icon name="update" className="mr-2 h-4 w-4 animate-spin" />
-															Cancelling...
+															<Icon name="update" className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+															<span>Cancelling...</span>
 														</>
 													) : (
-														<>Cancel Order</>
+														<span>Cancel Order</span>
 													)}
 												</Button>
 											</AlertDialogTrigger>
@@ -441,7 +459,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 						</CardHeader>
 						<CardContent className="px-6 pb-6">
 							<div className="flex items-start gap-3">
-								<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0">
+								<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted flex-shrink-0" aria-hidden="true">
 									<Icon name="map-pin" className="h-5 w-5 text-muted-foreground" />
 								</div>
 								<div className="flex flex-col gap-2">
@@ -543,14 +561,14 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 export function ErrorBoundary() {
 	return (
 		<div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-			<Icon name="question-mark-circled" className="h-12 w-12 text-muted-foreground" />
+			<Icon name="question-mark-circled" className="h-12 w-12 text-muted-foreground" aria-hidden="true" />
 			<h2 className="text-xl font-semibold">Order not found</h2>
 			<p className="text-muted-foreground text-center">
 				The order you're looking for doesn't exist or has been deleted.
 			</p>
 			<Button asChild>
 				<Link to="/admin/orders">
-					<Icon name="arrow-left" className="mr-2 h-4 w-4" />
+					<Icon name="arrow-left" className="mr-2 h-4 w-4" aria-hidden="true" />
 					Back to Orders
 				</Link>
 			</Button>
