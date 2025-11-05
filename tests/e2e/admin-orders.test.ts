@@ -72,9 +72,18 @@ test.describe('Admin Order Management', () => {
 
 	test.afterEach(async () => {
 		// Clean up test data
+		// Delete Orders first (will cascade delete OrderItems)
 		await prisma.order.deleteMany({
 			where: {
 				orderNumber: { startsWith: 'ORD-' },
+			},
+		})
+		// Delete CartItems before Products
+		await prisma.cartItem.deleteMany({
+			where: {
+				product: {
+					categoryId: testCategory.id,
+				},
 			},
 		})
 		await prisma.product.deleteMany({

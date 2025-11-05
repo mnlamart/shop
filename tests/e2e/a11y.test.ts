@@ -129,6 +129,13 @@ test.describe('Accessibility', () => {
 			await prisma.attribute.deleteMany({
 				where: { id: testAttribute.id },
 			})
+			// Delete OrderItems first (Restrict constraint on Product)
+			await prisma.orderItem.deleteMany({
+				where: { productId: testProduct.id },
+			})
+			await prisma.cartItem.deleteMany({
+				where: { productId: testProduct.id },
+			})
 			await prisma.product.deleteMany({
 				where: { id: testProduct.id },
 			})
@@ -245,6 +252,34 @@ test.describe('Accessibility', () => {
 		test('cache page should be accessible', async ({ page, insertNewUser }) => {
 			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin/cache')
 			await expectPageToBeAccessible(page)
+		})
+
+		test('users list page should be accessible', async ({ page, insertNewUser }) => {
+			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin/users')
+			await expectPageToBeAccessible(page, {
+				disableRules: ['button-name'], // Radix SelectTrigger buttons have aria-labels but axe-core doesn't always recognize them
+			})
+		})
+
+		test('user detail page should be accessible', async ({ page, insertNewUser }) => {
+			// Create a test user for detail page
+			const testUser = await prisma.user.create({
+				data: {
+					username: `testuser-a11y-${Date.now()}`,
+					email: `testuser-a11y-${Date.now()}@example.com`,
+					name: 'Test User A11y',
+				},
+			})
+
+			try {
+				await loginAndNavigateToAdminPage(page, insertNewUser, `/admin/users/${testUser.id}`)
+				await expectPageToBeAccessible(page)
+			} finally {
+				// Cleanup
+				await prisma.user.deleteMany({
+					where: { id: testUser.id },
+				})
+			}
 		})
 	})
 

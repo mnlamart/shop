@@ -53,6 +53,11 @@ const navData = {
 						{ title: 'Add Attribute', url: '/admin/attributes/new' },
 					],
 				},
+				{
+					title: 'Users',
+					url: '/admin/users',
+					icon: 'user' as IconName,
+				},
 			],
 		},
 		{

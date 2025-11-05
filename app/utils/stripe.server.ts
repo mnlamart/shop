@@ -5,16 +5,21 @@ import Stripe from 'stripe'
 /**
  * Initialize Stripe client with API key from environment variables.
  * Throws an error if STRIPE_SECRET_KEY is not set.
+ * 
+ * In test mode, we use the default HTTP client so MSW can intercept requests.
+ * In development/production, we use fetch-based HTTP client to bypass MSW.
  */
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 	apiVersion: '2025-10-29.clover',
 	maxNetworkRetries: 0, // Disable retries to fail fast
 	timeout: 10000, // 10 seconds global timeout
 	telemetry: false, // Disable telemetry for faster requests
-	// Use fetch-based HTTP client to bypass MSW interception
-	// MSW only intercepts Node's http/https modules, not fetch
+	// Use fetch-based HTTP client in non-test environments to bypass MSW interception
+	// In test mode, use default HTTP client so MSW can intercept requests
 	// See: https://github.com/mswjs/msw/issues/2259#issuecomment-2422672039
-	httpClient: Stripe.createFetchHttpClient(),
+	...(process.env.NODE_ENV !== 'test' && {
+		httpClient: Stripe.createFetchHttpClient(),
+	}),
 })
 
 invariant(

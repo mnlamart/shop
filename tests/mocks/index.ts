@@ -7,9 +7,10 @@ import { handlers as stripeHandlers } from './stripe.ts'
 import { handlers as tigrisHandlers } from './tigris.ts'
 
 const handlersToUse = [
-	// IMPORTANT: Stripe passthrough handlers MUST be first to ensure they're matched before other handlers
-	// In development, pass through Stripe API requests (we want to use real Stripe)
-	...(process.env.NODE_ENV !== 'test' ? stripeHandlers : []),
+	// IMPORTANT: Stripe handlers MUST be first to ensure they're matched before other handlers
+	// In test mode: use mocked Stripe handlers
+	// In development: pass through Stripe API requests (we want to use real Stripe)
+	...stripeHandlers,
 	...resendHandlers,
 	...githubHandlers,
 	...tigrisHandlers,
@@ -31,9 +32,12 @@ server.listen({
 		if (request.url.includes('__rrdt')) {
 			return
 		}
-		// Always bypass Stripe API requests - we want to use real Stripe
-		// This prevents MSW from intercepting these requests at all
-		if (request.url.includes('api.stripe.com') || request.url.includes('checkout.stripe.com')) {
+		// In development mode, bypass Stripe API requests - we want to use real Stripe
+		// In test mode, Stripe requests are handled by mock handlers
+		if (
+			process.env.NODE_ENV !== 'test' &&
+			(request.url.includes('api.stripe.com') || request.url.includes('checkout.stripe.com'))
+		) {
 			return
 		}
 		// Print the regular MSW unhandled request warning otherwise.
