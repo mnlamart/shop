@@ -1,11 +1,12 @@
 import { parseWithZod } from '@conform-to/zod/v4'
 import { parseFormData } from '@mjackson/form-data-parser'
-import { Prisma } from '@prisma/client'
+import { type Prisma } from '@prisma/client'
 import { data } from 'react-router'
 import { MAX_UPLOAD_SIZE } from '#app/schemas/constants'
 import { productSchema } from '#app/schemas/product.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
+import { handlePrismaError } from '#app/utils/prisma-error.server.ts'
 import { uploadProductImage } from '#app/utils/storage.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { type Route } from './+types/new.ts'
@@ -22,101 +23,6 @@ export function imageHasFile(
 	image: { file?: File },
 ): image is { file: NonNullable<{ file?: File }['file']> } {
 	return Boolean(image.file?.size && image.file?.size > 0)
-}
-
-/**
- * Result type for Prisma error handling
- */
-export type PrismaErrorResult = {
-	formErrors: string[]
-	fieldErrors?: Record<string, string[]>
-	statusCode: number
-}
-
-/**
- * Handles Prisma database errors and converts them to user-friendly error messages
- * 
- * @param error - The error object from Prisma operations
- * @returns Structured error result with form errors, field errors, and status code
- */
-export function handlePrismaError(error: unknown): PrismaErrorResult {
-	// 1. Known Prisma errors
-	if (error instanceof Prisma.PrismaClientKnownRequestError) {
-		const fieldErrors: Record<string, string[]> = {}
-
-		switch (error.code) {
-			case 'P2002': // Unique constraint violation
-				if (error.meta && 'target' in error.meta) {
-					const target = error.meta.target as string[]
-					if (target.includes('slug')) {
-						fieldErrors.slug = ['This slug already exists']
-					}
-					if (target.includes('sku')) {
-						fieldErrors.sku = ['This SKU already exists']
-					}
-					if (target.includes('tagId')) {
-						fieldErrors.tags = ['A tag with this name already exists']
-					}
-				}
-				break
-
-			case 'P2003': // Foreign key constraint failed
-				if (error.meta && 'field_name' in error.meta) {
-					fieldErrors.categoryId = ['This category does not exist']
-				}
-				break
-
-			case 'P2025': // Record not found
-				return {
-					formErrors: ['Record not found'],
-					statusCode: 404
-				}
-		}
-
-		return {
-			formErrors: ['Validation error'],
-			fieldErrors: Object.keys(fieldErrors).length > 0 ? fieldErrors : undefined,
-			statusCode: 400
-		}
-	}
-
-	// 2. Prisma validation errors
-	if (error instanceof Prisma.PrismaClientValidationError) {
-		return {
-			formErrors: ['Invalid data. Please check required fields.'],
-			statusCode: 400
-		}
-	}
-
-	// 3. Unknown Prisma errors
-	if (error instanceof Prisma.PrismaClientUnknownRequestError) {
-		return {
-			formErrors: ['Database error. Please try again later.'],
-			statusCode: 500
-		}
-	}
-
-	// 4. Prisma initialization errors
-	if (error instanceof Prisma.PrismaClientInitializationError) {
-		return {
-			formErrors: ['Service temporarily unavailable.'],
-			statusCode: 503
-		}
-	}
-
-	// 5. Rust panic errors (rare but possible)
-	if (error instanceof Prisma.PrismaClientRustPanicError) {
-		return {
-			formErrors: ['System error. Please restart the application.'],
-			statusCode: 500
-		}
-	}
-
-	// 6. Generic error
-	return {
-		formErrors: ['An unexpected error occurred'],
-		statusCode: 500
-	}
 }
 
 /**

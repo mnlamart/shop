@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { describe, expect, test } from 'vitest'
+import { handlePrismaError } from '#app/utils/prisma-error.server.ts'
 import { consoleError } from '#tests/setup/setup-test-env'
-import { handlePrismaError } from './__new.server.tsx'
 
 // Helper function copied from server file since it's not exported
 function imageHasFile(
