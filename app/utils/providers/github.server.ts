@@ -1,5 +1,6 @@
 import { SetCookie } from '@mjackson/headers'
 import { createId as cuid } from '@paralleldrive/cuid2'
+import * as Sentry from '@sentry/react-router'
 import { redirect } from 'react-router'
 import { GitHubStrategy } from 'remix-auth-github'
 import { z } from 'zod'
@@ -47,9 +48,11 @@ export class GitHubProvider implements AuthProvider {
 			!process.env.GITHUB_CLIENT_SECRET ||
 			!process.env.GITHUB_REDIRECT_URI
 		) {
-			console.log(
-				'GitHub OAuth strategy not available because environment variables are not set',
-			)
+			// Log missing env vars for monitoring (not an error, just informational)
+			Sentry.captureMessage('GitHub OAuth strategy not available - environment variables not set', {
+				level: 'info',
+				tags: { context: 'github-provider-init' },
+			})
 			return null
 		}
 		return new GitHubStrategy(

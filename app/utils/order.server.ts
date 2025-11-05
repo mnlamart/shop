@@ -1,5 +1,6 @@
 import { invariant } from '@epic-web/invariant'
 import { type OrderStatus } from '@prisma/client'
+import * as Sentry from '@sentry/react-router'
 import type Stripe from 'stripe'
 import { prisma } from './db.server.ts'
 import { sendEmail } from './email.server.ts'
@@ -326,10 +327,10 @@ New Status: ${statusLabel}
 	} catch (emailError) {
 		// Log email error but don't fail status update
 		// Status was successfully updated, email is secondary
-		console.error(
-			`Failed to send status update email for order ${order.orderNumber}:`,
-			emailError,
-		)
+		Sentry.captureException(emailError, {
+			tags: { context: 'order-status-email' },
+			extra: { orderNumber: order.orderNumber },
+		})
 	}
 }
 
@@ -400,10 +401,10 @@ export async function cancelOrder(orderId: string, request?: Request): Promise<v
 		} catch (refundError) {
 			// Log refund error but don't fail order cancellation
 			// Admin can manually process refund if needed
-			console.error(
-				`Failed to create refund for order ${order.orderNumber}:`,
-				refundError,
-			)
+			Sentry.captureException(refundError, {
+				tags: { context: 'order-cancellation-refund' },
+				extra: { orderNumber: order.orderNumber },
+			})
 			// Still proceed with order cancellation
 		}
 	}
@@ -442,10 +443,10 @@ View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
 		})
 	} catch (emailError) {
 		// Log email error but don't fail cancellation
-		console.error(
-			`Failed to send cancellation email for order ${order.orderNumber}:`,
-			emailError,
-		)
+		Sentry.captureException(emailError, {
+			tags: { context: 'order-cancellation-email' },
+			extra: { orderNumber: order.orderNumber },
+		})
 	}
 }
 
@@ -647,10 +648,10 @@ export async function createOrderFromStripeSession(
 					}
 				} catch (err) {
 					// Log but don't fail order creation if charge retrieval fails
-					console.error(
-						`[ORDER] Failed to retrieve charge ID for payment intent ${paymentIntentId}:`,
-						err,
-					)
+					Sentry.captureException(err, {
+						tags: { context: 'order-charge-retrieval' },
+						extra: { paymentIntentId },
+					})
 				}
 			}
 
@@ -738,10 +739,10 @@ View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
 		})
 	} catch (emailError) {
 		// Log email error but don't fail order creation
-		console.error(
-			`[ORDER] Failed to send confirmation email for order ${order.orderNumber}:`,
-			emailError,
-		)
+		Sentry.captureException(emailError, {
+			tags: { context: 'order-confirmation-email' },
+			extra: { orderNumber: order.orderNumber },
+		})
 	}
 
 	return { id: order.id, orderNumber: order.orderNumber }

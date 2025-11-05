@@ -1,4 +1,5 @@
 import { invariant, invariantResponse } from '@epic-web/invariant'
+import * as Sentry from '@sentry/react-router'
 import Stripe from 'stripe'
 
 /**
@@ -194,21 +195,15 @@ export async function createCheckoutSession({
 
 		return session
 	} catch (error) {
-		console.error('[STRIPE] Error creating checkout session:', {
-			error,
-			message: error instanceof Error ? error.message : 'Unknown error',
-			stack: error instanceof Error ? error.stack : undefined,
-			errorType: error instanceof Error ? error.constructor.name : typeof error,
+		// Log error to Sentry before re-throwing
+		// Caller will handle the error appropriately
+		Sentry.captureException(error, {
+			tags: { context: 'stripe-checkout-session-creation' },
+			extra: {
+				message: error instanceof Error ? error.message : 'Unknown error',
+				errorType: error instanceof Error ? error.constructor.name : typeof error,
+			},
 		})
-		// Log specific Stripe error details if available
-		if (error && typeof error === 'object' && 'type' in error) {
-			console.error('[STRIPE] Stripe error details:', {
-				type: (error as any).type,
-				code: (error as any).code,
-				param: (error as any).param,
-				message: (error as any).message,
-			})
-		}
 		throw error
 	}
 }

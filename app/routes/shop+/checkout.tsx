@@ -1,6 +1,7 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
+import * as Sentry from '@sentry/react-router'
 import { useEffect } from 'react'
 import { data, Form, Outlet, redirect, redirectDocument, useLocation } from 'react-router'
 import { z } from 'zod'
@@ -202,7 +203,7 @@ export async function action({ request }: Route.ActionArgs) {
 	try {
 		await validateStockAvailability(cart.id)
 	} catch (error) {
-		console.error('[CHECKOUT] Stock validation failed:', error)
+		// Stock validation errors are user-facing, not logged to Sentry
 		if (error instanceof StockValidationError) {
 			const stockMessages = error.issues.map(
 				(issue) =>
@@ -217,6 +218,10 @@ export async function action({ request }: Route.ActionArgs) {
 				{ status: 400 },
 			)
 		}
+		// Log unexpected errors
+		Sentry.captureException(error, {
+			tags: { context: 'checkout-stock-validation' },
+		})
 		throw error
 	}
 
@@ -281,7 +286,10 @@ export async function action({ request }: Route.ActionArgs) {
 		// Return redirect URL in response for client-side redirect (external URLs don't work with redirectDocument from form actions)
 		return data({ redirectUrl: session.url }, { status: 200 })
 	} catch (error) {
-		console.error('[CHECKOUT] Error creating checkout session:', error)
+		// Log Stripe errors to Sentry for monitoring
+		Sentry.captureException(error, {
+			tags: { context: 'checkout-session-creation' },
+		})
 		const stripeError = handleStripeError(error)
 
 		return data(

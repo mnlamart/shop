@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-router'
 import { getUserId } from './auth.server.ts'
 import { getCartSessionId, getCartSessionIdFromRequest } from './cart-session.server.ts'
 import { prisma } from './db.server.ts'
@@ -243,7 +244,10 @@ export async function mergeCartOnUserLogin(request: Request, userId: string) {
 		}
 	} catch (error) {
 		// Log error but don't fail login if cart merge fails
-		console.error('Failed to merge cart on login:', error)
+		Sentry.captureException(error, {
+			tags: { context: 'cart-merge-on-login' },
+			extra: { userId },
+		})
 	}
 }
 

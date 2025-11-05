@@ -5,6 +5,7 @@ import {
 	type SubmissionResult,
 } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
+import * as Sentry from '@sentry/react-router'
 import {
 	redirect,
 	data,
@@ -72,7 +73,10 @@ async function requireData({
 	if (result.success) {
 		return result.data
 	} else {
-		console.error(result.error)
+		Sentry.captureException(result.error, {
+			tags: { context: 'onboarding-provider' },
+			extra: { provider: params.provider, email },
+		})
 		throw redirect('/signup')
 	}
 }

@@ -1,6 +1,7 @@
 import { createHash, createHmac } from 'crypto'
 import { type FileUpload } from '@mjackson/form-data-parser'
 import { createId } from '@paralleldrive/cuid2'
+import * as Sentry from '@sentry/react-router'
 
 const STORAGE_ENDPOINT = process.env.AWS_ENDPOINT_URL_S3
 const STORAGE_BUCKET = process.env.BUCKET_NAME
@@ -19,7 +20,10 @@ async function uploadToStorage(file: File | FileUpload, key: string) {
 
 	if (!uploadResponse.ok) {
 		const errorMessage = `Failed to upload file to storage. Server responded with ${uploadResponse.status}: ${uploadResponse.statusText}`
-		console.error(errorMessage)
+		Sentry.captureException(new Error(errorMessage), {
+			tags: { context: 'storage-upload' },
+			extra: { key, status: uploadResponse.status, statusText: uploadResponse.statusText },
+		})
 		throw new Error(`Failed to upload object: ${key}`)
 	}
 
@@ -220,7 +224,10 @@ export async function deleteObjectFromStorage(objectKey: string): Promise<void> 
 	// Silently succeed if object doesn't exist (idempotent)
 	if (!deleteResponse.ok && deleteResponse.status !== 404) {
 		const errorMessage = `Failed to delete object from storage. Server responded with ${deleteResponse.status}: ${deleteResponse.statusText}`
-		console.error(errorMessage)
+		Sentry.captureException(new Error(errorMessage), {
+			tags: { context: 'storage-delete' },
+			extra: { objectKey, status: deleteResponse.status, statusText: deleteResponse.statusText },
+		})
 		throw new Error(`Failed to delete object: ${objectKey}`)
 	}
 }

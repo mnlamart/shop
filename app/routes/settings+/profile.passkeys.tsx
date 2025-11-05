@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-router'
 import { startRegistration } from '@simplewebauthn/browser'
 import { formatDistanceToNow } from 'date-fns'
 import { useState } from 'react'
@@ -118,7 +119,9 @@ export default function Passkeys({ loaderData }: Route.ComponentProps) {
 
 			void revalidator.revalidate()
 		} catch (err) {
-			console.error('Failed to create passkey:', err)
+			Sentry.captureException(err, {
+				tags: { context: 'passkey-registration' },
+			})
 			setError('Failed to create passkey. Please try again.')
 		}
 	}

@@ -1,8 +1,9 @@
 import { invariant } from '@epic-web/invariant'
 import { faker } from '@faker-js/faker'
 import { SetCookie } from '@mjackson/headers'
+import * as Sentry from '@sentry/react-router'
 import { http } from 'msw'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { twoFAVerificationType } from '#app/routes/settings+/profile.two-factor.tsx'
 import { getSessionExpirationDate, sessionKey } from '#app/utils/auth.server.ts'
 import { GITHUB_PROVIDER_NAME } from '#app/utils/connections.tsx'
@@ -12,9 +13,13 @@ import { generateTOTP } from '#app/utils/totp.server.ts'
 import { createUser } from '#tests/db-utils.ts'
 import { insertGitHubUser, deleteGitHubUsers } from '#tests/mocks/github.ts'
 import { server } from '#tests/mocks/index.ts'
-import { consoleError } from '#tests/setup/setup-test-env.ts'
 import { BASE_URL, convertSetCookieToCookie } from '#tests/utils.ts'
 import { loader } from './auth.$provider.callback.ts'
+
+vi.mock('@sentry/react-router', () => ({
+	captureException: vi.fn(),
+	captureMessage: vi.fn(),
+}))
 
 const ROUTE_PATH = '/auth/github/callback'
 const PARAMS = { provider: 'github' }
@@ -32,7 +37,6 @@ test('a new user goes to onboarding', async () => {
 })
 
 test('when auth fails, send the user to login with a toast', async () => {
-	consoleError.mockImplementation(() => {})
 	server.use(
 		http.post('https://github.com/login/oauth/access_token', async () => {
 			return new Response(null, { status: 400 })
@@ -50,7 +54,12 @@ test('when auth fails, send the user to login with a toast', async () => {
 			type: 'error',
 		}),
 	)
-	expect(consoleError).toHaveBeenCalledTimes(1)
+	expect(Sentry.captureException).toHaveBeenCalledWith(
+		expect.any(Error),
+		expect.objectContaining({
+			tags: { context: 'auth-provider-callback' },
+		}),
+	)
 })
 
 test('when a user is logged in, it creates the connection', async () => {

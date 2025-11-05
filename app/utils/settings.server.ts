@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-router'
 import { cachified, cache } from './cache.server.ts'
 import { prisma } from './db.server.ts'
 import { type Timings } from './timing.server.ts'
@@ -31,9 +32,10 @@ export async function getStoreCurrency({ timings }: { timings?: Timings } = {}) 
 
 	// Validate cached result - if it's missing required fields, clear cache and refetch
 	if (result && (!result.code || typeof result.code !== 'string')) {
-		console.warn(
-			'Currency cache has invalid data (missing code field), clearing cache and refetching...',
-		)
+		Sentry.captureMessage('Currency cache has invalid data (missing code field)', {
+			level: 'warning',
+			tags: { context: 'settings-currency-cache' },
+		})
 		await cache.delete('settings:currency')
 		// Refetch without cache
 		const freshSettings = await prisma.settings.findUnique({
