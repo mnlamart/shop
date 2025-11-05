@@ -132,11 +132,23 @@ export function handleError(
 		return
 	}
 
-	if (error instanceof Error) {
-		console.error(styleText('red', String(error.stack)))
-	} else {
-		console.error(error)
-	}
+	// Log to Sentry with context
+	Sentry.captureException(error, {
+		tags: {
+			context: 'server-error-handler',
+		},
+		extra: {
+			url: request.url,
+			method: request.method,
+		},
+	})
 
-	Sentry.captureException(error)
+	// Also log to console in development for local debugging
+	if (process.env.NODE_ENV === 'development') {
+		if (error instanceof Error) {
+			console.error(styleText('red', String(error.stack)))
+		} else {
+			console.error(error)
+		}
+	}
 }

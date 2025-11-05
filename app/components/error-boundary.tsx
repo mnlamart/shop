@@ -30,15 +30,34 @@ export function GeneralErrorBoundary({
 	const params = useParams()
 	const isResponse = isRouteErrorResponse(error)
 
-	if (typeof document !== 'undefined') {
-		console.error(error)
-	}
-
 	useEffect(() => {
-		if (isResponse) return
-
-		captureException(error)
-	}, [error, isResponse])
+		if (isResponse) {
+			// Log route error responses with context
+			captureException(error, {
+				tags: {
+					context: 'error-boundary',
+					errorType: 'route-error-response',
+					status: error.status,
+				},
+				extra: {
+					status: error.status,
+					data: error.data,
+					params,
+				},
+			})
+		} else {
+			// Log unexpected errors
+			captureException(error, {
+				tags: {
+					context: 'error-boundary',
+					errorType: 'unexpected-error',
+				},
+				extra: {
+					params,
+				},
+			})
+		}
+	}, [error, isResponse, params])
 
 	return (
 		<div className="text-h2 container flex items-center justify-center p-20">

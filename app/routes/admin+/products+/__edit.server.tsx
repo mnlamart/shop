@@ -6,10 +6,11 @@ import { MAX_UPLOAD_SIZE } from '#app/schemas/constants'
 import { productSchema } from '#app/schemas/product.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
+import { handlePrismaError } from '#app/utils/prisma-error.server.ts'
 import { uploadProductImage } from '#app/utils/storage.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { type Route } from './+types/$productSlug_.edit.ts'
-import { handlePrismaError, imageHasFile } from './__new.server.tsx'
+import { imageHasFile } from './__new.server.tsx'
 
 /**
  * Handles product edit form submissions
