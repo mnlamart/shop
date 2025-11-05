@@ -115,7 +115,7 @@ export const meta: Route.MetaFunction = () => [
 	{ name: 'description', content: 'Create a new category' },
 ]
 
-function CategoryForm({ categories, actionData }: { categories: any[], actionData?: any }) {
+function CategoryForm({ categories, actionData }: { categories: Route.ComponentProps['loaderData']['categories']; actionData?: Route.ComponentProps['actionData'] }) {
 	const isPending = useIsPending()
 
 	const [form, fields] = useForm({
@@ -217,7 +217,7 @@ function CategorySelect({
 	field,
 	categories,
 }: {
-	field: any
+	field: ReturnType<typeof useForm<z.infer<typeof CategorySchema>>>[1]['parentId']
 	categories: Array<{ id: string; name: string; parentId: string | null }>
 }) {
 	const input = useInputControl(field)

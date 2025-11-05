@@ -4,6 +4,7 @@ import { invariantResponse } from '@epic-web/invariant'
 import { parseFormData } from '@mjackson/form-data-parser'
 import * as Sentry from '@sentry/react-router'
 import { Form, Link, data } from 'react-router'
+import { type z } from 'zod'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
@@ -263,7 +264,7 @@ function CategorySelect({
 	field,
 	categories,
 }: {
-	field: any
+	field: ReturnType<typeof useForm<z.infer<typeof CategorySchema>>>[1]['parentId']
 	categories: Array<{ id: string; name: string; parentId: string | null }>
 }) {
 	const input = useInputControl(field)

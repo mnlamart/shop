@@ -78,7 +78,10 @@ export const meta: Route.MetaFunction = ({ loaderData }) => [
 
 export default function AttributeView({ loaderData }: Route.ComponentProps) {
 	const { attribute, products } = loaderData
-	const totalVariants = attribute.values.reduce((sum: number, value: any) => sum + value._count.variants, 0)
+	type AttributeValue = Route.ComponentProps['loaderData']['attribute']['values'][number]
+	type Product = Route.ComponentProps['loaderData']['products'][number]
+	
+	const totalVariants = attribute.values.reduce((sum: number, value: AttributeValue) => sum + value._count.variants, 0)
 	const hasVariants = totalVariants > 0
 
 	return (
@@ -160,7 +163,7 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 				</CardHeader>
 				<CardContent>
 					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-						{attribute.values.map((value: any) => (
+						{attribute.values.map((value: AttributeValue) => (
 							<div key={value.id} className="flex items-center justify-between p-3 border rounded-lg">
 								<div>
 									<div className="font-medium">{value.value}</div>
@@ -192,14 +195,14 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 					</CardHeader>
 					<CardContent>
 						<div className="space-y-3">
-							{products.map((product: any) => (
+							{products.map((product: Product) => (
 								<div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
 									<div className="flex items-center gap-3">
 										{product.images[0] ? (
 											<div className="h-10 w-10 flex-shrink-0">
 												<img 
 													src={`/resources/images?objectKey=${encodeURIComponent(product.images[0].objectKey)}`} 
-													alt={product.images[0].altText || product.name}
+													alt={product.name}
 													className="h-10 w-10 rounded object-cover"
 												/>
 											</div>

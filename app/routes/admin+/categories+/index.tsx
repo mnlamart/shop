@@ -76,7 +76,7 @@ export const meta: Route.MetaFunction = () => [
 	{ name: 'description', content: 'Manage product categories' },
 ]
 
-function CategoryRow({ category, level = 0 }: { category: any; level?: number }) {
+function CategoryRow({ category, level = 0 }: { category: Route.ComponentProps['loaderData']['categories'][number] & { level?: number }; level?: number }) {
 	const fetcher = useFetcher()
 	const isUncategorized = category.id === UNCATEGORIZED_CATEGORY_ID
 	const hasChildren = category.children && category.children.length > 0
@@ -207,7 +207,7 @@ function CategoryRow({ category, level = 0 }: { category: any; level?: number })
 					</div>
 				</TableCell>
 			</TableRow>
-			{hasChildren && category.children.map((child: any) => (
+			{hasChildren && category.children.map((child: Route.ComponentProps['loaderData']['categories'][number]['children'][number]) => (
 				<CategoryRow key={child.id} category={child} level={level + 1} />
 			))}
 		</>
@@ -221,12 +221,14 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 
 	// Flatten categories for search and filtering
 	const allCategories = useMemo(() => {
-		const flatten = (cats: any[], level = 0): any[] => {
-			const result: any[] = []
+		type CategoryWithLevel = Route.ComponentProps['loaderData']['categories'][number] & { level: number }
+		
+		const flatten = (cats: Route.ComponentProps['loaderData']['categories'], level = 0): CategoryWithLevel[] => {
+			const result: CategoryWithLevel[] = []
 			for (const cat of cats) {
 				result.push({ ...cat, level })
 				if (cat.children && cat.children.length > 0) {
-					result.push(...flatten(cat.children, level + 1))
+					result.push(...flatten(cat.children as Route.ComponentProps['loaderData']['categories'], level + 1))
 				}
 			}
 			return result
@@ -264,7 +266,7 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 			return filteredCategories
 		}
 		// For unfiltered results, show hierarchical structure
-		return categories
+		return categories.map(cat => ({ ...cat, level: 0 }))
 	}, [filteredCategories, categories, searchTerm, filterType])
 
 	return (
@@ -333,8 +335,8 @@ export default function CategoriesList({ loaderData }: Route.ComponentProps) {
 						{displayCategories.map((category) => (
 							<CategoryRow 
 								key={category.id} 
-								category={category} 
-								level={category.level || 0}
+								category={category}
+								level={category.level}
 							/>
 						))}
 					</TableBody>

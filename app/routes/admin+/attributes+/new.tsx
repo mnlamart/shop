@@ -91,7 +91,7 @@ export const meta: Route.MetaFunction = () => [
 	{ name: 'description', content: 'Create a new attribute' },
 ]
 
-function AttributeForm({ actionData }: { actionData?: any }) {
+function AttributeForm({ actionData }: { actionData?: Route.ComponentProps['actionData'] }) {
 	const isPending = useIsPending()
 
 	const [form, fields] = useForm({

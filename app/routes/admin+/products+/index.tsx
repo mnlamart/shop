@@ -103,7 +103,7 @@ function StatusBadge({ status }: { status: string }) {
 	return <Badge variant="secondary">Draft</Badge>
 }
 
-function DeleteProductButton({ product }: { product: any }) {
+function DeleteProductButton({ product }: { product: Route.ComponentProps['loaderData']['products'][number] }) {
 	const fetcher = useFetcher()
 
 	return (
