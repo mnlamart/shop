@@ -271,7 +271,8 @@ test.describe('Order History', () => {
 	})
 
 	test.afterEach(async () => {
-		// Cleanup: Delete test orders, products, and categories
+		// Cleanup: Delete in order to respect foreign key constraints
+		// Delete Orders first (will cascade delete OrderItems)
 		await prisma.order.deleteMany({
 			where: {
 				stripeCheckoutSessionId: {
@@ -280,6 +281,18 @@ test.describe('Order History', () => {
 			},
 		})
 
+		// Delete CartItems before Products
+		await prisma.cartItem.deleteMany({
+			where: {
+				product: {
+					sku: {
+						startsWith: 'SKU-',
+					},
+				},
+			},
+		})
+
+		// Now we can safely delete products
 		await prisma.product.deleteMany({
 			where: {
 				sku: {
