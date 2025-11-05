@@ -147,15 +147,24 @@ test.describe('Category Page', () => {
 		// Navigate to category1 page
 		await page.goto(`/shop/categories/${category1.slug}`)
 
+		// Wait for page to load
+		await page.waitForLoadState('networkidle')
+
 		// Initially should show only category1 products
 		await expect(page.getByRole('heading', { name: product1.name })).toBeVisible()
 
 		// Change filter to category2
 		const filterSelect = page.getByLabel(/filter by category/i)
 		await filterSelect.selectOption(category2.id)
+		
+		// Wait for the filter to update the products
+		await page.waitForTimeout(500)
+		await page.waitForLoadState('networkidle')
 
 		// Should now show only category2 products
 		await expect(page.getByRole('heading', { name: product2.name })).toBeVisible()
+		// Product A1 should not be visible
+		await expect(page.getByRole('heading', { name: product1.name })).not.toBeVisible()
 	})
 })
 

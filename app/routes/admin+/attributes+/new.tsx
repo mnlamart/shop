@@ -17,10 +17,16 @@ import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { type Route } from './+types/new.ts'
 
 const VariantAttributeSchema = z.object({
-	name: z.string().min(1, { error: 'Name is required' }).max(50, {
+	name: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'Name is required' : 'Not a string',
+	}).min(1, { error: 'Name is required' }).max(50, {
 		error: 'Name must be less than 50 characters',
 	}),
-	values: z.string().min(1, { error: 'At least one value is required' }),
+	values: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'At least one value is required' : 'Not a string',
+	}).min(1, { error: 'At least one value is required' }),
 })
 
 export async function action({ request }: Route.ActionArgs) {

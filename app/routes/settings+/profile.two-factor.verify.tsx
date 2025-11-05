@@ -22,10 +22,19 @@ export const handle: BreadcrumbHandle & SEOHandle = {
 	getSitemapEntries: () => null,
 }
 
-const CancelSchema = z.object({ intent: z.literal('cancel') })
+const CancelSchema = z.object({ 
+	intent: z.literal('cancel', {
+		error: 'Invalid intent value',
+	}) 
+})
 const VerifySchema = z.object({
-	intent: z.literal('verify'),
-	code: z.string().min(6).max(6),
+	intent: z.literal('verify', {
+		error: 'Invalid intent value',
+	}),
+	code: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'Code is required' : 'Not a string',
+	}).min(6, { error: 'Code must be 6 characters' }).max(6, { error: 'Code must be 6 characters' }),
 })
 
 const ActionSchema = z.discriminatedUnion('intent', [

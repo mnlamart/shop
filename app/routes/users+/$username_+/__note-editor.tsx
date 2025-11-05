@@ -37,7 +37,7 @@ const ImageFieldsetSchema = z.object({
 		.optional()
 		.refine((file) => {
 			return !file || file.size <= MAX_UPLOAD_SIZE
-		}, 'File size must be less than 3MB'),
+		}, { error: 'File size must be less than 3MB' }),
 	altText: z.string().optional(),
 })
 
@@ -45,9 +45,21 @@ export type ImageFieldset = z.infer<typeof ImageFieldsetSchema>
 
 export const NoteEditorSchema = z.object({
 	id: z.string().optional(),
-	title: z.string().min(titleMinLength).max(titleMaxLength),
-	content: z.string().min(contentMinLength).max(contentMaxLength),
-	images: z.array(ImageFieldsetSchema).max(5).optional(),
+	title: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'Title is required' : 'Not a string',
+	}).min(titleMinLength, { error: `Title must be at least ${titleMinLength} characters` }).max(titleMaxLength, {
+		error: `Title must be less than ${titleMaxLength} characters`,
+	}),
+	content: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'Content is required' : 'Not a string',
+	}).min(contentMinLength, { error: `Content must be at least ${contentMinLength} characters` }).max(contentMaxLength, {
+		error: `Content must be less than ${contentMaxLength} characters`,
+	}),
+	images: z.array(ImageFieldsetSchema).max(5, {
+		error: 'Maximum 5 images allowed',
+	}).optional(),
 })
 
 export function NoteEditor({

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, useLocation, Link } from 'react-router'
 import { AppSidebar } from '#app/components/app-sidebar.tsx'
+import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
 import {
 	Breadcrumb,
 	BreadcrumbItem,
@@ -9,6 +10,7 @@ import {
 	BreadcrumbPage,
 	BreadcrumbSeparator,
 } from '#app/components/ui/breadcrumb.tsx'
+import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { Toggle } from '#app/components/ui/toggle.tsx'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
@@ -119,5 +121,28 @@ export default function AdminLayout() {
 				</main>
 			</div>
 		</div>
+	)
+}
+
+export function ErrorBoundary() {
+	return (
+		<GeneralErrorBoundary
+			statusHandlers={{
+				403: ({ error }) => (
+					<div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+						<Icon name="lock-closed" className="h-12 w-12 text-muted-foreground" />
+						<h2 className="text-xl font-semibold">Unauthorized</h2>
+						<p className="text-muted-foreground text-center">
+							{typeof error.data === 'object' && error.data && 'message' in error.data
+								? String(error.data.message)
+								: 'You do not have permission to access this page.'}
+						</p>
+						<Button asChild>
+							<Link to="/">Back to Home</Link>
+						</Button>
+					</div>
+				),
+			}}
+		/>
 	)
 }

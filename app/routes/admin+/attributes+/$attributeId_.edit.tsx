@@ -19,11 +19,20 @@ import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { type Route } from './+types/$attributeId_.edit.ts'
 
 const AttributeEditSchema = z.object({
-	id: z.string(),
-	name: z.string().min(1, { error: 'Name is required' }).max(50, {
+	id: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'ID is required' : 'Not a string',
+	}),
+	name: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'Name is required' : 'Not a string',
+	}).min(1, { error: 'Name is required' }).max(50, {
 		error: 'Name must be less than 50 characters',
 	}),
-	values: z.string().min(1, { error: 'At least one value is required' }),
+	values: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'At least one value is required' : 'Not a string',
+	}).min(1, { error: 'At least one value is required' }),
 })
 
 export async function loader({ params, request }: Route.LoaderArgs) {

@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router'
+import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
@@ -332,16 +333,24 @@ export default function OrdersList({ loaderData }: Route.ComponentProps) {
 
 export function ErrorBoundary() {
 	return (
-		<div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-			<Icon name="question-mark-circled" className="h-12 w-12 text-muted-foreground" />
-			<h2 className="text-xl font-semibold">Error loading orders</h2>
-			<p className="text-muted-foreground text-center">
-				We encountered an error while loading orders. Please try again later.
-			</p>
-			<Button asChild>
-				<Link to="/admin/orders">Retry</Link>
-			</Button>
-		</div>
+		<GeneralErrorBoundary
+			statusHandlers={{
+				403: ({ error }) => (
+					<div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+						<Icon name="lock-closed" className="h-12 w-12 text-muted-foreground" />
+						<h2 className="text-xl font-semibold">Unauthorized</h2>
+						<p className="text-muted-foreground text-center">
+							{typeof error.data === 'object' && error.data && 'message' in error.data
+								? String(error.data.message)
+								: 'You do not have permission to access this page.'}
+						</p>
+						<Button asChild>
+							<Link to="/admin">Back to Dashboard</Link>
+						</Button>
+					</div>
+				),
+			}}
+		/>
 	)
 }
 

@@ -14,7 +14,8 @@ test('Users can add 2FA to their account and use it when logging in', async ({
 	await page.getByRole('link', { name: /enable 2fa/i }).click()
 
 	await expect(page).toHaveURL(`/settings/profile/two-factor`)
-	const main = page.getByRole('main')
+	// Use the first main element (the page content) to avoid multiple main elements
+	const main = page.getByRole('main').first()
 	await main.getByRole('button', { name: /enable 2fa/i }).click()
 	const otpUriString = await main
 		.getByLabel(/One-Time Password URI/i)
@@ -34,8 +35,11 @@ test('Users can add 2FA to their account and use it when logging in', async ({
 	)
 	await main.getByRole('button', { name: /submit/i }).click()
 
-	await expect(main).toHaveText(/You have enabled two-factor authentication./i)
-	await expect(main.getByRole('link', { name: /disable 2fa/i })).toBeVisible()
+	// Wait for the redirect back to the two-factor page after verification
+	await page.waitForURL(`/settings/profile/two-factor`, { timeout: 5000 })
+	// Use the page content directly instead of main to avoid multiple main elements
+	await expect(page.getByText(/You have enabled two-factor authentication./i)).toBeVisible()
+	await expect(page.getByRole('link', { name: /disable 2fa/i })).toBeVisible()
 
 	await page.getByRole('link', { name: 'User menu' }).click()
 	await page.getByRole('menuitem', { name: /logout/i }).click()
