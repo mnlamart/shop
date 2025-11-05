@@ -1529,3 +1529,42 @@ To prevent MSW from intercepting Stripe API requests in development mode, we use
 - ✅ Pagination controls with page numbers and navigation
 - ✅ Error boundaries with retry functionality
 - ✅ Loading states using React Router's built-in progress bar
+
+**Schema Validation:**
+- ✅ Updated all Zod schemas to use Zod v4 syntax (`error` parameter instead of `message`)
+- ✅ Added error functions for type/required errors with user-friendly messages
+- ✅ Consistent error messaging across all form validations
+- ✅ Improved user experience with descriptive validation errors
+
+### Schema Validation Updates (Zod v4)
+
+All validation schemas have been updated to use Zod v4 syntax for consistent, user-friendly error messages:
+
+**Before (Zod v3):**
+```typescript
+z.string().min(1, { message: 'Name is required' })
+```
+
+**After (Zod v4):**
+```typescript
+z.string({
+  error: (issue) => 
+    issue.input === undefined ? 'Name is required' : 'Not a string',
+}).min(1, { error: 'Name is required' })
+```
+
+**Benefits:**
+- ✅ Consistent error handling across all schemas
+- ✅ User-friendly error messages (not technical)
+- ✅ Better type safety with error functions
+- ✅ Easier to maintain and extend
+
+**Schemas Updated:**
+- Product schemas (`app/schemas/product.ts`)
+- Category schemas (`app/schemas/category.ts`)
+- Shipping form (`app/routes/shop+/checkout.tsx`)
+- Order status updates (`app/routes/admin+/orders+/$orderNumber.tsx`)
+- User validation (`app/utils/user-validation.ts`)
+- All other form validation schemas
+
+For detailed documentation, see [Checkout Success Page](checkout-success-page.md) for the fallback mechanism and [Implementation Notes](implementation-notes.md) for schema validation patterns.
