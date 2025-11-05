@@ -73,7 +73,16 @@ export function getErrorMessage(error: unknown) {
 	) {
 		return error.message
 	}
-	console.error('Unable to get error message for error', error)
+	// Log unexpected error format to Sentry (client-side only)
+	if (typeof window !== 'undefined') {
+		import('@sentry/react-router').then((Sentry) => {
+			Sentry.captureException(error, {
+				tags: { context: 'get-error-message' },
+			})
+		}).catch(() => {
+			// Sentry not available, ignore
+		})
+	}
 	return 'Unknown Error'
 }
 

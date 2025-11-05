@@ -1,4 +1,5 @@
 import { invariantResponse } from '@epic-web/invariant'
+import * as Sentry from '@sentry/react-router'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { deleteProductImages } from '#app/utils/storage.server.ts'
@@ -41,7 +42,11 @@ export async function action({ params, request }: Route.ActionArgs) {
 		try {
 			await deleteProductImages(imageKeys)
 		} catch (error) {
-			console.error('Failed to delete product images from storage:', error)
+			// Log error but continue - database is already cleaned up
+			Sentry.captureException(error, {
+				tags: { context: 'product-delete-storage' },
+				extra: { productId: product.id, imageKeysCount: imageKeys.length },
+			})
 			// Continue anyway - database is already cleaned up
 		}
 	}

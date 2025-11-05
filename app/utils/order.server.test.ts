@@ -1,9 +1,16 @@
+import * as Sentry from '@sentry/react-router'
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
 import { createProductData, createVariantData } from '#tests/product-utils.ts'
 import { UNCATEGORIZED_CATEGORY_ID } from './category.ts'
 import { prisma } from './db.server.ts'
 import { sendEmail } from './email.server.ts'
 import { validateStockAvailability, updateOrderStatus } from './order.server.ts'
+
+// Mock Sentry
+vi.mock('@sentry/react-router', () => ({
+	captureException: vi.fn(),
+	captureMessage: vi.fn(),
+}))
 
 // Mock email service
 vi.mock('./email.server.ts', () => ({
@@ -396,7 +403,6 @@ describe('updateOrderStatus', () => {
 	})
 
 	test('should handle email sending failure gracefully', async () => {
-		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 		
 		// Mock email sending to fail
 		vi.mocked(sendEmail).mockRejectedValueOnce(
@@ -412,10 +418,13 @@ describe('updateOrderStatus', () => {
 		})
 		expect(updatedOrder?.status).toBe('SHIPPED')
 
-		// Verify error was logged
-		expect(consoleError).toHaveBeenCalledTimes(1)
-		
-		consoleError.mockRestore()
+		// Verify error was logged to Sentry
+		expect(Sentry.captureException).toHaveBeenCalledWith(
+			expect.any(Error),
+			expect.objectContaining({
+				tags: { context: 'order-status-email' },
+			}),
+		)
 	})
 
 	test('should send email for all status transitions', async () => {

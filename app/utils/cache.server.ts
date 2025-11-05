@@ -13,6 +13,7 @@ import {
 	type CreateReporter,
 } from '@epic-web/cachified'
 import { remember } from '@epic-web/remember'
+import * as Sentry from '@sentry/react-router'
 import { LRUCache } from 'lru-cache'
 import { z } from 'zod'
 // import { updatePrimaryCacheValue } from '#app/routes/admin+/cache_.sqlite.server.ts'
@@ -43,9 +44,10 @@ function createDatabase(tryAgain = true): DatabaseSync {
 	} catch (error: unknown) {
 		fs.unlinkSync(CACHE_DATABASE_PATH)
 		if (tryAgain) {
-			console.error(
-				`Error creating cache database, deleting the file at "${CACHE_DATABASE_PATH}" and trying again...`,
-			)
+			Sentry.captureException(error, {
+				tags: { context: 'cache-database-creation' },
+				extra: { cachePath: CACHE_DATABASE_PATH },
+			})
 			return createDatabase(false)
 		}
 		throw error

@@ -2,6 +2,7 @@ import { useForm, getFormProps, getInputProps, getTextareaProps, FormProvider, u
 import { parseWithZod, getZodConstraint } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import { parseFormData } from '@mjackson/form-data-parser'
+import * as Sentry from '@sentry/react-router'
 import { Form, Link, data } from 'react-router'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Badge } from '#app/components/ui/badge.tsx'
@@ -95,7 +96,11 @@ export async function action({ params: _params, request }: Route.ActionArgs) {
 			})
 			if (currentCategory?.id === UNCATEGORIZED_CATEGORY_ID && data.slug !== 'uncategorized') {
 				// Allow slug change but it's not recommended
-				console.warn('Admin is changing the slug of the uncategorized category')
+				Sentry.captureMessage('Admin is changing the slug of the uncategorized category', {
+					level: 'warning',
+					tags: { context: 'category-edit' },
+					extra: { categoryId: currentCategory.id, newSlug: data.slug },
+				})
 			}
 		}),
 		async: true,

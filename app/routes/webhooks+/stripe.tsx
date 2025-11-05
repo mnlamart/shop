@@ -1,4 +1,5 @@
 import { invariant } from '@epic-web/invariant'
+import * as Sentry from '@sentry/react-router'
 import { data } from 'react-router'
 import type Stripe from 'stripe'
 import {
@@ -31,7 +32,10 @@ export async function action({ request }: Route.ActionArgs) {
 			300, // tolerance in seconds
 		)
 	} catch (err) {
-		console.error(`[WEBHOOK] Webhook signature verification failed:`, err)
+		// Log signature verification failures to Sentry
+		Sentry.captureException(err, {
+			tags: { context: 'webhook-signature-verification' },
+		})
 		return data(
 			{ error: `Webhook Error: ${err instanceof Error ? err.message : 'Unknown error'}` },
 			{ status: 400 },
@@ -49,8 +53,14 @@ export async function action({ request }: Route.ActionArgs) {
 
 		// Verify payment status before fulfilling order
 		if (fullSession.payment_status !== 'paid') {
-			console.error(
-				`[WEBHOOK] Payment not completed for session ${session.id}. Payment status: ${fullSession.payment_status}`,
+			// Log payment status issues for monitoring
+			Sentry.captureMessage(
+				`Payment not completed for session ${session.id}. Payment status: ${fullSession.payment_status}`,
+				{
+					level: 'warning',
+					tags: { context: 'webhook-payment-status' },
+					extra: { sessionId: session.id, paymentStatus: fullSession.payment_status },
+				},
 			)
 			return data(
 				{
@@ -73,13 +83,15 @@ export async function action({ request }: Route.ActionArgs) {
 			// Cart is already deleted within the transaction above
 			return data({ received: true, orderId: order.id })
 		} catch (error) {
-			console.error('[WEBHOOK] Error creating order:', {
-				error,
-				message: error instanceof Error ? error.message : 'Unknown error',
-				stack: error instanceof Error ? error.stack : undefined,
+			// Log critical errors to Sentry
+			Sentry.captureException(error, {
+				tags: { context: 'webhook-order-creation' },
+				extra: {
+					sessionId: session.id,
+					message: error instanceof Error ? error.message : 'Unknown error',
+				},
 			})
 			if (error instanceof StockUnavailableError) {
-				console.error('[WEBHOOK] Stock unavailable error:', error.data)
 				// Stock unavailable after payment - this is a critical error
 				// Payment was already processed, so we need to handle refund
 				const paymentIntentId =
@@ -99,15 +111,21 @@ export async function action({ request }: Route.ActionArgs) {
 								product_name: error.data.productName,
 							},
 						})
-						console.error(
-							`[WEBHOOK] Refund created for payment ${paymentIntentId} due to stock unavailability`,
+						// Log successful refund for monitoring
+						Sentry.captureMessage(
+							`Refund created for payment ${paymentIntentId} due to stock unavailability`,
+							{
+								level: 'info',
+								tags: { context: 'webhook-refund' },
+								extra: { paymentIntentId, sessionId: fullSession.id },
+							},
 						)
 					} catch (refundError) {
-						// Log refund error but don't fail webhook processing
-						console.error(
-							`[WEBHOOK] Failed to create refund for payment ${paymentIntentId}:`,
-							refundError,
-						)
+						// Log refund errors - these are critical
+						Sentry.captureException(refundError, {
+							tags: { context: 'webhook-refund-error' },
+							extra: { paymentIntentId, sessionId: fullSession.id },
+						})
 					}
 				}
 

@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import { redirect, redirectDocument, useFetcher, useRevalidator } from 'react-router'
 import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
@@ -30,8 +31,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 		try {
 			order = await getOrderByCheckoutSessionId(sessionId)
 		} catch (error) {
-			console.error('[CHECKOUT SUCCESS] Error looking up order:', error)
-			// If there's an error, still show processing state
+			// Log error but don't fail - show processing state instead
+			Sentry.captureException(error, {
+				tags: { context: 'checkout-success-loader' },
+				extra: { sessionId },
+			})
 			order = null
 		}
 
@@ -56,7 +60,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 			message: 'Your order is being processed. Please wait a moment.',
 		}
 	} catch (error) {
-		console.error('[CHECKOUT SUCCESS] Loader error:', error)
+		// Log error but still return processing state for user
+		Sentry.captureException(error, {
+			tags: { context: 'checkout-success-loader' },
+		})
 		// Return error state but still render something
 		const url = new URL(request.url)
 		const sessionId = url.searchParams.get('session_id')
@@ -98,7 +105,11 @@ export async function action({ request }: Route.ActionArgs) {
 			email: session.customer_email || session.metadata?.email || null,
 		}
 	} catch (error) {
-		console.error('[CHECKOUT SUCCESS] Error syncing order:', error)
+		// Log error to Sentry for critical failures
+		Sentry.captureException(error, {
+			tags: { context: 'checkout-success-sync' },
+			extra: { sessionId },
+		})
 		return {
 			error: 'Failed to sync order',
 			message:
@@ -119,8 +130,6 @@ export default function CheckoutSuccess({ loaderData }: Route.ComponentProps) {
 	const sessionId = loaderData?.sessionId ?? null
 	const message = loaderData?.message ?? 'Your order is being processed. Please wait a moment.'
 
-	console.log('[CHECKOUT SUCCESS] Component rendering', { processing, sessionId, message, loaderData })
-
 	const revalidator = useRevalidator()
 	const syncFetcher = useFetcher<typeof action>()
 	const [showSyncButton, setShowSyncButton] = useState(false)
@@ -129,16 +138,13 @@ export default function CheckoutSuccess({ loaderData }: Route.ComponentProps) {
 
 	const handleSyncOrder = useCallback(() => {
 		if (!sessionId) {
-			console.error('[CHECKOUT SUCCESS] No sessionId available for sync')
 			return
 		}
 		
 		if (syncFetcher.state !== 'idle') {
-			console.warn('[CHECKOUT SUCCESS] Sync already in progress, skipping')
 			return
 		}
 		
-		console.log('[CHECKOUT SUCCESS] Triggering manual order sync', { sessionId })
 		const formData = new FormData()
 		formData.append('intent', 'sync-order')
 		formData.append('session_id', sessionId)
@@ -155,7 +161,6 @@ export default function CheckoutSuccess({ loaderData }: Route.ComponentProps) {
 		// Check if we should trigger fallback immediately (if page has been open for > 15 seconds)
 		const elapsedSincePageLoad = Date.now() - pageLoadTime
 		if (elapsedSincePageLoad >= 15000) {
-			console.warn('[CHECKOUT SUCCESS] Page already open for >15s, triggering fallback immediately')
 			setShowSyncButton(true)
 			setHasTriggeredFallback(true)
 			handleSyncOrder()
@@ -169,7 +174,6 @@ export default function CheckoutSuccess({ loaderData }: Route.ComponentProps) {
 		const interval = setInterval(() => {
 			const elapsed = Date.now() - startTime
 			if (elapsed >= maxPollingDuration) {
-				console.warn('[CHECKOUT SUCCESS] Max polling duration reached, triggering fallback')
 				clearInterval(interval)
 				setShowSyncButton(true)
 				setHasTriggeredFallback(true)
@@ -177,7 +181,6 @@ export default function CheckoutSuccess({ loaderData }: Route.ComponentProps) {
 				handleSyncOrder()
 				return
 			}
-			console.log('[CHECKOUT SUCCESS] Polling for order...', { elapsed })
 			void revalidator.revalidate()
 		}, 3000) // Check every 3 seconds
 
@@ -187,10 +190,6 @@ export default function CheckoutSuccess({ loaderData }: Route.ComponentProps) {
 	// Handle sync fetcher response
 	useEffect(() => {
 		if (syncFetcher.data?.success && syncFetcher.data.orderNumber) {
-			console.log('[CHECKOUT SUCCESS] Order created successfully, redirecting...', {
-				orderNumber: syncFetcher.data.orderNumber,
-				email: syncFetcher.data.email,
-			})
 			// Redirect to order detail page
 			// For guests, include email in URL if available
 			let redirectUrl = `/shop/orders/${syncFetcher.data.orderNumber}`
@@ -199,7 +198,7 @@ export default function CheckoutSuccess({ loaderData }: Route.ComponentProps) {
 			}
 			window.location.href = redirectUrl
 		} else if (syncFetcher.data?.error) {
-			console.error('[CHECKOUT SUCCESS] Sync error:', syncFetcher.data.error, syncFetcher.data.message)
+			// Error is already displayed in UI, no need to log
 		}
 	}, [syncFetcher.data])
 

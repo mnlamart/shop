@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { type Connection, type Password, type User } from '@prisma/client'
+import * as Sentry from '@sentry/react-router'
 import bcrypt from 'bcryptjs'
 import { redirect } from 'react-router'
 import { Authenticator } from 'remix-auth'
@@ -289,11 +290,16 @@ export async function checkIsCommonPassword(password: string) {
 		})
 	} catch (error) {
 		if (error instanceof DOMException && error.name === 'TimeoutError') {
-			console.warn('Password check timed out')
+			Sentry.captureMessage('Password check timed out', {
+				level: 'warning',
+				tags: { context: 'password-check' },
+			})
 			return false
 		}
 
-		console.warn('Unknown error during password check', error)
+		Sentry.captureException(error, {
+			tags: { context: 'password-check' },
+		})
 		return false
 	}
 }

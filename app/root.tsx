@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-router'
 import { OpenImgContextProvider } from 'openimg/react'
 import {
 	data,
@@ -102,9 +103,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 			)
 		: null
 	if (userId && !user) {
-		console.info('something weird happened')
-		// something weird happened... The user is authenticated but we can't find
-		// them in the database. Maybe they were deleted? Let's log them out.
+		// User is authenticated but not found in database - log and logout
+		Sentry.captureMessage('Authenticated user not found in database', {
+			level: 'warning',
+			tags: { context: 'root-loader' },
+			extra: { userId },
+		})
 		await logout({ request, redirectTo: '/' })
 	}
 
@@ -115,7 +119,9 @@ export async function loader({ request }: Route.LoaderArgs) {
 		cartCount = cart?.items.reduce((sum, item) => sum + item.quantity, 0) || 0
 	} catch (error) {
 		// If cart creation fails, just default to 0
-		console.error('Failed to get cart count:', error)
+		Sentry.captureException(error, {
+			tags: { context: 'root-cart-count' },
+		})
 	}
 
 	const { toast, headers: toastHeaders } = await getToast(request)

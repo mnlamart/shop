@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-router'
 import { redirect } from 'react-router'
 import {
 	authenticator,
@@ -53,7 +54,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 		)
 
 	if (!authResult.success) {
-		console.error(authResult.error)
+		Sentry.captureException(authResult.error, {
+			tags: { context: 'auth-provider-callback' },
+			extra: { provider: providerName },
+		})
 		throw await redirectWithToast(
 			'/login',
 			{
