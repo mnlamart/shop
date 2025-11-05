@@ -110,13 +110,13 @@ function AttributeRow({ attribute }: { attribute: any }) {
 			<TableCell>
 				<div className="flex items-center gap-2">
 					<Button variant="ghost" size="sm" asChild>
-						<Link to={`/admin/attributes/${attribute.id}`}>
-							<Icon name="eye-open" className="h-4 w-4" />
+						<Link to={`/admin/attributes/${attribute.id}`} aria-label={`View ${attribute.name}`}>
+							<Icon name="eye-open" className="h-4 w-4" aria-hidden="true" />
 						</Link>
 					</Button>
 					<Button variant="ghost" size="sm" asChild>
-						<Link to={`/admin/attributes/${attribute.id}/edit`}>
-							<Icon name="pencil-1" className="h-4 w-4" />
+						<Link to={`/admin/attributes/${attribute.id}/edit`} aria-label={`Edit ${attribute.name}`}>
+							<Icon name="pencil-1" className="h-4 w-4" aria-hidden="true" />
 						</Link>
 					</Button>
 					<DeleteButton attribute={attribute} hasVariants={hasVariants} />
@@ -136,8 +136,9 @@ function DeleteButton({ attribute, hasVariants }: { attribute: any; hasVariants:
 					variant="ghost"
 					size="sm"
 					className="text-destructive hover:text-destructive transition-colors duration-200"
+					aria-label={`Delete ${attribute.name}`}
 				>
-					<Icon name="trash" className="h-4 w-4" />
+					<Icon name="trash" className="h-4 w-4" aria-hidden="true" />
 				</Button>
 			</AlertDialogTrigger>
 			<AlertDialogContent>
@@ -241,7 +242,7 @@ export default function AttributesList({ loaderData }: Route.ComponentProps) {
 				</div>
 				<div className="sm:w-48">
 					<Select value={filterType} onValueChange={setFilterType}>
-						<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+						<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label="Filter by usage">
 							<SelectValue placeholder="Filter by usage" />
 						</SelectTrigger>
 						<SelectContent>

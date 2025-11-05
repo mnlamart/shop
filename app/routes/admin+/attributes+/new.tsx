@@ -5,7 +5,7 @@ import { Form, Link } from 'react-router'
 import { z } from 'zod'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
+import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
@@ -110,7 +110,7 @@ function AttributeForm({ actionData }: { actionData?: any }) {
 			>
 				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Attribute Information</CardTitle>
+						<h2 className="text-base font-normal text-foreground">Attribute Information</h2>
 					</CardHeader>
 					<CardContent>
 						<div className="grid gap-6">

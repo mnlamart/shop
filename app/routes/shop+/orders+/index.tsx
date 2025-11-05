@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { ErrorList, Field } from '#app/components/forms.tsx'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
+import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
 import { getUserId } from '#app/utils/auth.server.ts'
 import { useIsPending } from '#app/utils/misc.tsx'
@@ -121,7 +121,7 @@ export default function OrderHistory({ loaderData, actionData }: Route.Component
 			{!isAuthenticated && (
 				<Card>
 					<CardHeader>
-						<CardTitle>Look Up Order</CardTitle>
+						<h2>Look Up Order</h2>
 					</CardHeader>
 					<CardContent>
 						<Form method="POST" {...getFormProps(form)}>

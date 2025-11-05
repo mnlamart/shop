@@ -48,7 +48,7 @@ export default function AdminDashboard() {
 								<Icon name="archive" className="h-6 w-6 text-primary" />
 							</div>
 							<div className="flex-1">
-								<h3 className="text-base font-normal text-foreground">Products</h3>
+								<h2 className="text-base font-normal text-foreground">Products</h2>
 								<p className="text-sm text-muted-foreground">
 									Manage your product catalog
 								</p>
@@ -73,7 +73,7 @@ export default function AdminDashboard() {
 								<Icon name="tags" className="h-6 w-6 text-primary" />
 							</div>
 							<div className="flex-1">
-								<h3 className="text-base font-normal text-foreground">Categories</h3>
+								<h2 className="text-base font-normal text-foreground">Categories</h2>
 								<p className="text-sm text-muted-foreground">
 									Organize your products
 								</p>
@@ -98,7 +98,7 @@ export default function AdminDashboard() {
 								<Icon name="settings" className="h-6 w-6 text-primary" />
 							</div>
 							<div className="flex-1">
-								<h3 className="text-base font-normal text-foreground">Attributes</h3>
+								<h2 className="text-base font-normal text-foreground">Attributes</h2>
 								<p className="text-sm text-muted-foreground">
 									Configure product attributes
 								</p>

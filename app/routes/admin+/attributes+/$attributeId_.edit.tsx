@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
+import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
@@ -198,7 +198,7 @@ export default function AttributeEdit({ loaderData }: Route.ComponentProps) {
 			<Card className="rounded-[14px]">
 				<CardHeader>
 					<div className="flex items-center justify-between">
-						<CardTitle className="text-base font-normal text-foreground">Attribute Details</CardTitle>
+						<h2 className="text-base font-normal text-foreground">Attribute Details</h2>
 						{hasVariants && (
 							<Badge variant="warning">In Use</Badge>
 						)}

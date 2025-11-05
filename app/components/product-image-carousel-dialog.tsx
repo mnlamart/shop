@@ -75,6 +75,7 @@ export function ProductImageCarouselDialog({
 	if (initialIndex === null) return null
 
 	const currentImage = images[currentIndex]
+	if (!currentImage) return null
 
 	return (
 		<>

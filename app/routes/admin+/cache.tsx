@@ -145,7 +145,7 @@ export default function CacheAdminRoute({ loaderData }: Route.ComponentProps) {
 							placeholder: 'results limit',
 						}}
 					/>
-					<select name="instance" defaultValue={instance}>
+					<select name="instance" defaultValue={instance} aria-label="Cache instance">
 						{Object.entries(loaderData.instances).map(([inst, region]) => (
 							<option key={inst} value={inst}>
 								{[

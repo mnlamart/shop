@@ -128,7 +128,7 @@ export default function ProductsIndex({ loaderData }: Route.ComponentProps) {
 								)}
 							</div>
 						<div className="p-4">
-							<h3 className="font-semibold mb-1">{product.name}</h3>
+							<h2 className="font-semibold mb-1 text-lg">{product.name}</h2>
 							<p className="text-sm text-muted-foreground mb-2">{product.category.name}</p>
 							<p className="text-lg font-bold">{formatPrice(product.price, currency)}</p>
 						</div>

@@ -2,7 +2,7 @@ import { invariantResponse } from '@epic-web/invariant'
 import { Link } from 'react-router'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
+import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
@@ -110,9 +110,9 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 			<div className="grid gap-6 md:grid-cols-3">
 				<Card className="rounded-[14px]">
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">
+						<div className="text-sm font-medium text-muted-foreground">
 							Total Values
-						</CardTitle>
+						</div>
 					</CardHeader>
 					<CardContent>
 						<div className="text-2xl font-normal text-foreground">{attribute._count.values}</div>
@@ -124,9 +124,9 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 				
 				<Card className="rounded-[14px]">
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">
+						<div className="text-sm font-medium text-muted-foreground">
 							Product Variants
-						</CardTitle>
+						</div>
 					</CardHeader>
 					<CardContent>
 						<div className="text-2xl font-normal text-foreground">{totalVariants}</div>
@@ -138,9 +138,9 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 				
 				<Card className="rounded-[14px]">
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">
+						<div className="text-sm font-medium text-muted-foreground">
 							Created
-						</CardTitle>
+						</div>
 					</CardHeader>
 					<CardContent>
 						<div className="text-sm font-medium">
@@ -156,7 +156,7 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 			{/* Values section */}
 			<Card className="rounded-[14px]">
 				<CardHeader>
-					<CardTitle className="text-base font-normal text-foreground">Attribute Values</CardTitle>
+					<h2 className="text-base font-normal text-foreground">Attribute Values</h2>
 				</CardHeader>
 				<CardContent>
 					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -182,7 +182,7 @@ export default function AttributeView({ loaderData }: Route.ComponentProps) {
 				<Card className="rounded-[14px]">
 					<CardHeader>
 						<div className="flex items-center justify-between">
-							<CardTitle className="text-base font-normal text-foreground">Products Using This Attribute</CardTitle>
+							<h2 className="text-base font-normal text-foreground">Products Using This Attribute</h2>
 							<Button variant="outline" size="sm" asChild>
 								<Link to={`/admin/products?attribute=${attribute.id}`}>
 									View All

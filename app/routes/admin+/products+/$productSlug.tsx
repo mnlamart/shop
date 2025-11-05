@@ -14,7 +14,7 @@ import {
 } from '#app/components/ui/alert-dialog.tsx'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
+import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import {
 	Table,
@@ -224,9 +224,9 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 			<div className="grid gap-6 md:grid-cols-3">
 				<Card className="rounded-lg border border-[#D1D5DC]">
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-normal text-[#4A5565]">
+						<div className="text-sm font-normal text-[#4A5565]">
 							Total Variants
-						</CardTitle>
+						</div>
 					</CardHeader>
 					<CardContent>
 						<div className="text-3xl font-normal text-[#101828]">{product.variants.length}</div>
@@ -238,9 +238,9 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 				
 				<Card className="rounded-lg border border-[#D1D5DC]">
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-normal text-[#4A5565]">
+						<div className="text-sm font-normal text-[#4A5565]">
 							Total Stock
-						</CardTitle>
+						</div>
 					</CardHeader>
 					<CardContent>
 						<div className="text-3xl font-normal text-[#101828]">{totalStock}</div>
@@ -252,9 +252,9 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 				
 				<Card className="rounded-lg border border-[#D1D5DC]">
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-normal text-[#4A5565]">
+						<div className="text-sm font-normal text-[#4A5565]">
 							Price
-						</CardTitle>
+						</div>
 					</CardHeader>
 					<CardContent>
 						<div className="text-3xl font-normal text-[#101828]">
@@ -270,7 +270,7 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 			{/* Product Details - Full Width */}
 			<Card className="rounded-lg border border-[#D1D5DC]">
 				<CardHeader>
-					<CardTitle className="text-lg font-normal text-[#101828]">Product Details</CardTitle>
+					<h2 className="text-lg font-normal text-[#101828]">Product Details</h2>
 				</CardHeader>
 				<CardContent>
 					<div className="grid grid-cols-3 gap-8">
@@ -324,7 +324,7 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 			<Card className="rounded-lg border border-[#D1D5DC]">
 				<CardHeader>
 					<div className="flex items-center justify-between">
-						<CardTitle className="text-lg font-normal text-[#101828]">Product Images</CardTitle>
+						<h2 className="text-lg font-normal text-[#101828]">Product Images</h2>
 						{product.images.length > 0 && (
 							<div className="flex items-center gap-2 text-sm font-normal text-[#4A5565]">
 								<Icon name="image" className="h-4 w-4" />
@@ -348,7 +348,7 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 			{product.variants.length > 0 && (
 				<Card className="rounded-lg border border-[#D1D5DC]">
 					<CardHeader>
-						<CardTitle className="text-lg font-normal text-[#101828]">Product Variants</CardTitle>
+						<h2 className="text-lg font-normal text-[#101828]">Product Variants</h2>
 					</CardHeader>
 					<CardContent>
 						<Table>

@@ -171,17 +171,15 @@ export default function SignupRoute({ actionData }: Route.ComponentProps) {
 					</StatusButton>
 				</Form>
 				<ul className="flex flex-col gap-4 py-4">
-					{providerNames.map((providerName) => (
-						<>
-							<hr />
-							<li key={providerName}>
-								<ProviderConnectionForm
-									type="Signup"
-									providerName={providerName}
-									redirectTo={redirectTo}
-								/>
-							</li>
-						</>
+					{providerNames.map((providerName, index) => (
+						<li key={providerName}>
+							{index > 0 && <hr className="mb-4" />}
+							<ProviderConnectionForm
+								type="Signup"
+								providerName={providerName}
+								redirectTo={redirectTo}
+							/>
+						</li>
 					))}
 				</ul>
 			</div>

@@ -114,9 +114,9 @@ export default function AdminLayout() {
 					</Toggle>
 					<AdminBreadcrumbs />
 				</header>
-				<div className="flex-1 overflow-auto p-4">
+				<main className="flex-1 overflow-auto p-4">
 					<Outlet />
-				</div>
+				</main>
 			</div>
 		</div>
 	)

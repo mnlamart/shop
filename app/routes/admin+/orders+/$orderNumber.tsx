@@ -244,9 +244,9 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 					{/* Order Details */}
 					<Card className="rounded-[14px]">
 						<CardHeader className="pb-6 px-6 pt-6">
-							<CardTitle className="text-base font-normal text-foreground">
+							<h2 className="text-base font-normal text-foreground">
 								Order Information
-							</CardTitle>
+							</h2>
 						</CardHeader>
 						<CardContent className="px-6 pb-6">
 							<div className="grid grid-cols-2 gap-6">
@@ -312,7 +312,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 							<div className="space-y-6">
 								{/* Update Status Section */}
 								<div className="space-y-4">
-									<h3 className="text-sm font-normal text-foreground">Update Status</h3>
+									<h4 className="text-sm font-normal text-foreground">Update Status</h4>
 									<div className="space-y-4">
 										<statusFetcher.Form method="POST" className="space-y-4">
 											<input type="hidden" name="status" value={status} />
@@ -331,6 +331,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 													<SelectTrigger
 														id="status-select"
 														className="w-full h-10 rounded-lg border bg-input px-3"
+														aria-label="Order status"
 													>
 														<SelectValue placeholder="Select status" />
 													</SelectTrigger>
@@ -395,7 +396,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 												aria-hidden="true"
 											/>
 											<div className="space-y-1">
-												<h3 className="text-sm font-normal text-foreground">Cancel Order</h3>
+												<h4 className="text-sm font-normal text-foreground">Cancel Order</h4>
 												<p className="text-sm text-muted-foreground">
 													This action cannot be undone. The order will be permanently
 													cancelled.
@@ -533,7 +534,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 
 								{/* Order Summary */}
 								<div className="space-y-3">
-									<h3 className="text-sm font-normal text-foreground">Order Summary</h3>
+									<h4 className="text-sm font-normal text-foreground">Order Summary</h4>
 									<div className="space-y-2">
 										<div className="flex items-center justify-between">
 											<span className="text-sm text-[var(--text-medium)]">Subtotal</span>

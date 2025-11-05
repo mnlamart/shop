@@ -1,7 +1,7 @@
 import { invariantResponse } from '@epic-web/invariant'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
+import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { getUserId } from '#app/utils/auth.server.ts'
 import { getOrderByOrderNumber } from '#app/utils/order.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
@@ -81,7 +81,7 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 				{/* Order Items */}
 				<Card>
 					<CardHeader>
-						<CardTitle>Items</CardTitle>
+						<h2>Items</h2>
 					</CardHeader>
 					<CardContent>
 						<div className="space-y-4">
@@ -95,7 +95,7 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 										/>
 									)}
 									<div className="flex-1">
-										<h3 className="font-semibold">{item.product.name}</h3>
+										<h2 className="font-semibold">{item.product.name}</h2>
 										{item.variant && (
 											<p className="text-sm text-muted-foreground">
 												{item.variant.attributeValues
@@ -120,7 +120,7 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 				<div className="space-y-6">
 					<Card>
 						<CardHeader>
-							<CardTitle>Order Summary</CardTitle>
+							<h2>Order Summary</h2>
 						</CardHeader>
 						<CardContent className="space-y-4">
 							<div className="flex justify-between">
@@ -136,7 +136,7 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 
 					<Card>
 						<CardHeader>
-							<CardTitle>Shipping Address</CardTitle>
+							<h2>Shipping Address</h2>
 						</CardHeader>
 						<CardContent>
 							<p className="font-semibold">{order.shippingName}</p>
@@ -151,7 +151,7 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 
 					<Card>
 						<CardHeader>
-							<CardTitle>Order Information</CardTitle>
+							<h2>Order Information</h2>
 						</CardHeader>
 						<CardContent className="space-y-2">
 							<div>

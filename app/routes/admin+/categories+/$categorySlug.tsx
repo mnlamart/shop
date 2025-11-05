@@ -2,7 +2,7 @@ import { invariantResponse } from '@epic-web/invariant'
 import { Link } from 'react-router'
 import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
+import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { UNCATEGORIZED_CATEGORY_ID } from '#app/utils/category.ts'
 import { prisma } from '#app/utils/db.server.ts'
@@ -109,7 +109,7 @@ export default function CategoryView({ loaderData }: Route.ComponentProps) {
 				<div className="space-y-8">
 					<Card className="rounded-[14px]">
 						<CardHeader>
-							<CardTitle className="text-base font-normal text-foreground">Category Information</CardTitle>
+							<h2 className="text-base font-normal text-foreground">Category Information</h2>
 						</CardHeader>
 						<CardContent className="space-y-6">
 							<div>
@@ -151,7 +151,7 @@ export default function CategoryView({ loaderData }: Route.ComponentProps) {
 					{/* Statistics */}
 					<Card className="rounded-[14px]">
 						<CardHeader>
-							<CardTitle className="text-base font-normal text-foreground">Statistics</CardTitle>
+							<h2 className="text-base font-normal text-foreground">Statistics</h2>
 						</CardHeader>
 						<CardContent>
 							<div className="grid grid-cols-2 gap-6">
@@ -173,7 +173,7 @@ export default function CategoryView({ loaderData }: Route.ComponentProps) {
 					{category.children.length > 0 && (
 						<Card className="rounded-[14px]">
 							<CardHeader>
-								<CardTitle className="text-base font-normal text-foreground">Subcategories</CardTitle>
+								<h2 className="text-base font-normal text-foreground">Subcategories</h2>
 							</CardHeader>
 							<CardContent>
 								<div className="space-y-3">
@@ -205,7 +205,7 @@ export default function CategoryView({ loaderData }: Route.ComponentProps) {
 						<Card className="rounded-[14px]">
 							<CardHeader>
 								<div className="flex items-center justify-between">
-									<CardTitle className="text-base font-normal text-foreground">Recent Products</CardTitle>
+									<h2 className="text-base font-normal text-foreground">Recent Products</h2>
 									<Button asChild variant="outline" size="sm" className="h-9 rounded-lg font-medium">
 										<Link to={`/admin/products?category=${category.slug}`}>
 											View All Products

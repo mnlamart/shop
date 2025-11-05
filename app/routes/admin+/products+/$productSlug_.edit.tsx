@@ -5,7 +5,7 @@ import { useRef, useState } from 'react'
 import { Form, Link } from 'react-router'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
+import { Card, CardContent, CardDescription, CardHeader } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
@@ -179,7 +179,7 @@ export default function EditProduct({ loaderData, actionData }: Route.ComponentP
 				{/* Basic Information, Organization & Pricing Card */}
 				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Basic Information, Organization & Pricing</CardTitle>
+						<h2 className="text-base font-normal text-foreground">Basic Information, Organization & Pricing</h2>
 						<CardDescription>Product details, status, categorization, and pricing information</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -217,7 +217,7 @@ export default function EditProduct({ loaderData, actionData }: Route.ComponentP
 								<div className="space-y-2">
 									<Label htmlFor={fields.status.id}>Status</Label>
 									<Select {...getInputProps(fields.status, { type: 'text' })}>
-										<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+										<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label="Product status">
 											<SelectValue placeholder="Select status" />
 										</SelectTrigger>
 										<SelectContent>
@@ -233,7 +233,7 @@ export default function EditProduct({ loaderData, actionData }: Route.ComponentP
 								<div className="space-y-2">
 									<Label htmlFor={fields.categoryId.id}>Category</Label>
 									<Select {...getInputProps(fields.categoryId, { type: 'text' })}>
-										<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+										<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label="Product category">
 											<SelectValue placeholder="Select category" />
 										</SelectTrigger>
 										<SelectContent>
@@ -328,7 +328,7 @@ export default function EditProduct({ loaderData, actionData }: Route.ComponentP
 								<div className="space-y-2">
 									<Label htmlFor={fields.currency.id}>Currency</Label>
 									<Select {...getInputProps(fields.currency, { type: 'text' })}>
-										<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+										<SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-primary/20" aria-label="Currency">
 											<SelectValue placeholder="Select currency" />
 										</SelectTrigger>
 										<SelectContent>
@@ -348,7 +348,7 @@ export default function EditProduct({ loaderData, actionData }: Route.ComponentP
 				{/* Product Images Card */}
 				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Product Images</CardTitle>
+						<h2 className="text-base font-normal text-foreground">Product Images</h2>
 						<CardDescription>Upload up to 10 images for your product</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
@@ -403,7 +403,7 @@ export default function EditProduct({ loaderData, actionData }: Route.ComponentP
 				{/* Product Variants Card */}
 				<Card className="rounded-[14px]">
 					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Product Variants</CardTitle>
+						<h2 className="text-base font-normal text-foreground">Product Variants</h2>
 						<CardDescription>Add product variations with different attributes</CardDescription>
 					</CardHeader>
 					<CardContent>
@@ -652,7 +652,7 @@ function VariantRow({ meta, attributes }: VariantRowProps) {
 								name={`${fields.attributeValueIds.name}[${attrIndex}]`}
 								defaultValue="none"
 							>
-								<SelectTrigger>
+								<SelectTrigger aria-label={`Select ${attr.name}`}>
 									<SelectValue placeholder={`Select ${attr.name} (optional)`} />
 								</SelectTrigger>
 								<SelectContent>
