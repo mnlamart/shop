@@ -1,7 +1,17 @@
 # Checkout Test Refactoring Plan
 
+> **Note**: The checkout tests are currently skipped (`describe.skip`) in `app/routes/shop+/checkout.test.ts`. This plan is valid for when tests are re-enabled and should be implemented at that time.
+
 ## Overview
 Refactor `app/routes/shop+/checkout.test.ts` to properly test the checkout action, eliminate duplication, and ensure all tests follow Epic Stack patterns.
+
+## Current Status
+
+**Tests Status**: ⏸️ Currently skipped
+- File: `app/routes/shop+/checkout.test.ts`
+- Status: Tests are wrapped in `describe.skip()` with TODO comment
+- Reason: Tests need to be re-implemented when payment provider is integrated
+- Plan Validity: This refactoring plan remains valid for when tests are re-enabled
 
 ## Issues Identified
 
