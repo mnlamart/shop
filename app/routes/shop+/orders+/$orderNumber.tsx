@@ -53,11 +53,11 @@ function getStatusBadgeVariant(status: string) {
 	}
 }
 
-export const meta: Route.MetaFunction = ({ data }) => {
-	if (!data?.order) {
+export const meta: Route.MetaFunction = ({ loaderData }) => {
+	if (!loaderData?.order) {
 		return [{ title: 'Order Not Found | Shop | Epic Shop' }]
 	}
-	return [{ title: `Order ${data.order.orderNumber} | Shop | Epic Shop` }]
+	return [{ title: `Order ${loaderData.order.orderNumber} | Shop | Epic Shop` }]
 }
 
 export default function OrderDetail({ loaderData }: Route.ComponentProps) {

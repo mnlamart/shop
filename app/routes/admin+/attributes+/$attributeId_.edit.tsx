@@ -162,9 +162,9 @@ export async function action({ params: _params, request }: Route.ActionArgs) {
 	})
 }
 
-export const meta: Route.MetaFunction = ({ data }: any) => [
-	{ title: `Edit ${data?.attribute.name} | Attributes | Admin | Epic Shop` },
-	{ name: 'description', content: `Edit attribute: ${data?.attribute.name}` },
+export const meta: Route.MetaFunction = ({ loaderData }) => [
+	{ title: `Edit ${loaderData?.attribute.name} | Attributes | Admin | Epic Shop` },
+	{ name: 'description', content: `Edit attribute: ${loaderData?.attribute.name}` },
 ]
 
 export default function AttributeEdit({ loaderData }: Route.ComponentProps) {

@@ -203,16 +203,16 @@ export function DeleteNote({
 	)
 }
 
-export const meta: Route.MetaFunction = ({ data, params, matches }) => {
+export const meta: Route.MetaFunction = ({ loaderData, params, matches }) => {
 	const notesMatch = matches.find(
 		(m) => m?.id === 'routes/users+/$username_+/notes',
-	) as { data: NotesRoute.ComponentProps['loaderData'] } | undefined
+	) as { loaderData: NotesRoute.ComponentProps['loaderData'] } | undefined
 
-	const displayName = notesMatch?.data?.owner.name ?? params.username
-	const noteTitle = data?.note.title ?? 'Note'
+	const displayName = notesMatch?.loaderData?.owner.name ?? params.username
+	const noteTitle = loaderData?.note.title ?? 'Note'
 	const noteContentsSummary =
-		data && data.note.content.length > 100
-			? data?.note.content.slice(0, 97) + '...'
+		loaderData && loaderData.note.content.length > 100
+			? loaderData?.note.content.slice(0, 97) + '...'
 			: 'No content'
 	return [
 		{ title: `${noteTitle} | ${displayName}'s Notes | Epic Notes` },

@@ -81,7 +81,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 			variants: product.variants.map(variant => ({
 				...variant,
 				price: variant.price ? Number(variant.price) : null,
-				attributes: variant.attributeValues.reduce((acc: any, av: any) => {
+				attributes: variant.attributeValues.reduce((acc: Record<string, string>, av) => {
 					acc[av.attributeValue.attribute.name] = av.attributeValue.value
 					return acc
 				}, {}),
@@ -94,12 +94,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 /**
  * Generates metadata for the product view page
  * 
- * @param data - Route data containing product information
+ * @param args - Route meta arguments containing loader data
  * @returns Array of meta tags for the page
  */
-export const meta: Route.MetaFunction = ({ data }: any) => [
-	{ title: `${data?.product.name} | Admin | Epic Shop` },
-	{ name: 'description', content: `View product: ${data?.product.name}` },
+export const meta: Route.MetaFunction = ({ loaderData }) => [
+	{ title: `${loaderData?.product.name} | Admin | Epic Shop` },
+	{ name: 'description', content: `View product: ${loaderData?.product.name}` },
 ]
 
 /**
@@ -140,7 +140,7 @@ function StockBadge({ stockQuantity }: { stockQuantity: number }) {
  * @param product - Product data to delete
  * @returns Alert dialog button for deleting the product
  */
-function DeleteProductButton({ product }: { product: any }) {
+function DeleteProductButton({ product }: { product: Route.ComponentProps['loaderData']['product'] }) {
 	const fetcher = useFetcher()
 
 	return (
@@ -194,7 +194,7 @@ function DeleteProductButton({ product }: { product: any }) {
  */
 export default function ProductView({ loaderData }: Route.ComponentProps) {
 	const { product, currency } = loaderData
-	const totalStock = product.variants.reduce((sum: number, variant: any) => sum + variant.stockQuantity, 0)
+	const totalStock = product.variants.reduce((sum: number, variant) => sum + variant.stockQuantity, 0)
 
 	return (
 		<div className="space-y-8 animate-slide-top">
@@ -299,9 +299,9 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 							<div>
 								<div className="text-sm font-normal text-[#4A5565] mb-2">Tags</div>
 								<div className="flex flex-wrap gap-1">
-									{product.tags.map(({ tag }: any) => (
-										<Badge key={tag.name} variant="secondary" className="text-xs">
-											{tag.name}
+									{product.tags.map((tagRelation) => (
+										<Badge key={tagRelation.tag.name} variant="secondary" className="text-xs">
+											{tagRelation.tag.name}
 										</Badge>
 									))}
 								</div>
@@ -361,7 +361,7 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{product.variants.map((variant: any) => (
+								{product.variants.map((variant) => (
 									<TableRow key={variant.id} className="transition-colors duration-150 hover:bg-muted/50">
 										<TableCell className="font-normal text-[#101828]">
 											{variant.sku}

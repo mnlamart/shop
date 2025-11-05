@@ -59,9 +59,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	return { category, products }
 }
 
-export const meta: Route.MetaFunction = ({ data }: any) => [
-	{ title: `${data?.category.name} | Categories | Admin | Epic Shop` },
-	{ name: 'description', content: `View category: ${data?.category.name}` },
+export const meta: Route.MetaFunction = ({ loaderData }) => [
+	{ title: `${loaderData?.category.name} | Categories | Admin | Epic Shop` },
+	{ name: 'description', content: `View category: ${loaderData?.category.name}` },
 ]
 
 export default function CategoryView({ loaderData }: Route.ComponentProps) {
