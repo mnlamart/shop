@@ -137,6 +137,17 @@ export default function ProductsList({ loaderData }: Route.ComponentProps) {
 	const [statusFilter, setStatusFilter] = useState('all')
 	const [categoryFilter, setCategoryFilter] = useState('all')
 
+	// Memoize category options to avoid recreating on every render
+	const categoryOptions = useMemo(
+		() =>
+			categories.map((category) => (
+				<SelectItem key={category.id} value={category.id}>
+					{category.name}
+				</SelectItem>
+			)),
+		[categories],
+	)
+
 	// Filter products based on search and filter criteria
 	const filteredProducts = useMemo(() => {
 		let filtered = products
@@ -215,11 +226,7 @@ export default function ProductsList({ loaderData }: Route.ComponentProps) {
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="all">All Categories</SelectItem>
-							{categories.map((category) => (
-								<SelectItem key={category.id} value={category.id}>
-									{category.name}
-								</SelectItem>
-							))}
+							{categoryOptions}
 						</SelectContent>
 					</Select>
 				</div>

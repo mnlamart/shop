@@ -44,6 +44,17 @@ export default function ProductsIndex({ loaderData }: Route.ComponentProps) {
 	const [searchTerm, setSearchTerm] = useState('')
 	const [selectedCategory, setSelectedCategory] = useState('all')
 
+	// Memoize category options to avoid recreating on every render
+	const categoryOptions = useMemo(
+		() =>
+			categories.map((category) => (
+				<option key={category.id} value={category.id}>
+					{category.name}
+				</option>
+			)),
+		[categories],
+	)
+
 	// Filter products
 	const filteredProducts = useMemo(() => {
 		let filtered = products
@@ -93,11 +104,7 @@ export default function ProductsIndex({ loaderData }: Route.ComponentProps) {
 						aria-label="Filter by category"
 					>
 						<option value="all">All Categories</option>
-						{categories.map((category) => (
-							<option key={category.id} value={category.id}>
-								{category.name}
-							</option>
-						))}
+						{categoryOptions}
 					</select>
 				</div>
 			</div>
