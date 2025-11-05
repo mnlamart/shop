@@ -1,5 +1,6 @@
 import { invariantResponse } from '@epic-web/invariant'
 import { Link, useFetcher } from 'react-router'
+import { ProductImageScrollArea } from '#app/components/product-image-scroll-area.tsx'
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -147,7 +148,7 @@ function DeleteProductButton({ product }: { product: any }) {
 			<AlertDialogTrigger asChild>
 				<Button
 					variant="destructive"
-					className="transition-colors duration-200"
+					className="h-9 px-4 rounded-lg font-medium transition-colors duration-200"
 				>
 					<Icon name="trash" className="h-4 w-4 mr-2" />
 					Delete Product
@@ -194,7 +195,6 @@ function DeleteProductButton({ product }: { product: any }) {
 export default function ProductView({ loaderData }: Route.ComponentProps) {
 	const { product, currency } = loaderData
 	const totalStock = product.variants.reduce((sum: number, variant: any) => sum + variant.stockQuantity, 0)
-	const primaryImage = product.images[0] // Already ordered by displayOrder in loader
 
 	return (
 		<div className="space-y-8 animate-slide-top">
@@ -202,15 +202,15 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 			<div className="flex items-center justify-between">
 				<div>
 					<div className="flex items-center gap-3 mb-1">
-						<h1 className="text-2xl font-normal tracking-tight text-foreground">{product.name}</h1>
+						<h1 className="text-3xl font-normal text-[#101828]">{product.name}</h1>
 						<StatusBadge status={product.status} />
 					</div>
-					<p className="text-sm text-muted-foreground">
-						SKU: {product.sku} • Created {new Date(product.createdAt).toLocaleDateString()}
+					<p className="text-sm font-normal text-[#4A5565] mt-1">
+						SKU: {product.sku} · Created {new Date(product.createdAt).toLocaleDateString()}
 					</p>
 				</div>
 				<div className="flex gap-2">
-					<Button variant="outline" asChild className="h-9 rounded-lg font-medium">
+					<Button variant="outline" asChild className="h-9 px-4 rounded-lg font-medium border border-[#D1D5DC] bg-white text-[#101828] hover:bg-gray-50">
 						<Link to={`/admin/products/${product.slug}/edit`}>
 							<Icon name="pencil-1" className="h-4 w-4 mr-2" />
 							Edit
@@ -222,166 +222,148 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 
 			{/* Statistics cards in grid */}
 			<div className="grid gap-6 md:grid-cols-3">
-				<Card className="rounded-[14px]">
+				<Card className="rounded-lg border border-[#D1D5DC]">
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">
+						<CardTitle className="text-sm font-normal text-[#4A5565]">
 							Total Variants
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="text-2xl font-normal text-foreground">{product.variants.length}</div>
-						<p className="text-xs text-muted-foreground">
+						<div className="text-3xl font-normal text-[#101828]">{product.variants.length}</div>
+						<p className="text-xs font-normal text-[#4A5565] mt-1">
 							Product variations
 						</p>
 					</CardContent>
 				</Card>
 				
-				<Card className="rounded-[14px]">
+				<Card className="rounded-lg border border-[#D1D5DC]">
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">
+						<CardTitle className="text-sm font-normal text-[#4A5565]">
 							Total Stock
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="text-2xl font-normal text-foreground">{totalStock}</div>
-						<p className="text-xs text-muted-foreground">
+						<div className="text-3xl font-normal text-[#101828]">{totalStock}</div>
+						<p className="text-xs font-normal text-[#4A5565] mt-1">
 							Units available
 						</p>
 					</CardContent>
 				</Card>
 				
-				<Card className="rounded-[14px]">
+				<Card className="rounded-lg border border-[#D1D5DC]">
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">
+						<CardTitle className="text-sm font-normal text-[#4A5565]">
 							Price
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="text-2xl font-normal text-foreground">
+						<div className="text-3xl font-normal text-[#101828]">
 							{formatPrice(product.price, currency)}
 						</div>
-						<p className="text-xs text-muted-foreground">
+						<p className="text-xs font-normal text-[#4A5565] mt-1">
 							Base price
 						</p>
 					</CardContent>
 				</Card>
 			</div>
 
-			<div className="grid gap-6 lg:grid-cols-2">
-				{/* Product Images */}
-				<Card className="rounded-[14px]">
-					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Product Images</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="space-y-4">
-							{primaryImage ? (
-								<div className="aspect-square rounded-lg border bg-muted">
-									<img
-										src={`/resources/images?objectKey=${encodeURIComponent(primaryImage.objectKey)}`}
-										alt={primaryImage.altText || product.name}
-										className="h-full w-full rounded-lg object-cover"
-									/>
-								</div>
-							) : (
-								<div className="flex aspect-square items-center justify-center rounded-lg border bg-muted">
-									<Icon name="image" className="h-12 w-12 text-muted-foreground" />
-								</div>
-							)}
-							
-							{product.images.length > 1 && (
-								<div className="grid grid-cols-4 gap-2">
-									{product.images.slice(1).map((image: any) => (
-										<div key={image.id} className="aspect-square rounded-lg border bg-muted">
-											<img
-												src={`/resources/images?objectKey=${encodeURIComponent(image.objectKey)}`}
-												alt={image.altText || product.name}
-												className="h-full w-full rounded-lg object-cover"
-											/>
-										</div>
+			{/* Product Details - Full Width */}
+			<Card className="rounded-lg border border-[#D1D5DC]">
+				<CardHeader>
+					<CardTitle className="text-lg font-normal text-[#101828]">Product Details</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<div className="grid grid-cols-3 gap-8">
+						<div>
+							<div className="text-sm font-normal text-[#4A5565] mb-2">Stock Status</div>
+							<StockBadge stockQuantity={totalStock} />
+						</div>
+
+						<div>
+							<div className="text-sm font-normal text-[#4A5565] mb-2">Category</div>
+							<div className="text-sm font-normal text-[#101828]">
+								{product.category ? (
+									<Link 
+										to={`/admin/categories/${product.category.slug}`}
+										className="text-primary hover:underline"
+									>
+										{product.category.name}
+									</Link>
+								) : (
+									'Uncategorized'
+								)}
+							</div>
+						</div>
+
+						{product.tags.length > 0 && (
+							<div>
+								<div className="text-sm font-normal text-[#4A5565] mb-2">Tags</div>
+								<div className="flex flex-wrap gap-1">
+									{product.tags.map(({ tag }: any) => (
+										<Badge key={tag.name} variant="secondary" className="text-xs">
+											{tag.name}
+										</Badge>
 									))}
 								</div>
-							)}
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* Product Details */}
-				<Card className="rounded-[14px]">
-					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Product Details</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="space-y-4">
-							<div>
-								<label className="text-sm font-medium text-muted-foreground">Stock Status</label>
-								<div className="mt-1">
-									<StockBadge stockQuantity={totalStock} />
-								</div>
 							</div>
-							
-							<div>
-								<label className="text-sm font-medium text-muted-foreground">Category</label>
-								<p className="text-sm">
-									{product.category ? (
-										<Link 
-											to={`/admin/categories/${product.category.slug}`}
-											className="text-primary hover:underline"
-										>
-											{product.category.name}
-										</Link>
-									) : (
-										'Uncategorized'
-									)}
-								</p>
-							</div>
-							
-							{product.tags.length > 0 && (
-								<div>
-									<label className="text-sm font-medium text-muted-foreground">Tags</label>
-									<div className="mt-1 flex flex-wrap gap-1">
-										{product.tags.map(({ tag }: any) => (
-											<Badge key={tag.name} variant="secondary" className="text-xs">
-												{tag.name}
-											</Badge>
-										))}
-									</div>
-								</div>
-							)}
+						)}
+					</div>
 
-							{product.description && (
-								<div>
-									<label className="text-sm font-medium text-muted-foreground">Description</label>
-									<div className="mt-1 text-sm whitespace-pre-wrap">
-										{product.description}
-									</div>
-								</div>
-							)}
+					{product.description && (
+						<div className="mt-6 pt-6 border-t border-[#D1D5DC]">
+							<div className="text-sm font-normal text-[#4A5565] mb-3">Description</div>
+							<div className="text-sm font-normal text-[#101828] leading-relaxed whitespace-pre-wrap">
+								{product.description}
+							</div>
 						</div>
-					</CardContent>
-				</Card>
-			</div>
+					)}
+				</CardContent>
+			</Card>
+
+			{/* Product Images - Horizontal Scroll */}
+			<Card className="rounded-lg border border-[#D1D5DC]">
+				<CardHeader>
+					<div className="flex items-center justify-between">
+						<CardTitle className="text-lg font-normal text-[#101828]">Product Images</CardTitle>
+						{product.images.length > 0 && (
+							<div className="flex items-center gap-2 text-sm font-normal text-[#4A5565]">
+								<Icon name="image" className="h-4 w-4" />
+								<span>{product.images.length} images</span>
+							</div>
+						)}
+					</div>
+				</CardHeader>
+				<CardContent>
+					{product.images.length > 0 ? (
+						<ProductImageScrollArea images={product.images} productName={product.name} />
+					) : (
+						<div className="flex aspect-square items-center justify-center rounded-lg border bg-muted">
+							<Icon name="image" className="h-12 w-12 text-[#4A5565]" />
+						</div>
+					)}
+				</CardContent>
+			</Card>
 
 			{/* Product Variants */}
 			{product.variants.length > 0 && (
-				<Card className="rounded-[14px]">
+				<Card className="rounded-lg border border-[#D1D5DC]">
 					<CardHeader>
-						<CardTitle className="text-base font-normal text-foreground">Product Variants</CardTitle>
+						<CardTitle className="text-lg font-normal text-[#101828]">Product Variants</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<Table>
 							<TableHeader>
 								<TableRow>
-									<TableHead>SKU</TableHead>
-									<TableHead>Attributes</TableHead>
-									<TableHead className="hidden md:table-cell">Price</TableHead>
-									<TableHead>Stock</TableHead>
+									<TableHead className="text-sm font-normal text-[#4A5565]">SKU</TableHead>
+									<TableHead className="text-sm font-normal text-[#4A5565]">Attributes</TableHead>
+									<TableHead className="hidden md:table-cell text-sm font-normal text-[#4A5565]">Price</TableHead>
+									<TableHead className="text-sm font-normal text-[#4A5565]">Stock</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{product.variants.map((variant: any) => (
 									<TableRow key={variant.id} className="transition-colors duration-150 hover:bg-muted/50">
-										<TableCell className="font-medium">
+										<TableCell className="font-normal text-[#101828]">
 											{variant.sku}
 										</TableCell>
 										<TableCell>
@@ -395,11 +377,11 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 										</TableCell>
 										<TableCell className="hidden md:table-cell">
 											{variant.price ? (
-												<span className="font-medium">
+												<span className="font-normal text-[#101828]">
 													{formatPrice(variant.price, currency)}
 												</span>
 											) : (
-												<span className="text-muted-foreground">Base price</span>
+												<span className="text-[#4A5565]">Base price</span>
 											)}
 										</TableCell>
 										<TableCell>

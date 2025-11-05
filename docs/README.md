@@ -16,6 +16,9 @@ Comprehensive overview of the admin interface architecture, including route stru
 ### [Implementation Notes](implementation-notes.md)
 Key architectural decisions, trade-offs, and lessons learned during development. Essential reading for understanding the reasoning behind implementation choices.
 
+### [Accessibility Testing](accessibility-testing.md)
+Complete guide to accessibility testing with axe-core, covering E2E tests (Playwright), component tests (Vitest), configuration options, and best practices for maintaining WCAG compliance.
+
 ## Planning Documentation
 
 ### [Admin Product Management Plan](plans/001-admin-product-management.md)
@@ -42,6 +45,7 @@ Original implementation plan with status updates and completion notes. Shows the
 2. **Fixture Updates**: Modify `tests/fixtures/images/products/` as needed
 3. **Component Development**: Follow Epic Stack patterns and ARIA guidelines
 4. **Testing**: Use Playwright for E2E, React Testing Library for components
+5. **Accessibility Testing**: Run accessibility tests with axe-core (see [Accessibility Testing](accessibility-testing.md))
 
 ## Contributing
 
