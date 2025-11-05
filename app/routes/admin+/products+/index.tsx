@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Link, useFetcher } from 'react-router'
+import { ProductStatusBadge, StockBadge } from '#app/components/product-status-badge.tsx'
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -11,7 +12,6 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from '#app/components/ui/alert-dialog.tsx'
-import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
@@ -82,26 +82,6 @@ export const meta: Route.MetaFunction = () => [
 	{ title: 'Products | Admin | Epic Shop' },
 	{ name: 'description', content: 'Manage your product catalog' },
 ]
-
-function StockBadge({ stockQuantity }: { stockQuantity: number }) {
-	if (stockQuantity === 0) {
-		return <Badge variant="destructive">Out of Stock</Badge>
-	}
-	if (stockQuantity <= 10) {
-		return <Badge variant="warning">Low Stock ({stockQuantity})</Badge>
-	}
-	return <Badge variant="success">In Stock ({stockQuantity})</Badge>
-}
-
-function StatusBadge({ status }: { status: string }) {
-	if (status === 'ACTIVE') {
-		return <Badge variant="success">Active</Badge>
-	}
-	if (status === 'ARCHIVED') {
-		return <Badge variant="destructive">Archived</Badge>
-	}
-	return <Badge variant="secondary">Draft</Badge>
-}
 
 function DeleteProductButton({ product }: { product: Route.ComponentProps['loaderData']['products'][number] }) {
 	const fetcher = useFetcher()
@@ -334,7 +314,7 @@ export default function ProductsList({ loaderData }: Route.ComponentProps) {
 										<StockBadge stockQuantity={totalStock} />
 									</TableCell>
 									<TableCell>
-										<StatusBadge status={product.status} />
+										<ProductStatusBadge status={product.status} />
 									</TableCell>
 									<TableCell className="hidden lg:table-cell">
 										<span className="text-muted-foreground">

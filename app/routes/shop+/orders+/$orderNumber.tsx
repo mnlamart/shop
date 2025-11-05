@@ -1,5 +1,5 @@
 import { invariantResponse } from '@epic-web/invariant'
-import { Badge } from '#app/components/ui/badge.tsx'
+import { OrderStatusBadge } from '#app/components/order-status-badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { getUserId } from '#app/utils/auth.server.ts'
@@ -36,23 +36,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	return { order }
 }
 
-function getStatusBadgeVariant(status: string) {
-	switch (status) {
-		case 'CONFIRMED':
-			return 'default'
-		case 'SHIPPED':
-			return 'success'
-		case 'DELIVERED':
-			return 'success'
-		case 'CANCELLED':
-			return 'destructive'
-		case 'PENDING':
-			return 'secondary'
-		default:
-			return 'secondary'
-	}
-}
-
 export const meta: Route.MetaFunction = ({ loaderData }) => {
 	if (!loaderData?.order) {
 		return [{ title: 'Order Not Found | Shop | Epic Shop' }]
@@ -72,9 +55,7 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 						Order Number: <span className="font-semibold">{order.orderNumber}</span>
 					</p>
 				</div>
-				<Badge variant={getStatusBadgeVariant(order.status)} className="text-sm">
-					{order.status}
-				</Badge>
+				<OrderStatusBadge status={order.status} className="text-sm" />
 			</div>
 
 			<div className="grid gap-6 md:grid-cols-2">

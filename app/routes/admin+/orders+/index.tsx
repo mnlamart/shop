@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router'
 import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
-import { Badge } from '#app/components/ui/badge.tsx'
+import { OrderStatusBadge } from '#app/components/order-status-badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
@@ -63,27 +63,6 @@ export const meta: Route.MetaFunction = () => [
 	{ title: 'Orders | Admin | Epic Shop' },
 	{ name: 'description', content: 'Manage all orders' },
 ]
-
-function StatusBadge({ status }: { status: string }) {
-	const statusConfig: Record<
-		string,
-		{ label: string; variant: 'default' | 'secondary' | 'destructive' | 'success' | 'warning' }
-	> = {
-		PENDING: { label: 'Pending', variant: 'warning' },
-		CONFIRMED: { label: 'Confirmed', variant: 'default' },
-		SHIPPED: { label: 'Shipped', variant: 'secondary' },
-		DELIVERED: { label: 'Delivered', variant: 'success' },
-		CANCELLED: { label: 'Cancelled', variant: 'destructive' },
-	}
-
-	const config = statusConfig[status] || { label: status, variant: 'default' }
-
-	return (
-		<Badge variant={config.variant} className="capitalize">
-			{config.label}
-		</Badge>
-	)
-}
 
 const ITEMS_PER_PAGE = 25
 
@@ -256,7 +235,7 @@ export default function OrdersList({ loaderData }: Route.ComponentProps) {
 										</span>
 									</TableCell>
 									<TableCell>
-										<StatusBadge status={order.status} />
+										<OrderStatusBadge status={order.status} />
 									</TableCell>
 									<TableCell>
 										<div className="flex items-center gap-2">

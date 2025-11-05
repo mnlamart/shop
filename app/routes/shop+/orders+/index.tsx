@@ -3,7 +3,7 @@ import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { data, Form, Link, redirect } from 'react-router'
 import { z } from 'zod'
 import { ErrorList, Field } from '#app/components/forms.tsx'
-import { Badge } from '#app/components/ui/badge.tsx'
+import { OrderStatusBadge } from '#app/components/order-status-badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
@@ -70,23 +70,6 @@ export async function action({ request }: Route.ActionArgs) {
 
 	// Redirect to order detail page with email query param for guest access
 	return redirect(`/shop/orders/${orderNumber}?email=${encodeURIComponent(email)}`)
-}
-
-function getStatusBadgeVariant(status: string) {
-	switch (status) {
-		case 'CONFIRMED':
-			return 'default'
-		case 'SHIPPED':
-			return 'success'
-		case 'DELIVERED':
-			return 'success'
-		case 'CANCELLED':
-			return 'destructive'
-		case 'PENDING':
-			return 'secondary'
-		default:
-			return 'secondary'
-	}
 }
 
 export const meta: Route.MetaFunction = () => [
@@ -200,9 +183,7 @@ export default function OrderHistory({ loaderData, actionData }: Route.Component
 													>
 														{order.orderNumber}
 													</Link>
-													<Badge variant={getStatusBadgeVariant(order.status)}>
-														{order.status}
-													</Badge>
+													<OrderStatusBadge status={order.status} />
 												</div>
 												<p className="text-sm text-muted-foreground">
 													{new Date(order.createdAt).toLocaleDateString('en-US', {
