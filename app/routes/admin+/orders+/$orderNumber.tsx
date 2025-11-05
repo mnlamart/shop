@@ -149,15 +149,15 @@ export async function action({ params, request }: Route.ActionArgs) {
 	})
 }
 
-export const meta: Route.MetaFunction = ({ data }) => {
-	if (!data?.order) {
+export const meta: Route.MetaFunction = ({ loaderData }) => {
+	if (!loaderData?.order) {
 		return [{ title: 'Order Not Found | Admin | Epic Shop' }]
 	}
 	return [
 		{
-			title: `Order ${data.order.orderNumber} | Admin | Epic Shop`,
+			title: `Order ${loaderData.order.orderNumber} | Admin | Epic Shop`,
 		},
-		{ name: 'description', content: `View and manage order: ${data.order.orderNumber}` },
+		{ name: 'description', content: `View and manage order: ${loaderData.order.orderNumber}` },
 	]
 }
 

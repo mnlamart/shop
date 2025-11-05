@@ -106,8 +106,8 @@ export default function ProfileRoute() {
 	)
 }
 
-export const meta: Route.MetaFunction = ({ data, params }) => {
-	const displayName = data?.user.name ?? params.username
+export const meta: Route.MetaFunction = ({ loaderData, params }) => {
+	const displayName = loaderData?.user.name ?? params.username
 	return [
 		{ title: `${displayName} | Epic Notes` },
 		{

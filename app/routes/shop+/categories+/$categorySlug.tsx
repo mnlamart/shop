@@ -44,14 +44,14 @@ export async function loader({ params }: Route.LoaderArgs) {
 	return { category, products, allCategories, currency: currency || { symbol: '$', decimals: 2 } }
 }
 
-export const meta: Route.MetaFunction = ({ data }) => {
-	if (!data?.category) {
+export const meta: Route.MetaFunction = ({ loaderData }) => {
+	if (!loaderData?.category) {
 		return [{ title: 'Category not found' }]
 	}
 
 	return [
-		{ title: `${data.category.name} - Shop` },
-		{ name: 'description', content: data.category.description || `Browse ${data.category.name} products` },
+		{ title: `${loaderData.category.name} - Shop` },
+		{ name: 'description', content: loaderData.category.description || `Browse ${loaderData.category.name} products` },
 	]
 }
 

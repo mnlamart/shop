@@ -31,7 +31,7 @@ async function testSitemap() {
 
 		// Extract all URLs from sitemap
 		const urlMatches = xml.matchAll(/<loc>(.*?)<\/loc>/g)
-		const urls = Array.from(urlMatches, m => m[1])
+		const urls = Array.from(urlMatches, m => m[1]).filter((url): url is string => url !== undefined)
 		const baseUrl = urls[0]?.split('/').slice(0, 3).join('/') || SERVER_URL
 
 		// Count URLs

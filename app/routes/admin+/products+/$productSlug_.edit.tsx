@@ -102,12 +102,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 /**
  * Generates metadata for the edit product page
  * 
- * @param data - Route data containing product information
+ * @param args - Route meta arguments containing loader data
  * @returns Array of meta tags for the page
  */
-export const meta: Route.MetaFunction = ({ data }: any) => [
-	{ title: `Edit ${data?.product.name} | Admin | Epic Shop` },
-	{ name: 'description', content: `Edit product: ${data?.product.name}` },
+export const meta: Route.MetaFunction = ({ loaderData }) => [
+	{ title: `Edit ${loaderData?.product.name} | Admin | Epic Shop` },
+	{ name: 'description', content: `Edit product: ${loaderData?.product.name}` },
 ]
 
 /**

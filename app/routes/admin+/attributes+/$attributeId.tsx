@@ -71,9 +71,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	}
 }
 
-export const meta: Route.MetaFunction = ({ data }: any) => [
-	{ title: `${data?.attribute.name} | Attributes | Admin | Epic Shop` },
-	{ name: 'description', content: `View attribute: ${data?.attribute.name}` },
+export const meta: Route.MetaFunction = ({ loaderData }) => [
+	{ title: `${loaderData?.attribute.name} | Attributes | Admin | Epic Shop` },
+	{ name: 'description', content: `View attribute: ${loaderData?.attribute.name}` },
 ]
 
 export default function AttributeView({ loaderData }: Route.ComponentProps) {

@@ -127,9 +127,9 @@ export async function action({ params: _params, request }: Route.ActionArgs) {
 	})
 }
 
-export const meta: Route.MetaFunction = ({ data }: any) => [
-	{ title: `Edit ${data?.category.name} | Admin | Epic Shop` },
-	{ name: 'description', content: `Edit category: ${data?.category.name}` },
+export const meta: Route.MetaFunction = ({ loaderData }) => [
+	{ title: `Edit ${loaderData?.category.name} | Admin | Epic Shop` },
+	{ name: 'description', content: `Edit category: ${loaderData?.category.name}` },
 ]
 
 export default function EditCategory({ loaderData, actionData }: Route.ComponentProps) {
