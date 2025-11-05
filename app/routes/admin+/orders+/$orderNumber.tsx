@@ -34,12 +34,19 @@ import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { type Route } from './+types/$orderNumber.ts'
 
 const StatusUpdateSchema = z.object({
-	status: z.enum(['PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED']),
-	trackingNumber: z.string().optional(),
+	status: z.enum(['PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED'], {
+		error: 'Status must be one of: PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED',
+	}),
+	trackingNumber: z.string({
+		error: (issue) =>
+			issue.input === undefined ? undefined : 'Tracking number must be a string',
+	}).optional(),
 })
 
 const CancelOrderSchema = z.object({
-	intent: z.literal('cancel'),
+	intent: z.literal('cancel', {
+		error: 'Invalid intent value',
+	}),
 })
 
 function getStatusLabel(status: string): string {

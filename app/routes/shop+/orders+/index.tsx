@@ -14,8 +14,14 @@ import { formatPrice } from '#app/utils/price.ts'
 import { type Route } from './+types/index.ts'
 
 const GuestOrderLookupSchema = z.object({
-	orderNumber: z.string().min(1, 'Order number is required').trim(),
-	email: z.string().min(1, 'Email is required').email('Invalid email address').trim().toLowerCase(),
+	orderNumber: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'Order number is required' : 'Not a string',
+	}).min(1, { error: 'Order number is required' }).trim(),
+	email: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'Email is required' : 'Not a string',
+	}).min(1, { error: 'Email is required' }).email({ error: 'Invalid email address' }).trim().toLowerCase(),
 })
 
 export async function loader({ request }: Route.LoaderArgs) {

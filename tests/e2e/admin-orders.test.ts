@@ -95,8 +95,14 @@ test.describe('Admin Order Management', () => {
 	}) => {
 		await login()
 		await navigate('/admin/orders')
-		// Should redirect or show error
-		await expect(page).not.toHaveURL(/\/admin\/orders/)
+		// requireUserWithRole throws a 403 response, which React Router renders as an error page
+		// Wait for the error page to load
+		await page.waitForLoadState('networkidle')
+		
+		// The error response data contains { error: 'Unauthorized', requiredRole: 'admin', message: ... }
+		// Check for error content that indicates unauthorized access
+		// The ErrorBoundary shows "Unauthorized" as a heading
+		await expect(page.getByRole('heading', { name: /unauthorized/i })).toBeVisible({ timeout: 5000 })
 	})
 
 	test('should display admin order list page', async ({ page, navigate }) => {
@@ -114,10 +120,8 @@ test.describe('Admin Order Management', () => {
 		const { user, password } = await createAdminUser()
 		await loginAsAdmin(page, user.username, password)
 
-		// Create test orders
+		// Create test orders - generate second order number after first is committed
 		const orderNumber1 = await generateOrderNumber()
-		const orderNumber2 = await generateOrderNumber()
-
 		await prisma.order.create({
 			data: {
 				orderNumber: orderNumber1,
@@ -141,6 +145,8 @@ test.describe('Admin Order Management', () => {
 			},
 		})
 
+		// Generate second order number after first order is committed
+		const orderNumber2 = await generateOrderNumber()
 		await prisma.order.create({
 			data: {
 				orderNumber: orderNumber2,
@@ -179,8 +185,6 @@ test.describe('Admin Order Management', () => {
 
 		// Create orders with different statuses
 		const orderNumber1 = await generateOrderNumber()
-		const orderNumber2 = await generateOrderNumber()
-
 		await prisma.order.create({
 			data: {
 				orderNumber: orderNumber1,
@@ -203,7 +207,8 @@ test.describe('Admin Order Management', () => {
 				},
 			},
 		})
-
+		// Generate second order number after first order is committed
+		const orderNumber2 = await generateOrderNumber()
 		await prisma.order.create({
 			data: {
 				orderNumber: orderNumber2,
@@ -245,8 +250,6 @@ test.describe('Admin Order Management', () => {
 		await loginAsAdmin(page, user.username, password)
 
 		const orderNumber1 = await generateOrderNumber()
-		const orderNumber2 = await generateOrderNumber()
-
 		await prisma.order.create({
 			data: {
 				orderNumber: orderNumber1,
@@ -270,6 +273,8 @@ test.describe('Admin Order Management', () => {
 			},
 		})
 
+		// Generate second order number after first order is committed
+		const orderNumber2 = await generateOrderNumber()
 		await prisma.order.create({
 			data: {
 				orderNumber: orderNumber2,
@@ -356,9 +361,9 @@ test.describe('Admin Order Management', () => {
 
 		await navigate('/admin/orders')
 
-		await expect(
-			page.getByText(/no orders|you haven't received any orders/i),
-		).toBeVisible()
+		// The page shows two separate messages: "No orders found." and "You haven't received any orders yet."
+		// Use a more specific selector or check for the first one
+		await expect(page.getByText('No orders found.')).toBeVisible()
 	})
 
 	test('should link to order detail page from order list', async ({ page, navigate }) => {

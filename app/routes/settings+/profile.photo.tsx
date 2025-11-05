@@ -29,11 +29,15 @@ export const handle: BreadcrumbHandle & SEOHandle = {
 const MAX_SIZE = 1024 * 1024 * 3 // 3MB
 
 const DeleteImageSchema = z.object({
-	intent: z.literal('delete'),
+	intent: z.literal('delete', {
+		error: 'Invalid intent value',
+	}),
 })
 
 const NewImageSchema = z.object({
-	intent: z.literal('submit'),
+	intent: z.literal('submit', {
+		error: 'Invalid intent value',
+	}),
 	photoFile: z.instanceof(File)
 		.refine((file) => file.size > 0, { error: 'Image is required' })
 		.refine(

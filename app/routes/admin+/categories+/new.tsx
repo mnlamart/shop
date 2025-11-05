@@ -18,10 +18,16 @@ import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { type Route } from './+types/new.ts'
 
 const CategorySchema = z.object({
-	name: z.string().min(1, { error: 'Name is required' }).max(100, {
+	name: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'Name is required' : 'Not a string',
+	}).min(1, { error: 'Name is required' }).max(100, {
 		error: 'Name must be less than 100 characters',
 	}),
-	slug: z.string().min(1, { error: 'Slug is required' }).max(100, {
+	slug: z.string({
+		error: (issue) =>
+			issue.input === undefined ? 'Slug is required' : 'Not a string',
+	}).min(1, { error: 'Slug is required' }).max(100, {
 		error: 'Slug must be less than 100 characters',
 	}).regex(/^[a-z0-9-]+$/, {
 		error: 'Slug can only contain lowercase letters, numbers, and hyphens',
@@ -29,7 +35,10 @@ const CategorySchema = z.object({
 	description: z.string().max(500, {
 		error: 'Description must be less than 500 characters',
 	}).optional(),
-	parentId: z.string(),
+	parentId: z.string({
+		error: (issue) =>
+			issue.input === undefined ? undefined : 'Parent ID must be a string',
+	}),
 })
 
 export async function action({ request }: Route.ActionArgs) {

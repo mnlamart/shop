@@ -32,13 +32,16 @@ test.describe('Order History', () => {
 		})
 	})
 
-	test('should redirect unauthenticated users attempting to access order history', async ({
+	test('should allow unauthenticated users to access order history for guest lookup', async ({
 		page,
 		navigate,
 	}) => {
 		await navigate('/shop/orders')
-		// Should redirect to login or show an error
-		await expect(page).not.toHaveURL(/\/shop\/orders/)
+		// Shop orders page allows unauthenticated access for guest order lookup
+		await expect(page).toHaveURL(/\/shop\/orders/)
+		// Should show guest lookup form
+		await expect(page.getByRole('textbox', { name: /order number/i })).toBeVisible()
+		await expect(page.getByRole('textbox', { name: /email/i })).toBeVisible()
 	})
 
 	test('should display empty state when user has no orders', async ({ page, login }) => {
@@ -56,10 +59,8 @@ test.describe('Order History', () => {
 	}) => {
 		const user = await login()
 
-		// Create two orders with different timestamps
+		// Create two orders - generate second order number after first is committed
 		const orderNumber1 = await generateOrderNumber()
-		const orderNumber2 = await generateOrderNumber()
-
 		await prisma.order.create({
 			data: {
 				orderNumber: orderNumber1,
@@ -84,9 +85,8 @@ test.describe('Order History', () => {
 			},
 		})
 
-		// Create second order slightly later (to test ordering)
-		await new Promise((resolve) => setTimeout(resolve, 10))
-
+		// Generate second order number after first order is committed
+		const orderNumber2 = await generateOrderNumber()
 		await prisma.order.create({
 			data: {
 				orderNumber: orderNumber2,
@@ -162,7 +162,13 @@ test.describe('Order History', () => {
 		await expect(page.getByText(/\$500\.00|\$500/)).toBeVisible()
 		await expect(page.getByText(/confirmed/i)).toBeVisible()
 		// Date should be formatted and visible
-		const formattedDate = new Date(order.createdAt).toLocaleDateString()
+		// The route uses toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+		// which produces something like "November 5, 2025"
+		const date = new Date(order.createdAt)
+		const month = date.toLocaleDateString('en-US', { month: 'long' })
+		const day = date.getDate()
+		const year = date.getFullYear()
+		const formattedDate = `${month} ${day}, ${year}`
 		await expect(
 			page.getByText(new RegExp(formattedDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))),
 		).toBeVisible()

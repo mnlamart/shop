@@ -25,8 +25,8 @@ const ShippingFormSchema = z.object({
 			error: (issue) =>
 				issue.input === undefined ? 'Name is required' : 'Not a string',
 		})
-		.min(1, 'Name is required')
-		.max(100, 'Name must be less than 100 characters')
+		.min(1, { error: 'Name is required' })
+		.max(100, { error: 'Name must be less than 100 characters' })
 		.trim(),
 	email: z
 		.string({
@@ -35,7 +35,7 @@ const ShippingFormSchema = z.object({
 		})
 		.trim()
 		.toLowerCase()
-		.min(1, 'Email is required')
+		.min(1, { error: 'Email is required' })
 		.pipe(z.email({ error: 'Invalid email address' })),
 	street: z
 		.string({
@@ -44,20 +44,20 @@ const ShippingFormSchema = z.object({
 					? 'Street address is required'
 					: 'Not a string',
 		})
-		.min(1, 'Street address is required')
-		.max(200, 'Street address must be less than 200 characters')
+		.min(1, { error: 'Street address is required' })
+		.max(200, { error: 'Street address must be less than 200 characters' })
 		.trim(),
 	city: z
 		.string({
 			error: (issue) =>
 				issue.input === undefined ? 'City is required' : 'Not a string',
 		})
-		.min(1, 'City is required')
-		.max(100, 'City must be less than 100 characters')
+		.min(1, { error: 'City is required' })
+		.max(100, { error: 'City must be less than 100 characters' })
 		.trim(),
 	state: z
 		.string()
-		.max(100, 'State must be less than 100 characters')
+		.max(100, { error: 'State must be less than 100 characters' })
 		.trim()
 		.optional(),
 	postal: z
@@ -67,8 +67,8 @@ const ShippingFormSchema = z.object({
 					? 'Postal code is required'
 					: 'Not a string',
 		})
-		.min(1, 'Postal code is required')
-		.max(20, 'Postal code must be less than 20 characters')
+		.min(1, { error: 'Postal code is required' })
+		.max(20, { error: 'Postal code must be less than 20 characters' })
 		.trim(),
 	country: z
 		.string({
@@ -78,7 +78,7 @@ const ShippingFormSchema = z.object({
 		.trim()
 		.toUpperCase()
 		.refine((val) => val.length === 2, {
-			message: 'Country must be a 2-letter ISO code (e.g., US, GB)',
+			error: 'Country must be a 2-letter ISO code (e.g., US, GB)',
 		}),
 })
 
