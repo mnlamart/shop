@@ -62,9 +62,11 @@ export const meta: Route.MetaFunction = () => [
 	{ name: 'description', content: 'Manage product attributes' },
 ]
 
-function AttributeRow({ attribute }: { attribute: any }) {
-	const hasVariants = attribute.values.some((value: any) => value._count.variants > 0)
-	const totalVariants = attribute.values.reduce((sum: number, value: any) => sum + value._count.variants, 0)
+function AttributeRow({ attribute }: { attribute: Route.ComponentProps['loaderData']['attributes'][number] }) {
+	type AttributeValue = Route.ComponentProps['loaderData']['attributes'][number]['values'][number]
+	
+	const hasVariants = attribute.values.some((value: AttributeValue) => value._count.variants > 0)
+	const totalVariants = attribute.values.reduce((sum: number, value: AttributeValue) => sum + value._count.variants, 0)
 
 	return (
 		<TableRow className="transition-colors duration-150 hover:bg-muted/50 animate-slide-top">
@@ -85,7 +87,7 @@ function AttributeRow({ attribute }: { attribute: any }) {
 			</TableCell>
 			<TableCell className="hidden md:table-cell">
 				<div className="flex flex-wrap gap-1">
-					{attribute.values.slice(0, 3).map((value: any) => (
+					{attribute.values.slice(0, 3).map((value: AttributeValue) => (
 						<Badge key={value.id} variant="secondary" className="text-xs">
 							{value.value}
 						</Badge>
@@ -126,7 +128,7 @@ function AttributeRow({ attribute }: { attribute: any }) {
 	)
 }
 
-function DeleteButton({ attribute, hasVariants }: { attribute: any; hasVariants: boolean }) {
+function DeleteButton({ attribute, hasVariants }: { attribute: Route.ComponentProps['loaderData']['attributes'][number]; hasVariants: boolean }) {
 	const fetcher = useFetcher()
 
 	return (
@@ -179,6 +181,9 @@ export default function AttributesList({ loaderData }: Route.ComponentProps) {
 	const [searchTerm, setSearchTerm] = useState('')
 	const [filterType, setFilterType] = useState('all')
 
+	type Attribute = Route.ComponentProps['loaderData']['attributes'][number]
+	type AttributeValue = Attribute['values'][number]
+
 	// Filter attributes based on search and filter criteria
 	const filteredAttributes = useMemo(() => {
 		let filtered = attributes
@@ -186,9 +191,9 @@ export default function AttributesList({ loaderData }: Route.ComponentProps) {
 		// Apply search filter
 		if (searchTerm.trim()) {
 			const search = searchTerm.toLowerCase()
-			filtered = filtered.filter((attribute: any) => 
+			filtered = filtered.filter((attribute: Attribute) => 
 				attribute.name.toLowerCase().includes(search) ||
-				attribute.values.some((value: any) => 
+				attribute.values.some((value: AttributeValue) => 
 					value.value.toLowerCase().includes(search)
 				)
 			)
@@ -196,12 +201,12 @@ export default function AttributesList({ loaderData }: Route.ComponentProps) {
 
 		// Apply type filter
 		if (filterType === 'with-variants') {
-			filtered = filtered.filter((attribute: any) => 
-				attribute.values.some((value: any) => value._count.variants > 0)
+			filtered = filtered.filter((attribute: Attribute) => 
+				attribute.values.some((value: AttributeValue) => value._count.variants > 0)
 			)
 		} else if (filterType === 'unused') {
-			filtered = filtered.filter((attribute: any) => 
-				attribute.values.every((value: any) => value._count.variants === 0)
+			filtered = filtered.filter((attribute: Attribute) => 
+				attribute.values.every((value: AttributeValue) => value._count.variants === 0)
 			)
 		}
 
@@ -288,7 +293,7 @@ export default function AttributesList({ loaderData }: Route.ComponentProps) {
 							</TableCell>
 						</TableRow>
 					) : (
-						filteredAttributes.map((attribute: any) => (
+						filteredAttributes.map((attribute: Attribute) => (
 							<AttributeRow key={attribute.id} attribute={attribute} />
 						))
 					)}

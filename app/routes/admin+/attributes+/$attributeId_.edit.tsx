@@ -167,22 +167,24 @@ export const meta: Route.MetaFunction = ({ loaderData }) => [
 	{ name: 'description', content: `Edit attribute: ${loaderData?.attribute.name}` },
 ]
 
-export default function AttributeEdit({ loaderData }: Route.ComponentProps) {
+export default function AttributeEdit({ loaderData, actionData }: Route.ComponentProps) {
 	const { attribute } = loaderData
 	const isPending = useIsPending()
-	const hasVariants = attribute.values.some((value: any) => value._count.variants > 0)
+	type AttributeValue = Route.ComponentProps['loaderData']['attribute']['values'][number]
+	
+	const hasVariants = attribute.values.some((value: AttributeValue) => value._count.variants > 0)
 
 	const [form, fields] = useForm({
 		id: 'attribute-edit-form',
 		constraint: getZodConstraint(AttributeEditSchema),
-		lastResult: (loaderData as any).result,
+		lastResult: actionData?.result,
 		onValidate({ formData }) {
 			return parseWithZod(formData, { schema: AttributeEditSchema })
 		},
 		defaultValue: {
 			id: attribute.id,
 			name: attribute.name,
-			values: attribute.values.map((value: any) => value.value).join(', '),
+			values: attribute.values.map((value: AttributeValue) => value.value).join(', '),
 		},
 	})
 
