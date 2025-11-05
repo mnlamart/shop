@@ -27,6 +27,7 @@
     "test:e2e:install": "npx playwright install --with-deps chromium",
     "test:a11y": "playwright test tests/e2e/a11y.test.ts",
     "test:a11y:ui": "playwright test tests/e2e/a11y.test.ts --ui",
+    "test:sitemap": "tsx scripts/test-sitemap.ts",
     "typecheck": "react-router typegen && tsc",
     "validate": "run-p \"test -- --run\" lint typecheck test:e2e:run",
     "stop": "pkill -f \"npm run dev\""
@@ -49,7 +50,6 @@
     "@epic-web/totp": "^4.0.1",
     "@mjackson/form-data-parser": "^0.7.0",
     "@mjackson/headers": "^0.10.0",
-    "@nasa-gcn/remix-seo": "^2.0.1",
     "@nichtsam/helmet": "^0.3.1",
     "@oslojs/crypto": "^1.0.1",
     "@oslojs/encoding": "^1.1.0",
