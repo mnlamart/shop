@@ -1,6 +1,7 @@
 import { invariantResponse } from '@epic-web/invariant'
 import { Link, useFetcher } from 'react-router'
 import { ProductImageScrollArea } from '#app/components/product-image-scroll-area.tsx'
+import { ProductStatusBadge, StockBadge } from '#app/components/product-status-badge.tsx'
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -103,38 +104,6 @@ export const meta: Route.MetaFunction = ({ loaderData }) => [
 ]
 
 /**
- * StatusBadge component for displaying product status
- * 
- * @param status - Product status (ACTIVE, ARCHIVED, DRAFT)
- * @returns Badge component with appropriate styling based on status
- */
-function StatusBadge({ status }: { status: string }) {
-	if (status === 'ACTIVE') {
-		return <Badge variant="success">Active</Badge>
-	}
-	if (status === 'ARCHIVED') {
-		return <Badge variant="destructive">Archived</Badge>
-	}
-	return <Badge variant="secondary">Draft</Badge>
-}
-
-/**
- * StockBadge component for displaying stock quantity status
- * 
- * @param stockQuantity - Current stock quantity
- * @returns Badge component with stock status (Out of Stock, Low Stock, In Stock)
- */
-function StockBadge({ stockQuantity }: { stockQuantity: number }) {
-	if (stockQuantity === 0) {
-		return <Badge variant="destructive">Out of Stock</Badge>
-	}
-	if (stockQuantity <= 10) {
-		return <Badge variant="warning">Low Stock ({stockQuantity})</Badge>
-	}
-	return <Badge variant="success">In Stock ({stockQuantity})</Badge>
-}
-
-/**
  * DeleteProductButton component with confirmation dialog
  * 
  * @param product - Product data to delete
@@ -203,7 +172,7 @@ export default function ProductView({ loaderData }: Route.ComponentProps) {
 				<div>
 					<div className="flex items-center gap-3 mb-1">
 						<h1 className="text-3xl font-normal text-[#101828]">{product.name}</h1>
-						<StatusBadge status={product.status} />
+						<ProductStatusBadge status={product.status} />
 					</div>
 					<p className="text-sm font-normal text-[#4A5565] mt-1">
 						SKU: {product.sku} · Created {new Date(product.createdAt).toLocaleDateString()}

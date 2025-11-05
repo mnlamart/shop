@@ -3,6 +3,7 @@ import { invariantResponse } from '@epic-web/invariant'
 import { useEffect, useState } from 'react'
 import { data, Link, useFetcher } from 'react-router'
 import { z } from 'zod'
+import { OrderStatusBadge } from '#app/components/order-status-badge.tsx'
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -14,7 +15,6 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from '#app/components/ui/alert-dialog.tsx'
-import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
@@ -26,6 +26,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '#app/components/ui/select.tsx'
+import { getOrderStatusLabel } from '#app/utils/order-status.ts'
 import { getOrderByOrderNumber, updateOrderStatus, cancelOrder } from '#app/utils/order.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
@@ -48,23 +49,6 @@ const CancelOrderSchema = z.object({
 		error: 'Invalid intent value',
 	}),
 })
-
-function getStatusLabel(status: string): string {
-	switch (status) {
-		case 'PENDING':
-			return 'Pending'
-		case 'CONFIRMED':
-			return 'Confirmed'
-		case 'SHIPPED':
-			return 'Shipped'
-		case 'DELIVERED':
-			return 'Delivered'
-		case 'CANCELLED':
-			return 'Cancelled'
-		default:
-			return status
-	}
-}
 
 export async function loader({ params, request }: Route.LoaderArgs) {
 	await requireUserWithRole(request, 'admin')
@@ -137,7 +121,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
 	await updateOrderStatus(order.id, status, request, trackingNumber || null)
 
-	const statusLabel = getStatusLabel(status)
+	const statusLabel = getOrderStatusLabel(status)
 	const description = trackingNumber
 		? `Order status updated to ${statusLabel} (Tracking: ${trackingNumber})`
 		: `Order status updated to ${statusLabel}`
@@ -159,23 +143,6 @@ export const meta: Route.MetaFunction = ({ loaderData }) => {
 		},
 		{ name: 'description', content: `View and manage order: ${loaderData.order.orderNumber}` },
 	]
-}
-
-function getStatusBadgeVariant(status: string) {
-	switch (status) {
-		case 'PENDING':
-			return 'warning'
-		case 'CONFIRMED':
-			return 'default'
-		case 'SHIPPED':
-			return 'secondary'
-		case 'DELIVERED':
-			return 'success'
-		case 'CANCELLED':
-			return 'destructive'
-		default:
-			return 'secondary'
-	}
 }
 
 export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
@@ -217,12 +184,10 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 							<h1 className="text-2xl font-normal tracking-tight text-foreground">
 								Order {order.orderNumber}
 							</h1>
-							<Badge
-								variant={getStatusBadgeVariant(order.status)}
+							<OrderStatusBadge 
+								status={order.status}
 								className="text-xs font-medium px-2 py-0.5 rounded-lg"
-							>
-								{getStatusLabel(order.status)}
-							</Badge>
+							/>
 						</div>
 						<p className="text-sm text-muted-foreground">
 							Placed on{' '}
