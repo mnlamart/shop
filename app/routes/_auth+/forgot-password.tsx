@@ -1,6 +1,5 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
-import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import * as E from '@react-email/components'
 import { data, redirect, Link, useFetcher } from 'react-router'
 import { HoneypotInputs } from 'remix-utils/honeypot/react'
@@ -14,10 +13,6 @@ import { checkHoneypot } from '#app/utils/honeypot.server.ts'
 import { EmailSchema, UsernameSchema } from '#app/utils/user-validation.ts'
 import { type Route } from './+types/forgot-password.ts'
 import { prepareVerification } from './verify.server.ts'
-
-export const handle: SEOHandle = {
-	getSitemapEntries: () => null,
-}
 
 const ForgotPasswordSchema = z.object({
 	usernameOrEmail: z.union([EmailSchema, UsernameSchema]),

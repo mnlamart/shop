@@ -1,6 +1,5 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
-import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { data, redirect, Form } from 'react-router'
 import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
 import { ErrorList, Field } from '#app/components/forms.tsx'
@@ -14,10 +13,6 @@ import { useIsPending } from '#app/utils/misc.tsx'
 import { PasswordAndConfirmPasswordSchema } from '#app/utils/user-validation.ts'
 import { verifySessionStorage } from '#app/utils/verification.server.ts'
 import { type Route } from './+types/reset-password.ts'
-
-export const handle: SEOHandle = {
-	getSitemapEntries: () => null,
-}
 
 export const resetPasswordUsernameSessionKey = 'resetPasswordUsername'
 

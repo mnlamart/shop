@@ -1,6 +1,5 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
-import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import * as E from '@react-email/components'
 import { data, redirect, Form, useSearchParams } from 'react-router'
 import { HoneypotInputs } from 'remix-utils/honeypot/react'
@@ -20,10 +19,6 @@ import { useIsPending } from '#app/utils/misc.tsx'
 import { EmailSchema } from '#app/utils/user-validation.ts'
 import { type Route } from './+types/signup.ts'
 import { prepareVerification } from './verify.server.ts'
-
-export const handle: SEOHandle = {
-	getSitemapEntries: () => null,
-}
 
 const SignupSchema = z.object({
 	email: EmailSchema,

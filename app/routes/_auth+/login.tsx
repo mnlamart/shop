@@ -1,6 +1,5 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
-import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { startAuthentication } from '@simplewebauthn/browser'
 import { useOptimistic, useState, useTransition } from 'react'
 import { data, Form, Link, useNavigate, useSearchParams } from 'react-router'
@@ -21,10 +20,6 @@ import { getErrorMessage, useIsPending } from '#app/utils/misc.tsx'
 import { PasswordSchema, UsernameSchema } from '#app/utils/user-validation.ts'
 import { type Route } from './+types/login.ts'
 import { handleNewSession } from './login.server.ts'
-
-export const handle: SEOHandle = {
-	getSitemapEntries: () => null,
-}
 
 const LoginFormSchema = z.object({
 	username: UsernameSchema,
