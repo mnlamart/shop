@@ -29,6 +29,16 @@ const navData = {
 					icon: 'file-text' as IconName,
 				},
 				{
+					title: 'Shipping',
+					url: '/admin/shipping/zones',
+					icon: 'shopping-cart' as IconName,
+					hasSubmenu: true,
+					items: [
+						{ title: 'Shipping Zones', url: '/admin/shipping/zones' },
+						{ title: 'Shipping Methods', url: '/admin/shipping/methods' },
+					],
+				},
+				{
 					title: 'Products',
 					url: '/admin/products',
 					icon: 'package' as IconName,
