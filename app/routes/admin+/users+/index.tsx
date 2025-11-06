@@ -20,8 +20,8 @@ import {
 	TableHeader,
 	TableRow,
 } from '#app/components/ui/table.tsx'
-import { getUserImgSrc } from '#app/utils/misc.tsx'
 import { prisma } from '#app/utils/db.server.ts'
+import { getUserImgSrc } from '#app/utils/misc.tsx'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { type Route } from './+types/index.ts'
 

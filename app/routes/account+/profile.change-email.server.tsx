@@ -54,7 +54,7 @@ export async function handleVerification({
 	})
 
 	return redirectWithToast(
-		'/settings/profile',
+		'/account',
 		{
 			title: 'Email Changed',
 			type: 'success',

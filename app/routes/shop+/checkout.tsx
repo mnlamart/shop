@@ -1,11 +1,18 @@
-import { getFormProps, getInputProps, useForm } from '@conform-to/react'
+import { getFormProps, getInputProps, useForm, useInputControl } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import * as Sentry from '@sentry/react-router'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { data, Form, Outlet, redirect, redirectDocument, useLocation } from 'react-router'
 import { z } from 'zod'
 import { ErrorList, Field } from '#app/components/forms.tsx'
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '#app/components/ui/select.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
 import { getUserId } from '#app/utils/auth.server.ts'
 import { getOrCreateCartFromRequest } from '#app/utils/cart.server.ts'
@@ -21,66 +28,107 @@ import { createCheckoutSession, handleStripeError } from '#app/utils/stripe.serv
 import { type Route } from './+types/checkout.ts'
 
 const ShippingFormSchema = z.object({
-	name: z
-		.string({
-			error: (issue) =>
-				issue.input === undefined ? 'Name is required' : 'Not a string',
-		})
-		.min(1, { error: 'Name is required' })
-		.max(100, { error: 'Name must be less than 100 characters' })
-		.trim(),
-	email: z
-		.string({
-			error: (issue) =>
-				issue.input === undefined ? 'Email is required' : 'Not a string',
-		})
-		.trim()
-		.toLowerCase()
-		.min(1, { error: 'Email is required' })
-		.pipe(z.email({ error: 'Invalid email address' })),
-	street: z
-		.string({
-			error: (issue) =>
-				issue.input === undefined
-					? 'Street address is required'
-					: 'Not a string',
-		})
-		.min(1, { error: 'Street address is required' })
-		.max(200, { error: 'Street address must be less than 200 characters' })
-		.trim(),
-	city: z
-		.string({
-			error: (issue) =>
-				issue.input === undefined ? 'City is required' : 'Not a string',
-		})
-		.min(1, { error: 'City is required' })
-		.max(100, { error: 'City must be less than 100 characters' })
-		.trim(),
-	state: z
-		.string()
-		.max(100, { error: 'State must be less than 100 characters' })
-		.trim()
-		.optional(),
-	postal: z
-		.string({
-			error: (issue) =>
-				issue.input === undefined
-					? 'Postal code is required'
-					: 'Not a string',
-		})
-		.min(1, { error: 'Postal code is required' })
-		.max(20, { error: 'Postal code must be less than 20 characters' })
-		.trim(),
-	country: z
-		.string({
-			error: (issue) =>
-				issue.input === undefined ? 'Country is required' : 'Not a string',
-		})
-		.trim()
-		.toUpperCase()
-		.refine((val) => val.length === 2, {
-			error: 'Country must be a 2-letter ISO code (e.g., US, GB)',
-		}),
+	addressId: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z.string().optional(),
+	), // For selecting saved address
+	saveAddress: z.preprocess(
+		(val) => {
+			// Checkbox sends 'on' when checked, undefined when unchecked
+			// Match the pattern from notifications.tsx
+			return val === 'on' || val === true
+		},
+		z.boolean().default(false),
+	), // Default to false when checkbox is unchecked (field missing from FormData)
+	label: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z
+			.string()
+			.max(50, { error: 'Label must be less than 50 characters' })
+			.trim()
+			.optional(),
+	), // Optional label/name for saved address
+	name: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z
+			.string({
+				error: (issue) =>
+					issue.input === undefined ? 'Name is required' : 'Not a string',
+			})
+			.min(1, { error: 'Name is required' })
+			.max(100, { error: 'Name must be less than 100 characters' })
+			.trim(),
+	),
+	email: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z
+			.string({
+				error: (issue) =>
+					issue.input === undefined ? 'Email is required' : 'Not a string',
+			})
+			.trim()
+			.toLowerCase()
+			.min(1, { error: 'Email is required' })
+			.pipe(z.email({ error: 'Invalid email address' })),
+	),
+	street: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z
+			.string({
+				error: (issue) =>
+					issue.input === undefined
+						? 'Street address is required'
+						: 'Not a string',
+			})
+			.min(1, { error: 'Street address is required' })
+			.max(200, { error: 'Street address must be less than 200 characters' })
+			.trim(),
+	),
+	city: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z
+			.string({
+				error: (issue) =>
+					issue.input === undefined ? 'City is required' : 'Not a string',
+			})
+			.min(1, { error: 'City is required' })
+			.max(100, { error: 'City must be less than 100 characters' })
+			.trim(),
+	),
+	state: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z
+			.string()
+			.max(100, { error: 'State must be less than 100 characters' })
+			.trim()
+			.optional(),
+	),
+	postal: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z
+			.string({
+				error: (issue) =>
+					issue.input === undefined
+						? 'Postal code is required'
+						: 'Not a string',
+			})
+			.min(1, { error: 'Postal code is required' })
+			.max(20, { error: 'Postal code must be less than 20 characters' })
+			.trim(),
+	),
+	country: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z
+			.string({
+				error: (issue) =>
+					issue.input === undefined ? 'Country is required' : 'Not a string',
+			})
+			.trim()
+			.toUpperCase()
+			.refine((val) => val.length === 2, {
+				error: 'Country must be a 2-letter ISO code (e.g., US, GB)',
+			}),
+	),
 })
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -159,8 +207,21 @@ export async function loader({ request }: Route.LoaderArgs) {
 		return sum + (price ?? 0) * item.quantity
 	}, 0)
 
-	// Get user email if authenticated (for pre-filling)
+	// Get user email and saved addresses if authenticated
 	let userEmail: string | undefined = undefined
+	let savedAddresses: Array<{
+		id: string
+		name: string
+		street: string
+		city: string
+		state: string | null
+		postal: string
+		country: string
+		label: string | null
+		isDefaultShipping: boolean
+	}> = []
+	let defaultShippingAddress: (typeof savedAddresses)[number] | null = null
+
 	const userId = await getUserId(request)
 	if (userId) {
 		const user = await prisma.user.findUnique({
@@ -168,6 +229,27 @@ export async function loader({ request }: Route.LoaderArgs) {
 			select: { email: true },
 		})
 		userEmail = user?.email || undefined
+
+		// Load saved addresses
+		const addresses = await prisma.address.findMany({
+			where: { userId },
+			orderBy: [
+				{ isDefaultShipping: 'desc' },
+				{ createdAt: 'desc' },
+			],
+		})
+		savedAddresses = addresses.map((addr) => ({
+			id: addr.id,
+			name: addr.name,
+			street: addr.street,
+			city: addr.city,
+			state: addr.state,
+			postal: addr.postal,
+			country: addr.country,
+			label: addr.label,
+			isDefaultShipping: addr.isDefaultShipping,
+		}))
+		defaultShippingAddress = savedAddresses.find((a) => a.isDefaultShipping) || null
 	}
 
 	return {
@@ -175,6 +257,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 		currency,
 		subtotal,
 		userEmail,
+		savedAddresses,
+		defaultShippingAddress,
 		canceled,
 	}
 }
@@ -193,6 +277,68 @@ export async function action({ request }: Route.ActionArgs) {
 	}
 
 	const shippingData = submission.value
+	const userId = await getUserId(request)
+
+	// If addressId is provided, load the saved address
+	let finalShippingData = shippingData
+	if (shippingData.addressId && userId) {
+		const savedAddress = await prisma.address.findUnique({
+			where: {
+				id: shippingData.addressId,
+				userId, // Ensure user owns this address
+			},
+		})
+
+		if (savedAddress) {
+			// Use saved address data
+			finalShippingData = {
+				...shippingData,
+				name: savedAddress.name,
+				street: savedAddress.street,
+				city: savedAddress.city,
+				state: savedAddress.state || undefined,
+				postal: savedAddress.postal,
+				country: savedAddress.country,
+			}
+		}
+	}
+
+	// If saveAddress is checked and no addressId (new address), save it
+	// The preprocess converts empty string to undefined, so we check for falsy values
+	// Also handle the edge case where 'new' might be submitted from the Select component
+	const isNewAddress = !shippingData.addressId || shippingData.addressId === '' || shippingData.addressId === 'new'
+	
+	if (shippingData.saveAddress === true && isNewAddress && userId) {
+		// Check if this address already exists (to avoid duplicates)
+		const existingAddress = await prisma.address.findFirst({
+			where: {
+				userId,
+				name: shippingData.name,
+				street: shippingData.street,
+				city: shippingData.city,
+				postal: shippingData.postal,
+				country: shippingData.country,
+			},
+		})
+
+		if (!existingAddress) {
+			await prisma.address.create({
+				data: {
+					userId,
+					name: shippingData.name,
+					street: shippingData.street,
+					city: shippingData.city,
+					state: shippingData.state || null,
+					postal: shippingData.postal,
+					country: shippingData.country,
+					label: shippingData.label || null,
+					type: 'SHIPPING',
+					isDefaultShipping: false, // Don't auto-set as default
+					isDefaultBilling: false,
+				},
+			})
+		}
+	}
 
 	// Get cart
 	const { cart } = await getOrCreateCartFromRequest(request)
@@ -257,26 +403,23 @@ export async function action({ request }: Route.ActionArgs) {
 	const currency = await getStoreCurrency()
 	invariantResponse(currency, 'Currency not configured', { status: 500 })
 
-	// Get user ID (optional - guest checkout supported)
-	const userId = await getUserId(request)
-
 	// Create Stripe Checkout Session
 	try {
 		const domainUrl = getDomainUrl(request)
 		const session = await createCheckoutSession({
 			cart: cartWithItems,
 			shippingInfo: {
-				name: shippingData.name,
-				email: shippingData.email,
-				street: shippingData.street,
-				city: shippingData.city,
-				state: shippingData.state,
-				postal: shippingData.postal,
-				country: shippingData.country,
+				name: finalShippingData.name,
+				email: finalShippingData.email,
+				street: finalShippingData.street,
+				city: finalShippingData.city,
+				state: finalShippingData.state,
+				postal: finalShippingData.postal,
+				country: finalShippingData.country,
 			},
 			currency,
 			domainUrl,
-			userId,
+			userId: userId || undefined,
 		})
 
 		// Redirect to Stripe Checkout (external URL)
@@ -314,8 +457,23 @@ export default function Checkout({
 	actionData,
 }: Route.ComponentProps) {
 	const isPending = useIsPending()
-	const { cart, currency, subtotal, userEmail } = loaderData || {}
+	const {
+		cart,
+		currency,
+		subtotal,
+		userEmail,
+		savedAddresses = [],
+		defaultShippingAddress,
+	} = loaderData || {}
 	
+	const [selectedAddressId, setSelectedAddressId] = useState<string>(
+		defaultShippingAddress?.id || '',
+	)
+	const [useNewAddress, setUseNewAddress] = useState(!defaultShippingAddress)
+	const [saveAddressChecked, setSaveAddressChecked] = useState(false)
+
+	const selectedAddress = savedAddresses.find((a) => a.id === selectedAddressId)
+
 	// Call hooks unconditionally (React rules)
 	const [form, fields] = useForm({
 		id: 'checkout-form',
@@ -326,10 +484,57 @@ export default function Checkout({
 		},
 		shouldRevalidate: 'onBlur',
 		defaultValue: {
+			addressId: defaultShippingAddress?.id || '',
 			email: userEmail || '',
-			country: 'US',
+			name: defaultShippingAddress?.name || '',
+			street: defaultShippingAddress?.street || '',
+			city: defaultShippingAddress?.city || '',
+			state: defaultShippingAddress?.state || '',
+			postal: defaultShippingAddress?.postal || '',
+			country: defaultShippingAddress?.country || 'US',
+			label: '',
+			saveAddress: undefined,
 		},
 	})
+
+	// Update form fields when address is selected
+	// Note: TypeScript errors below are expected - Conform's type inference doesn't handle z.preprocess
+	// correctly (fields.initialValue is inferred as 'unknown'). Safe at runtime.
+	// @ts-expect-error - Conform type inference limitation with z.preprocess
+	const nameInput = useInputControl(fields.name)
+	// @ts-expect-error
+	const streetInput = useInputControl(fields.street)
+	// @ts-expect-error
+	const cityInput = useInputControl(fields.city)
+	// @ts-expect-error
+	const stateInput = useInputControl(fields.state)
+	// @ts-expect-error
+	const postalInput = useInputControl(fields.postal)
+	// @ts-expect-error
+	const countryInput = useInputControl(fields.country)
+	// @ts-expect-error
+	const addressIdInput = useInputControl(fields.addressId)
+	// @ts-expect-error
+	const saveAddressInput = useInputControl(fields.saveAddress)
+	
+	// Track if save address checkbox is checked for conditional label field display
+	// Check both the controlled state and the form field value
+	const isSaveAddressChecked = saveAddressChecked || saveAddressInput.value === 'on'
+	
+	useEffect(() => {
+		if (selectedAddress && !useNewAddress) {
+			nameInput.change(selectedAddress.name)
+			streetInput.change(selectedAddress.street)
+			cityInput.change(selectedAddress.city)
+			stateInput.change(selectedAddress.state || '')
+			postalInput.change(selectedAddress.postal)
+			countryInput.change(selectedAddress.country)
+			addressIdInput.change(selectedAddress.id)
+		} else if (useNewAddress) {
+			// IMPORTANT: Clear addressId when using new address to ensure it's empty
+			addressIdInput.change('')
+		}
+	}, [selectedAddress, useNewAddress, nameInput, streetInput, cityInput, stateInput, postalInput, countryInput, addressIdInput])
 
 	// Handle external redirect to Stripe Checkout
 	useEffect(() => {
@@ -399,106 +604,231 @@ export default function Checkout({
 					{/* Checkout Form */}
 					<div>
 						<h2 className="text-xl font-semibold mb-4">Shipping Information</h2>
+						
+						{savedAddresses.length > 0 && (
+							<div className="mb-6 space-y-3">
+								<label htmlFor="address-select" className="text-sm font-medium">
+									Use Saved Address
+								</label>
+								<Select
+									value={useNewAddress ? 'new' : selectedAddressId}
+									onValueChange={(value) => {
+										if (value === 'new') {
+											setUseNewAddress(true)
+											setSelectedAddressId('')
+											// Clear form fields when switching to new address
+											// IMPORTANT: Clear addressId FIRST to ensure it's empty
+											addressIdInput.change('')
+											nameInput.change('')
+											streetInput.change('')
+											cityInput.change('')
+											stateInput.change('')
+											postalInput.change('')
+											countryInput.change('US')
+											// Also clear saveAddress checkbox
+											saveAddressInput.change(undefined)
+											setSaveAddressChecked(false)
+										} else {
+											setUseNewAddress(false)
+											setSelectedAddressId(value)
+										}
+									}}
+								>
+									<SelectTrigger id="address-select">
+										<SelectValue placeholder="Select an address" />
+									</SelectTrigger>
+									<SelectContent>
+										{savedAddresses.map((address) => (
+											<SelectItem key={address.id} value={address.id}>
+												{address.label || address.name}
+												{address.isDefaultShipping && ' (Default)'}
+											</SelectItem>
+										))}
+										<SelectItem value="new">Use New Address</SelectItem>
+									</SelectContent>
+								</Select>
+								
+								{selectedAddress && !useNewAddress && (
+									<div className="p-4 border rounded-lg bg-muted/50">
+										<p className="font-medium">{selectedAddress.name}</p>
+										<p className="text-sm text-muted-foreground">
+											{selectedAddress.street}
+										</p>
+										<p className="text-sm text-muted-foreground">
+											{selectedAddress.city}
+											{selectedAddress.state && `, ${selectedAddress.state}`}{' '}
+											{selectedAddress.postal}
+										</p>
+										<p className="text-sm text-muted-foreground">
+											{selectedAddress.country}
+										</p>
+									</div>
+								)}
+							</div>
+						)}
+
 						<Form method="POST" className="space-y-4" {...getFormProps(form)} noValidate>
-						<Field
-							labelProps={{
-								htmlFor: fields.name.id,
-								children: 'Name',
-							}}
-							inputProps={{
-								...getInputProps(fields.name, { type: 'text' }),
-								autoComplete: 'name',
-								autoFocus: true,
-							}}
-							errors={fields.name.errors}
-						/>
-
-						<Field
-							labelProps={{
-								htmlFor: fields.email.id,
-								children: 'Email',
-							}}
-							inputProps={{
-								...getInputProps(fields.email, { type: 'email' }),
-								autoComplete: 'email',
-							}}
-							errors={fields.email.errors}
-						/>
-
-						<Field
-							labelProps={{
-								htmlFor: fields.street.id,
-								children: 'Street Address',
-							}}
-							inputProps={{
-								...getInputProps(fields.street, { type: 'text' }),
-								autoComplete: 'street-address',
-							}}
-							errors={fields.street.errors}
-						/>
-
-						<Field
-							labelProps={{
-								htmlFor: fields.city.id,
-								children: 'City',
-							}}
-							inputProps={{
-								...getInputProps(fields.city, { type: 'text' }),
-								autoComplete: 'address-level2',
-							}}
-							errors={fields.city.errors}
-						/>
-
-						<Field
-							labelProps={{
-								htmlFor: fields.state.id,
-								children: 'State / Province',
-							}}
-							inputProps={{
-								...getInputProps(fields.state, { type: 'text' }),
-								autoComplete: 'address-level1',
-							}}
-							errors={fields.state.errors}
-						/>
-
-						<div className="grid grid-cols-2 gap-4">
-							<Field
-								labelProps={{
-									htmlFor: fields.postal.id,
-									children: 'Postal Code',
-								}}
-								inputProps={{
-									...getInputProps(fields.postal, { type: 'text' }),
-									autoComplete: 'postal-code',
-								}}
-								errors={fields.postal.errors}
+							{/* Hidden field for addressId - ensure it's cleared when using new address */}
+							<input
+								type="hidden"
+								name={fields.addressId.name}
+								value={useNewAddress ? '' : (selectedAddressId || '')}
 							/>
 
-							<Field
-								labelProps={{
-									htmlFor: fields.country.id,
-									children: 'Country',
-								}}
-								inputProps={{
-									...getInputProps(fields.country, { type: 'text' }),
-									autoComplete: 'country',
-									placeholder: 'US (2-letter code)',
-								}}
-								errors={fields.country.errors}
-							/>
-						</div>
+							{/* Show form fields only if using new address or no saved addresses */}
+							{(useNewAddress || savedAddresses.length === 0) && (
+								<>
+									<Field
+										labelProps={{
+											htmlFor: fields.name.id,
+											children: 'Name',
+										}}
+										inputProps={{
+											...getInputProps(fields.name, { type: 'text' }),
+											autoComplete: 'name',
+											autoFocus: savedAddresses.length === 0,
+										}}
+										errors={fields.name.errors}
+									/>
 
-						<ErrorList errors={form.errors} id={form.errorId} />
+									<Field
+										labelProps={{
+											htmlFor: fields.email.id,
+											children: 'Email',
+										}}
+										inputProps={{
+											...getInputProps(fields.email, { type: 'email' }),
+											autoComplete: 'email',
+										}}
+										errors={fields.email.errors}
+									/>
 
-						<StatusButton
-							className="w-full"
-							status={isPending ? 'pending' : (form.status ?? 'idle')}
-							type="submit"
-							disabled={isPending}
-						>
-							Proceed to Checkout
-						</StatusButton>
-					</Form>
+									<Field
+										labelProps={{
+											htmlFor: fields.street.id,
+											children: 'Street Address',
+										}}
+										inputProps={{
+											...getInputProps(fields.street, { type: 'text' }),
+											autoComplete: 'street-address',
+										}}
+										errors={fields.street.errors}
+									/>
+
+									<Field
+										labelProps={{
+											htmlFor: fields.city.id,
+											children: 'City',
+										}}
+										inputProps={{
+											...getInputProps(fields.city, { type: 'text' }),
+											autoComplete: 'address-level2',
+										}}
+										errors={fields.city.errors}
+									/>
+
+									<Field
+										labelProps={{
+											htmlFor: fields.state.id,
+											children: 'State / Province',
+										}}
+										inputProps={{
+											...getInputProps(fields.state, { type: 'text' }),
+											autoComplete: 'address-level1',
+										}}
+										errors={fields.state.errors}
+									/>
+
+									<div className="grid grid-cols-2 gap-4">
+										<Field
+											labelProps={{
+												htmlFor: fields.postal.id,
+												children: 'Postal Code',
+											}}
+											inputProps={{
+												...getInputProps(fields.postal, { type: 'text' }),
+												autoComplete: 'postal-code',
+											}}
+											errors={fields.postal.errors}
+										/>
+
+										<Field
+											labelProps={{
+												htmlFor: fields.country.id,
+												children: 'Country',
+											}}
+											inputProps={{
+												...getInputProps(fields.country, { type: 'text' }),
+												autoComplete: 'country',
+												placeholder: 'US (2-letter code)',
+											}}
+											errors={fields.country.errors}
+										/>
+									</div>
+
+									{/* Save address checkbox - only show for authenticated users entering new address */}
+									{userEmail && ((savedAddresses.length > 0 && useNewAddress) || savedAddresses.length === 0) && (
+										<>
+											<div className="flex items-center space-x-2">
+												<input
+													{...getInputProps(fields.saveAddress, { type: 'checkbox' })}
+													className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary/20"
+													onChange={(e) => {
+														setSaveAddressChecked(e.target.checked)
+													}}
+												/>
+												<label
+													htmlFor={fields.saveAddress.id}
+													className="text-sm font-medium leading-none cursor-pointer"
+												>
+													Save this address for future use
+												</label>
+											</div>
+											{/* Address label/name field - only show when saveAddress is checked */}
+											{isSaveAddressChecked && (
+												<Field
+													labelProps={{
+														htmlFor: fields.label.id,
+														children: 'Address Name (Optional)',
+													}}
+													inputProps={{
+														...getInputProps(fields.label, { type: 'text' }),
+														placeholder: 'e.g., Home, Work, Office',
+													}}
+													errors={fields.label.errors}
+												/>
+											)}
+										</>
+									)}
+								</>
+							)}
+
+							{/* If using saved address, still need email field */}
+							{!useNewAddress && savedAddresses.length > 0 && (
+								<Field
+									labelProps={{
+										htmlFor: fields.email.id,
+										children: 'Email',
+									}}
+									inputProps={{
+										...getInputProps(fields.email, { type: 'email' }),
+										autoComplete: 'email',
+									}}
+									errors={fields.email.errors}
+								/>
+							)}
+
+							<ErrorList errors={form.errors} id={form.errorId} />
+
+							<StatusButton
+								className="w-full"
+								status={isPending ? 'pending' : (form.status ?? 'idle')}
+								type="submit"
+								disabled={isPending}
+							>
+								Proceed to Checkout
+							</StatusButton>
+						</Form>
 				</div>
 
 				{/* Order Summary */}

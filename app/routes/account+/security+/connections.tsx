@@ -1,6 +1,8 @@
 import { invariantResponse } from '@epic-web/invariant'
 import { useState } from 'react'
-import { data, useFetcher } from 'react-router'
+import { data, Link, useFetcher } from 'react-router'
+import { Button } from '#app/components/ui/button.tsx'
+import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
 import {
@@ -22,11 +24,11 @@ import { prisma } from '#app/utils/db.server.ts'
 import { pipeHeaders } from '#app/utils/headers.server.js'
 import { makeTimings } from '#app/utils/timing.server.ts'
 import { createToastHeaders } from '#app/utils/toast.server.ts'
-import { type Route } from './+types/profile.connections.ts'
-import { type BreadcrumbHandle } from './profile.tsx'
+import { type BreadcrumbHandle } from '../../account.tsx'
+import { type Route } from './+types/connections.ts'
 
 export const handle: BreadcrumbHandle = {
-	breadcrumb: <Icon name="link-2">Connections</Icon>,
+	breadcrumb: 'Connections',
 }
 
 async function userCanDeleteConnections(userId: string) {
@@ -113,33 +115,63 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function Connections({ loaderData }: Route.ComponentProps) {
 	return (
-		<div className="mx-auto max-w-md">
-			{loaderData.connections.length ? (
-				<div className="flex flex-col gap-2">
-					<p>Here are your current connections:</p>
-					<ul className="flex flex-col gap-4">
-						{loaderData.connections.map((c) => (
-							<li key={c.id}>
-								<Connection
-									connection={c}
-									canDelete={loaderData.canDeleteConnections}
-								/>
-							</li>
-						))}
-					</ul>
+		<div className="space-y-8">
+			<div className="flex items-center justify-between">
+				<div>
+					<h1 className="text-3xl font-bold tracking-tight">Manage Connections</h1>
+					<p className="text-gray-600">
+						Connect or disconnect social accounts
+					</p>
 				</div>
-			) : (
-				<p>You don't have any connections yet.</p>
-			)}
-			<div className="border-border mt-5 flex flex-col gap-5 border-t-2 border-b-2 py-3">
-				{providerNames.map((providerName) => (
-					<ProviderConnectionForm
-						key={providerName}
-						type="Connect"
-						providerName={providerName}
-					/>
-				))}
+				<Button variant="outline" asChild>
+					<Link to="/account">
+						<Icon name="arrow-left" className="h-4 w-4 mr-2" />
+						Back to Settings
+					</Link>
+				</Button>
 			</div>
+
+			<Card className="p-6 hover:shadow-lg transition-shadow border-red-100 bg-white/80 backdrop-blur-sm">
+				<CardHeader className="p-0 pb-6">
+					<div className="flex items-center gap-3">
+						<div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
+							<Icon name="link-2" className="w-5 h-5 text-red-700" />
+						</div>
+						<CardTitle className="text-lg">Social Connections</CardTitle>
+					</div>
+				</CardHeader>
+				<CardContent className="p-0 space-y-6">
+					{loaderData.connections.length ? (
+						<div className="space-y-4">
+							<p className="text-gray-900">Here are your current connections:</p>
+							<ul className="flex flex-col gap-4">
+								{loaderData.connections.map((c) => (
+									<li key={c.id}>
+										<Connection
+											connection={c}
+											canDelete={loaderData.canDeleteConnections}
+										/>
+									</li>
+								))}
+							</ul>
+						</div>
+					) : (
+						<p className="text-gray-600">You don't have any connections yet.</p>
+					)}
+					<div className="border-t pt-6">
+						<p className="text-gray-900 mb-4">Connect a new account:</p>
+						<div className="flex flex-col gap-3">
+							{providerNames.map((providerName) => (
+								<ProviderConnectionForm
+									key={providerName}
+									type="Connect"
+									providerName={providerName}
+								/>
+							))}
+						</div>
+					</div>
+				</CardContent>
+			</Card>
 		</div>
 	)
 }
