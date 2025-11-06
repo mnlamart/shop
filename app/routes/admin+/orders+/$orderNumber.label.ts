@@ -1,7 +1,7 @@
 import { invariantResponse } from '@epic-web/invariant'
+import { getMondialRelayLabel, createMondialRelayShipmentAndLabel } from '#app/utils/label.server.ts'
 import { getOrderByOrderNumber } from '#app/utils/order.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
-import { getMondialRelayLabel, createMondialRelayShipmentAndLabel } from '#app/utils/label.server.ts'
 import { type StoreAddress } from '#app/utils/shipment.server.ts'
 import { type Route } from './+types/$orderNumber.label.ts'
 
