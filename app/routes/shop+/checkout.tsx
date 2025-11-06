@@ -404,6 +404,7 @@ export async function action({ request }: Route.ActionArgs) {
 							name: true,
 							description: true,
 							price: true,
+							weightGrams: true,
 						},
 					},
 					variant: {
@@ -411,6 +412,7 @@ export async function action({ request }: Route.ActionArgs) {
 							id: true,
 							price: true,
 							sku: true,
+							weightGrams: true,
 						},
 					},
 				},
@@ -430,8 +432,22 @@ export async function action({ request }: Route.ActionArgs) {
 		return sum + (price ?? 0) * item.quantity
 	}, 0)
 
+	// Calculate total weight (for weight-based shipping)
+	const DEFAULT_WEIGHT_GRAMS = 500
+	const totalWeightGrams = cartWithItems.items.reduce((sum, item) => {
+		const itemWeight =
+			item.variant?.weightGrams ??
+			item.product.weightGrams ??
+			DEFAULT_WEIGHT_GRAMS
+		return sum + itemWeight * item.quantity
+	}, 0)
+
 	// Calculate shipping cost
-	const shippingCost = await getShippingCost(shippingData.shippingMethodId, subtotal)
+	const shippingCost = await getShippingCost(
+		shippingData.shippingMethodId,
+		subtotal,
+		totalWeightGrams,
+	)
 
 	// Get shipping method details for metadata
 	const shippingMethod = await prisma.shippingMethod.findUnique({

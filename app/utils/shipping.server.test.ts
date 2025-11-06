@@ -365,17 +365,70 @@ describe('shipping.server', () => {
 			expect(cost).toBe(700)
 		})
 
-		test('should handle WEIGHT_BASED rate (fallback to flatRate)', () => {
+		test('should calculate WEIGHT_BASED rate correctly', () => {
 			const method = {
 				rateType: 'WEIGHT_BASED',
-				flatRate: 500,
+				flatRate: 1000, // Fallback rate
+				weightRates: [
+					{ minWeightGrams: 0, maxWeightGrams: 1000, rateCents: 500 },
+					{ minWeightGrams: 1001, maxWeightGrams: 5000, rateCents: 1000 },
+					{ minWeightGrams: 5001, maxWeightGrams: null, rateCents: 2000 },
+				],
 				priceRates: null,
 				freeShippingThreshold: null,
 			}
 
-			const cost = calculateShippingRate(method, 1000)
+			expect(calculateShippingRate(method, 1000, 500)).toBe(500) // 500g -> 500 cents
+			expect(calculateShippingRate(method, 1000, 2500)).toBe(1000) // 2500g -> 1000 cents
+			expect(calculateShippingRate(method, 1000, 6000)).toBe(2000) // 6000g -> 2000 cents
+			expect(calculateShippingRate(method, 1000, 1000)).toBe(500) // Exactly 1000g -> 500 cents
+			expect(calculateShippingRate(method, 1000, 5001)).toBe(2000) // Exactly 5001g -> 2000 cents
+		})
 
-			expect(cost).toBe(500)
+		test('should fallback to flatRate for WEIGHT_BASED when weight not provided', () => {
+			const method = {
+				rateType: 'WEIGHT_BASED',
+				flatRate: 500,
+				weightRates: [
+					{ minWeightGrams: 0, maxWeightGrams: 1000, rateCents: 300 },
+				],
+				priceRates: null,
+				freeShippingThreshold: null,
+			}
+
+			const cost = calculateShippingRate(method, 1000) // No weight provided
+
+			expect(cost).toBe(500) // Falls back to flatRate
+		})
+
+		test('should fallback to flatRate for WEIGHT_BASED when weightRates not configured', () => {
+			const method = {
+				rateType: 'WEIGHT_BASED',
+				flatRate: 500,
+				weightRates: null,
+				priceRates: null,
+				freeShippingThreshold: null,
+			}
+
+			const cost = calculateShippingRate(method, 1000, 2000)
+
+			expect(cost).toBe(500) // Falls back to flatRate
+		})
+
+		test('should return 0 for WEIGHT_BASED with no matching range and no flatRate', () => {
+			const method = {
+				rateType: 'WEIGHT_BASED',
+				flatRate: null,
+				weightRates: [
+					{ minWeightGrams: 0, maxWeightGrams: 1000, rateCents: 500 },
+				],
+				priceRates: null,
+				freeShippingThreshold: null,
+			}
+
+			const cost = calculateShippingRate(method, 1000, 2000) // Weight outside range
+
+			expect(cost).toBe(0) // No matching rate and no flatRate fallback
 		})
 
 		test('should return 0 for unknown rate type', () => {

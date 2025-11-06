@@ -47,11 +47,13 @@ export async function createMondialRelayShipment(
 						select: {
 							id: true,
 							name: true,
+							weightGrams: true,
 						},
 					},
 					variant: {
 						select: {
 							id: true,
+							weightGrams: true,
 						},
 					},
 				},
@@ -66,16 +68,16 @@ export async function createMondialRelayShipment(
 	)
 
 	// Calculate total weight from order items
-	// Note: Product/Variant weight fields don't exist yet in schema
-	// Using default weight per item: 500g
-	// TODO: Add weight fields to Product/ProductVariant models
+	// Use variant weight if available, otherwise product weight, otherwise default
 	const DEFAULT_WEIGHT_GRAMS = 500
 	let totalWeight = 0
 
 	for (const item of order.items) {
-		// For now, use default weight per item
-		// In the future, use: item.variant?.weight ?? item.product.weight ?? DEFAULT_WEIGHT_GRAMS
-		totalWeight += DEFAULT_WEIGHT_GRAMS * item.quantity
+		const itemWeight =
+			item.variant?.weightGrams ??
+			item.product.weightGrams ??
+			DEFAULT_WEIGHT_GRAMS
+		totalWeight += itemWeight * item.quantity
 	}
 
 	// Ensure minimum weight (Mondial Relay minimum is usually 100g)

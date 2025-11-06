@@ -206,7 +206,7 @@ describe('shipment.server', () => {
 		await prisma.order.delete({ where: { id: order.id } })
 	})
 
-	test('calculates weight from order items using default weight', async () => {
+	test('calculates weight from order items using product and variant weights', async () => {
 		// Create category first (required for product)
 		const category = await prisma.category.create({
 			data: {
@@ -216,15 +216,42 @@ describe('shipment.server', () => {
 			},
 		})
 
-		const product = await prisma.product.create({
+		// Create product with weight
+		const product1 = await prisma.product.create({
 			data: {
-				name: 'Test Product',
-				slug: `test-product-${Date.now()}`,
+				name: 'Test Product 1',
+				slug: `test-product-1-${Date.now()}`,
 				description: 'Test',
-				sku: `SKU-${Date.now()}`,
+				sku: `SKU-1-${Date.now()}`,
 				price: 5000,
 				status: 'ACTIVE',
+				weightGrams: 300, // Product weight
 				categoryId: category.id,
+			},
+		})
+
+		// Create product without weight (should use default)
+		const product2 = await prisma.product.create({
+			data: {
+				name: 'Test Product 2',
+				slug: `test-product-2-${Date.now()}`,
+				description: 'Test',
+				sku: `SKU-2-${Date.now()}`,
+				price: 3000,
+				status: 'ACTIVE',
+				// No weightGrams - should use default
+				categoryId: category.id,
+			},
+		})
+
+		// Create variant with weight
+		const variant = await prisma.productVariant.create({
+			data: {
+				productId: product2.id,
+				sku: `SKU-VAR-${Date.now()}`,
+				price: 3500,
+				stockQuantity: 10,
+				weightGrams: 750, // Variant weight (overrides product weight)
 			},
 		})
 
@@ -248,7 +275,14 @@ describe('shipment.server', () => {
 						{
 							quantity: 2,
 							price: 5000,
-							productId: product.id,
+							productId: product1.id, // Product with weight: 300g
+							// No variant
+						},
+						{
+							quantity: 1,
+							price: 3500,
+							productId: product2.id, // Product without weight
+							variantId: variant.id, // Variant with weight: 750g
 						},
 					],
 				},
@@ -274,17 +308,22 @@ describe('shipment.server', () => {
 
 		await createMondialRelayShipment(order.id, storeAddress)
 
-		// Verify weight was calculated (2 items * 500g default = 1000g)
+		// Verify weight was calculated correctly:
+		// - Product1: 2 items * 300g = 600g
+		// - Product2 with variant: 1 item * 750g = 750g
+		// - Total: 1350g (but minimum is 100g, so should be 1350g)
 		expect(mondialRelayApi2.createShipment).toHaveBeenCalledWith(
 			expect.objectContaining({
-				weight: 1000, // in grams
+				weight: 1350, // (2 * 300) + (1 * 750) = 1350g
 			}),
 		)
 
 		// Cleanup
 		await prisma.orderItem.deleteMany({ where: { orderId: order.id } })
 		await prisma.order.delete({ where: { id: order.id } })
-		await prisma.product.delete({ where: { id: product.id } })
+		await prisma.productVariant.delete({ where: { id: variant.id } })
+		await prisma.product.delete({ where: { id: product1.id } })
+		await prisma.product.delete({ where: { id: product2.id } })
 		await prisma.category.delete({ where: { id: category.id } })
 	})
 })

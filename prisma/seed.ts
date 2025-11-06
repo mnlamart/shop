@@ -42,6 +42,7 @@ async function createProduct(categoryId: string) {
 				{ weight: 70, value: 'ACTIVE' },
 				{ weight: 10, value: 'ARCHIVED' },
 			]),
+			weightGrams: faker.number.int({ min: 50, max: 5000 }), // Random weight between 50g and 5kg
 			categoryId,
 		},
 	})
@@ -87,7 +88,7 @@ async function createProduct(categoryId: string) {
 			
 			usedCombinations.add(combination)
 			
-			await prisma.productVariant.create({
+			const variant = await prisma.productVariant.create({
 				data: {
 					productId: product.id,
 					sku: `${product.sku}-${combination}-${faker.string.alphanumeric(4)}`,
@@ -97,6 +98,10 @@ async function createProduct(categoryId: string) {
 					dec: 2 
 				})) * 100), // Convert back to cents
 					stockQuantity: faker.number.int({ min: 0, max: 100 }),
+					// 30% chance variant has its own weight (different from product)
+					weightGrams: faker.datatype.boolean({ probability: 0.3 })
+						? faker.number.int({ min: 50, max: 5000 })
+						: null,
 					attributeValues: {
 						create: [
 							{ attributeValueId: sizeValue.id },

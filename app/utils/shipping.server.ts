@@ -102,16 +102,18 @@ export async function getShippingMethodsForCountry(country: string) {
 }
 
 /**
- * Calculate shipping cost for a method based on order subtotal
+ * Calculate shipping cost for a method based on order subtotal and/or weight
  */
 export function calculateShippingRate(
 	method: {
 		rateType: string
 		flatRate: number | null
+		weightRates: unknown
 		priceRates: unknown
 		freeShippingThreshold: number | null
 	},
 	subtotal: number,
+	totalWeightGrams?: number,
 ): number {
 	switch (method.rateType) {
 		case 'FLAT':
@@ -142,9 +144,25 @@ export function calculateShippingRate(
 			return method.flatRate ?? 0
 		}
 
-		case 'WEIGHT_BASED':
-			// TODO: Implement weight-based calculation when product weights are added
-			return method.flatRate ?? 0
+		case 'WEIGHT_BASED': {
+			if (!method.weightRates || totalWeightGrams === undefined) {
+				// Fallback to flat rate if weight rates not configured or weight not provided
+				return method.flatRate ?? 0
+			}
+			const weightRates = method.weightRates as Array<{
+				minWeightGrams: number
+				maxWeightGrams: number | null
+				rateCents: number
+			}>
+			// Find matching weight range
+			const matchingRate = weightRates.find((rate) => {
+				const inMinRange = totalWeightGrams >= rate.minWeightGrams
+				const inMaxRange =
+					rate.maxWeightGrams === null || totalWeightGrams <= rate.maxWeightGrams
+				return inMinRange && inMaxRange
+			})
+			return matchingRate?.rateCents ?? method.flatRate ?? 0
+		}
 
 		default:
 			return 0
@@ -157,6 +175,7 @@ export function calculateShippingRate(
 export async function getShippingCost(
 	methodId: string,
 	subtotal: number,
+	totalWeightGrams?: number,
 ): Promise<number> {
 	const method = await prisma.shippingMethod.findUnique({
 		where: { id: methodId },
@@ -166,7 +185,7 @@ export async function getShippingCost(
 		return 0
 	}
 
-	return calculateShippingRate(method, subtotal)
+	return calculateShippingRate(method, subtotal, totalWeightGrams)
 }
 
 /**
