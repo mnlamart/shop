@@ -15,8 +15,8 @@ import { getUserImgSrc, useIsPending } from '#app/utils/misc.tsx'
 import { authSessionStorage } from '#app/utils/session.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { NameSchema, UsernameSchema } from '#app/utils/user-validation.ts'
-import { type BreadcrumbHandle } from './account.tsx'
 import { type Route } from './+types/account.index.ts'
+import { type BreadcrumbHandle } from './account.tsx'
 
 export const handle: BreadcrumbHandle = {
 	breadcrumb: 'Profile',
