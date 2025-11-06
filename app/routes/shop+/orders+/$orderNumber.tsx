@@ -1,7 +1,10 @@
 import { invariantResponse } from '@epic-web/invariant'
+import { useEffect, useState } from 'react'
+import { useFetcher } from 'react-router'
 import { OrderStatusBadge } from '#app/components/order-status-badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
+import { Icon } from '#app/components/ui/icon.tsx'
 import { getUserId } from '#app/utils/auth.server.ts'
 import { getOrderByOrderNumber } from '#app/utils/order.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
@@ -45,6 +48,32 @@ export const meta: Route.MetaFunction = ({ loaderData }) => {
 
 export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 	const { order } = loaderData
+	const [showTracking, setShowTracking] = useState(false)
+
+	const trackingFetcher = useFetcher<{
+		trackingInfo?: {
+			status: string
+			statusCode: string
+			events: Array<{
+				date: Date
+				description: string
+				location?: string
+			}>
+		}
+		error?: string
+		message?: string
+	}>()
+
+	// Fetch tracking info when button is clicked
+	const handleLoadTracking = () => {
+		if (!showTracking && order.mondialRelayShipmentNumber) {
+			const url = new URL(window.location.href)
+			const email = url.searchParams.get('email')
+			const trackingUrl = `/shop/orders/${order.orderNumber}/tracking${email ? `?email=${encodeURIComponent(email)}` : ''}`
+			trackingFetcher.load(trackingUrl)
+			setShowTracking(true)
+		}
+	}
 
 	return (
 		<div className="container mx-auto px-4 py-8 space-y-8">
@@ -137,9 +166,30 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 										</p>
 									)}
 									{order.mondialRelayShipmentNumber && (
-										<p className="mt-1">
-											<strong>Tracking:</strong> {order.mondialRelayShipmentNumber}
-										</p>
+										<div className="mt-2">
+											<p className="mb-2">
+												<strong>Shipment Number:</strong> {order.mondialRelayShipmentNumber}
+											</p>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												onClick={handleLoadTracking}
+												disabled={trackingFetcher.state === 'loading'}
+											>
+												{trackingFetcher.state === 'loading' ? (
+													<>
+														<Icon name="update" className="h-4 w-4 animate-spin mr-2" />
+														Loading...
+													</>
+												) : (
+													<>
+														<Icon name="magnifying-glass" className="h-4 w-4 mr-2" />
+														{showTracking ? 'Refresh Tracking' : 'View Tracking'}
+													</>
+												)}
+											</Button>
+										</div>
 									)}
 								</div>
 							)}
