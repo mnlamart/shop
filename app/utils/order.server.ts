@@ -274,7 +274,10 @@ export async function updateOrderStatus(
 		where: { id: orderId },
 		data: {
 			status,
-			...(status === 'SHIPPED' && trackingNumber ? { trackingNumber } : {}),
+			// Always update trackingNumber when status is SHIPPED (even if it's empty string/null)
+			...(status === 'SHIPPED'
+				? { trackingNumber: trackingNumber ?? '' }
+				: {}),
 		},
 		select: {
 			id: true,
