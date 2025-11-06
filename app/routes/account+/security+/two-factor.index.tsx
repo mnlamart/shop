@@ -6,14 +6,10 @@ import { StatusButton } from '#app/components/ui/status-button.tsx'
 import { requireUserId } from '#app/utils/auth.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { generateTOTP } from '#app/utils/totp.server.ts'
-import { type BreadcrumbHandle } from '../../account.tsx'
 import { type Route } from './+types/two-factor.index.ts'
 import { twoFAVerificationType } from './two-factor.tsx'
 import { twoFAVerifyVerificationType } from './two-factor.verify.tsx'
 
-export const handle: BreadcrumbHandle = {
-	breadcrumb: 'Overview',
-}
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
