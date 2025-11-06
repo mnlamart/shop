@@ -1,10 +1,11 @@
 import { cn } from '#app/utils/misc.tsx'
 
-export type CheckoutStep = 'review' | 'shipping' | 'payment'
+export type CheckoutStep = 'review' | 'shipping' | 'delivery' | 'payment'
 
 const steps: Array<{ id: CheckoutStep; name: string; path: string }> = [
 	{ id: 'review', name: 'Review', path: '/shop/checkout/review' },
 	{ id: 'shipping', name: 'Shipping', path: '/shop/checkout/shipping' },
+	{ id: 'delivery', name: 'Delivery', path: '/shop/checkout/delivery' },
 	{ id: 'payment', name: 'Payment', path: '/shop/checkout/payment' },
 ]
 

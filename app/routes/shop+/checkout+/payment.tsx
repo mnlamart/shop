@@ -35,12 +35,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 	// Validate required fields
 	if (!name || !email || !street || !city || !postal || !country || !shippingMethodId || !shippingCostParam) {
-		return redirect('/shop/checkout/shipping')
+		return redirect('/shop/checkout/delivery')
 	}
 
 	const shippingCost = parseInt(shippingCostParam, 10)
 	if (isNaN(shippingCost)) {
-		return redirect('/shop/checkout/shipping')
+		return redirect('/shop/checkout/delivery')
 	}
 
 	const checkoutData = await getCheckoutData(request)
@@ -82,12 +82,12 @@ export async function action({ request }: Route.ActionArgs) {
 
 	// Validate required fields
 	if (!name || !email || !street || !city || !postal || !country || !shippingMethodId || !shippingCostParam) {
-		return redirect('/shop/checkout/shipping')
+		return redirect('/shop/checkout/delivery')
 	}
 
 	const shippingCost = parseInt(shippingCostParam, 10)
 	if (isNaN(shippingCost)) {
-		return redirect('/shop/checkout/shipping')
+		return redirect('/shop/checkout/delivery')
 	}
 
 	// Get cart
@@ -247,7 +247,19 @@ export default function CheckoutPayment() {
 							)}
 							<div className="flex justify-center gap-4 pt-4">
 								<Button variant="outline" asChild>
-									<Link to="/shop/checkout/shipping">Back to Shipping</Link>
+									<Link to={`/shop/checkout/delivery?${new URLSearchParams({
+										name: loaderData.shippingInfo.name,
+										email: loaderData.shippingInfo.email,
+										street: loaderData.shippingInfo.street,
+										city: loaderData.shippingInfo.city,
+										state: loaderData.shippingInfo.state || '',
+										postal: loaderData.shippingInfo.postal,
+										country: loaderData.shippingInfo.country,
+										shippingMethodId: loaderData.shippingMethodId,
+										shippingCost: loaderData.shippingCost.toString(),
+									}).toString()}`}>
+										Back to Delivery
+									</Link>
 								</Button>
 								<Button asChild>
 									<Link to="/shop/cart">Return to Cart</Link>
