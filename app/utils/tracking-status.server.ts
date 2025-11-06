@@ -13,9 +13,17 @@ import { getMondialRelayTrackingInfo } from './tracking.server.ts'
 /**
  * Checks if a tracking status indicates the package has been delivered.
  * 
- * Mondial Relay uses status codes to indicate delivery state:
- * - Status code '4' typically indicates "Livré" (delivered)
- * - We also check status descriptions and events as fallback
+ * Mondial Relay uses status codes to indicate delivery state.
+ * Based on our implementation and tests:
+ * - Status code '4' indicates "Livré" (delivered) - confirmed in our tests
+ * - Note: Different Mondial Relay API versions may use different codes
+ *   (e.g., some documentation mentions '82' for delivered, but our API1 
+ *   implementation uses '4' for "Livré")
+ * 
+ * Documentation: https://www.mondialrelay.fr/professionnel-de-le-commerce/webservice/
+ * API Documentation: https://storage.mondialrelay.fr/Presentation%20of%20WebServices.pdf
+ * 
+ * We also check status descriptions and events as fallback for reliability.
  * 
  * @param status - The tracking status description
  * @param statusCode - The tracking status code from Mondial Relay API
@@ -28,9 +36,10 @@ function isDelivered(
 	events: Array<{ date: Date; description: string; location?: string }>,
 ): boolean {
 	// Primary check: Mondial Relay status codes
-	// Status code '4' indicates "Livré" (delivered) according to Mondial Relay API
-	// Status code '5' may also indicate delivery in some cases
-	if (statusCode === '4' || statusCode === '5') {
+	// Status code '4' indicates "Livré" (delivered) - confirmed in our API1 implementation
+	// Note: Status code '5' actually means "Incorrect Merchant shipment reference" (error),
+	// not delivery, so we don't check for it
+	if (statusCode === '4') {
 		return true
 	}
 
