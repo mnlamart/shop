@@ -12,12 +12,12 @@ import { prisma } from '#app/utils/db.server.ts'
 import { getDomainUrl, useIsPending } from '#app/utils/misc.tsx'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { getTOTPAuthUri } from '#app/utils/totp.server.ts'
-import { type Route } from './+types/profile.two-factor.verify.ts'
-import { type BreadcrumbHandle } from './profile.tsx'
-import { twoFAVerificationType } from './profile.two-factor.tsx'
+import { type BreadcrumbHandle } from '../../account.tsx'
+import { type Route } from './+types/two-factor.verify.ts'
+import { twoFAVerificationType } from './two-factor.tsx'
 
 export const handle: BreadcrumbHandle = {
-	breadcrumb: <Icon name="check">Verify</Icon>,
+	breadcrumb: 'Verify',
 }
 
 const CancelSchema = z.object({ 
@@ -57,7 +57,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 		},
 	})
 	if (!verification) {
-		return redirect('/settings/profile/two-factor')
+		return redirect('/account/security/two-factor')
 	}
 	const user = await prisma.user.findUniqueOrThrow({
 		where: { id: userId },
@@ -110,7 +110,7 @@ export async function action({ request }: Route.ActionArgs) {
 			await prisma.verification.deleteMany({
 				where: { type: twoFAVerifyVerificationType, target: userId },
 			})
-			return redirect('/settings/profile/two-factor')
+			return redirect('/account/security/two-factor')
 		}
 		case 'verify': {
 			await prisma.verification.update({
@@ -119,7 +119,7 @@ export async function action({ request }: Route.ActionArgs) {
 				},
 				data: { type: twoFAVerificationType },
 			})
-			return redirectWithToast('/settings/profile/two-factor', {
+			return redirectWithToast('/account/security/two-factor', {
 				type: 'success',
 				title: 'Enabled',
 				description: 'Two-factor authentication has been enabled.',

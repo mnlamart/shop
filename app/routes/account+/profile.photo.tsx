@@ -17,11 +17,11 @@ import {
 	useIsPending,
 } from '#app/utils/misc.tsx'
 import { uploadProfileImage } from '#app/utils/storage.server.ts'
+import { type BreadcrumbHandle } from '../account.tsx'
 import { type Route } from './+types/profile.photo.ts'
-import { type BreadcrumbHandle } from './profile.tsx'
 
 export const handle: BreadcrumbHandle = {
-	breadcrumb: <Icon name="avatar">Photo</Icon>,
+	breadcrumb: 'Change Photo',
 }
 
 const MAX_SIZE = 1024 * 1024 * 3 // 3MB
@@ -93,7 +93,7 @@ export async function action({ request }: Route.ActionArgs) {
 
 	if (intent === 'delete') {
 		await prisma.userImage.deleteMany({ where: { userId } })
-		return redirect('/settings/profile')
+		return redirect('/account')
 	}
 
 	await prisma.$transaction(async ($prisma) => {
@@ -104,7 +104,7 @@ export async function action({ request }: Route.ActionArgs) {
 		})
 	})
 
-	return redirect('/settings/profile')
+	return redirect('/account')
 }
 
 export default function PhotoRoute({

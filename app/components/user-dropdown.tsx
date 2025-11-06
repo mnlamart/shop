@@ -52,8 +52,15 @@ export function UserDropdown() {
 						</Link>
 					</DropdownMenuItem>
 					<DropdownMenuItem asChild>
-						<Link prefetch="intent" to="/shop/orders">
-							<Icon className="text-body-md" name="file-text">
+						<Link prefetch="intent" to="/account">
+							<Icon className="text-body-md" name="user">
+								My Account
+							</Icon>
+						</Link>
+					</DropdownMenuItem>
+					<DropdownMenuItem asChild>
+						<Link prefetch="intent" to="/account/orders">
+							<Icon className="text-body-md" name="package">
 								My Orders
 							</Icon>
 						</Link>
@@ -62,13 +69,6 @@ export function UserDropdown() {
 						<Link prefetch="intent" to="/shop/cart">
 							<Icon className="text-body-md" name="shopping-cart">
 								Cart
-							</Icon>
-						</Link>
-					</DropdownMenuItem>
-					<DropdownMenuItem asChild>
-						<Link prefetch="intent" to="/settings/profile">
-							<Icon className="text-body-md" name="settings">
-								Settings
 							</Icon>
 						</Link>
 					</DropdownMenuItem>

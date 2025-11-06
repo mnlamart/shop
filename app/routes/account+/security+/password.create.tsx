@@ -3,6 +3,7 @@ import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { data, redirect, Form, Link } from 'react-router'
 import { ErrorList, Field } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
+import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
 import {
@@ -13,11 +14,11 @@ import {
 import { prisma } from '#app/utils/db.server.ts'
 import { useIsPending } from '#app/utils/misc.tsx'
 import { PasswordAndConfirmPasswordSchema } from '#app/utils/user-validation.ts'
-import { type Route } from './+types/profile.password_.create.ts'
-import { type BreadcrumbHandle } from './profile.tsx'
+import { type BreadcrumbHandle } from '../../account.tsx'
+import { type Route } from './+types/password.create.ts'
 
 export const handle: BreadcrumbHandle = {
-	breadcrumb: <Icon name="dots-horizontal">Password</Icon>,
+	breadcrumb: 'Create Password',
 }
 
 const CreatePasswordForm = PasswordAndConfirmPasswordSchema
@@ -28,7 +29,7 @@ async function requireNoPassword(userId: string) {
 		where: { userId },
 	})
 	if (password) {
-		throw redirect('/settings/profile/password')
+		throw redirect('/account/security/password')
 	}
 }
 
@@ -80,7 +81,7 @@ export async function action({ request }: Route.ActionArgs) {
 		},
 	})
 
-	return redirect(`/settings/profile`, { status: 302 })
+	return redirect(`/account`, { status: 302 })
 }
 
 export default function CreatePasswordRoute({
@@ -99,37 +100,66 @@ export default function CreatePasswordRoute({
 	})
 
 	return (
-		<Form method="POST" {...getFormProps(form)} className="mx-auto max-w-md">
-			<Field
-				labelProps={{ children: 'New Password' }}
-				inputProps={{
-					...getInputProps(fields.password, { type: 'password' }),
-					autoComplete: 'new-password',
-				}}
-				errors={fields.password.errors}
-			/>
-			<Field
-				labelProps={{ children: 'Confirm New Password' }}
-				inputProps={{
-					...getInputProps(fields.confirmPassword, {
-						type: 'password',
-					}),
-					autoComplete: 'new-password',
-				}}
-				errors={fields.confirmPassword.errors}
-			/>
-			<ErrorList id={form.errorId} errors={form.errors} />
-			<div className="grid w-full grid-cols-2 gap-6">
-				<Button variant="secondary" asChild>
-					<Link to="..">Cancel</Link>
+		<div className="space-y-8">
+			<div className="flex items-center justify-between">
+				<div>
+					<h1 className="text-3xl font-bold tracking-tight">Create Password</h1>
+					<p className="text-gray-600">
+						Set a password for your account
+					</p>
+				</div>
+				<Button variant="outline" asChild>
+					<Link to="/account">
+						<Icon name="arrow-left" className="h-4 w-4 mr-2" />
+						Back to Settings
+					</Link>
 				</Button>
-				<StatusButton
-					type="submit"
-					status={isPending ? 'pending' : (form.status ?? 'idle')}
-				>
-					Create Password
-				</StatusButton>
 			</div>
-		</Form>
+
+			<Card className="p-6 hover:shadow-lg transition-shadow border-red-100 bg-white/80 backdrop-blur-sm">
+				<CardHeader className="p-0 pb-6">
+					<div className="flex items-center gap-3">
+						<div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
+							<Icon name="lock-closed" className="w-5 h-5 text-red-700" />
+						</div>
+						<CardTitle className="text-lg">Password</CardTitle>
+					</div>
+				</CardHeader>
+				<CardContent className="p-0">
+					<Form method="POST" {...getFormProps(form)} className="space-y-6">
+						<Field
+							labelProps={{ children: 'New Password' }}
+							inputProps={{
+								...getInputProps(fields.password, { type: 'password' }),
+								autoComplete: 'new-password',
+							}}
+							errors={fields.password.errors}
+						/>
+						<Field
+							labelProps={{ children: 'Confirm New Password' }}
+							inputProps={{
+								...getInputProps(fields.confirmPassword, {
+									type: 'password',
+								}),
+								autoComplete: 'new-password',
+							}}
+							errors={fields.confirmPassword.errors}
+						/>
+						<ErrorList id={form.errorId} errors={form.errors} />
+						<div className="flex gap-4 justify-end pt-6 border-t">
+							<Button variant="outline" asChild type="button">
+								<Link to="/account">Cancel</Link>
+							</Button>
+							<StatusButton
+								type="submit"
+								status={isPending ? 'pending' : (form.status ?? 'idle')}
+							>
+								Create Password
+							</StatusButton>
+						</div>
+					</Form>
+				</CardContent>
+			</Card>
+		</div>
 	)
 }

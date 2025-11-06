@@ -192,6 +192,9 @@ export default function EditUser({ loaderData, actionData }: Route.ComponentProp
 			name: user.name || '',
 			email: user.email,
 			username: user.username,
+			// @ts-expect-error - Conform's type inference doesn't properly handle z.preprocess for arrays.
+			// The roleIds field uses z.preprocess to convert FormData to string[], but Conform infers it as string.
+			// This is safe because getCollectionProps correctly handles the array type at runtime.
 			roleIds: user.roles.map((r) => r.id),
 		},
 		shouldRevalidate: 'onBlur',
@@ -221,7 +224,7 @@ export default function EditUser({ loaderData, actionData }: Route.ComponentProp
 
 			<FormProvider context={form.context}>
 				<Form method="POST" className="space-y-8" {...getFormProps(form)}>
-					<input type="hidden" name="id" value={user.id} />
+					<input {...getInputProps(fields.id, { type: 'hidden' })} value={user.id} />
 
 					<Card className="transition-shadow duration-200 hover:shadow-md">
 						<CardHeader>

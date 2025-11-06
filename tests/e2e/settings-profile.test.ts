@@ -9,7 +9,7 @@ const CODE_REGEX = /Here's your verification code: (?<code>[\d\w]+)/
 
 test('Users can update their basic info', async ({ page, navigate, login }) => {
 	await login()
-	await navigate('/settings/profile')
+	await navigate('/account')
 
 	const newUserData = createUser()
 
@@ -25,13 +25,10 @@ test('Users can update their password', async ({ page, navigate, login }) => {
 	const oldPassword = faker.internet.password()
 	const newPassword = faker.internet.password()
 	const user = await login({ password: oldPassword })
-	await navigate('/settings/profile')
+	await navigate('/account/security/password')
 
-	await page.getByRole('link', { name: /change password/i }).click()
+	await page.getByRole('textbox', { name: /^current password/i }).fill(oldPassword)
 
-	await page
-		.getByRole('textbox', { name: /^current password/i })
-		.fill(oldPassword)
 	await page.getByRole('textbox', { name: /^new password/i }).fill(newPassword)
 	await page
 		.getByRole('textbox', { name: /^confirm new password/i })
@@ -39,7 +36,7 @@ test('Users can update their password', async ({ page, navigate, login }) => {
 
 	await page.getByRole('button', { name: /^change password/i }).click()
 
-	await expect(page).toHaveURL(`/settings/profile`)
+	await expect(page).toHaveURL(`/account`)
 
 	const { username } = user
 	expect(
@@ -58,7 +55,7 @@ test('Users can update their profile photo', async ({
 	login,
 }) => {
 	const user = await login()
-	await navigate('/settings/profile')
+	await navigate('/account')
 
 	const beforeSrc = await page
 		.getByRole('main')
@@ -67,7 +64,7 @@ test('Users can update their profile photo', async ({
 
 	await page.getByRole('link', { name: /change profile photo/i }).click()
 
-	await expect(page).toHaveURL(`/settings/profile/photo`)
+	await expect(page).toHaveURL(`/account/profile/photo`)
 
 	await page
 		.getByRole('button', { name: /change/i })
@@ -78,7 +75,7 @@ test('Users can update their profile photo', async ({
 	await expect(
 		page,
 		'Was not redirected after saving the profile photo',
-	).toHaveURL(`/settings/profile`)
+	).toHaveURL(`/account`)
 
 	const afterSrc = await page
 		.getByRole('main')
@@ -98,8 +95,7 @@ test('Users can change their email address', async ({
 	const preUpdateUser = await login()
 	const newEmailAddress = faker.internet.email().toLowerCase()
 	expect(preUpdateUser.email).not.toEqual(newEmailAddress)
-	await navigate('/settings/profile')
-	await page.getByRole('link', { name: /change email/i }).click()
+	await navigate('/account/profile/change-email')
 	await page.getByRole('textbox', { name: /new email/i }).fill(newEmailAddress)
 	await page.getByRole('button', { name: /send confirmation/i }).click()
 	await expect(page.getByText(/check your email/i)).toBeVisible()

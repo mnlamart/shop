@@ -9,11 +9,11 @@ test('Users can add 2FA to their account and use it when logging in', async ({
 }) => {
 	const password = faker.internet.password()
 	const user = await login({ password })
-	await navigate('/settings/profile')
+	await navigate('/account/security/two-factor')
 
-	await page.getByRole('link', { name: /enable 2fa/i }).click()
+	await page.getByRole('button', { name: /enable 2fa/i }).click()
 
-	await expect(page).toHaveURL(`/settings/profile/two-factor`)
+	await expect(page).toHaveURL(`/account/security/two-factor`)
 	// Use the first main element (the page content) to avoid multiple main elements
 	const main = page.getByRole('main').first()
 	await main.getByRole('button', { name: /enable 2fa/i }).click()
@@ -36,7 +36,7 @@ test('Users can add 2FA to their account and use it when logging in', async ({
 	await main.getByRole('button', { name: /submit/i }).click()
 
 	// Wait for the redirect back to the two-factor page after verification
-	await page.waitForURL(`/settings/profile/two-factor`, { timeout: 5000 })
+	await page.waitForURL(`/account/security/two-factor`, { timeout: 5000 })
 	// Use the page content directly instead of main to avoid multiple main elements
 	await expect(page.getByText(/You have enabled two-factor authentication./i)).toBeVisible()
 	await expect(page.getByRole('link', { name: /disable 2fa/i })).toBeVisible()
