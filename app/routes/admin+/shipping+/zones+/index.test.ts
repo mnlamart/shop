@@ -55,7 +55,7 @@ describe('admin shipping zones index route', () => {
 			},
 		})
 
-		const zone2 = await prisma.shippingZone.create({
+		await prisma.shippingZone.create({
 			data: {
 				name: 'Test Zone 2',
 				description: 'Test description 2',
@@ -94,8 +94,8 @@ describe('admin shipping zones index route', () => {
 		expect(result.zones[0]).toHaveProperty('name')
 		expect(result.zones[0]).toHaveProperty('countries')
 		expect(result.zones[0]).toHaveProperty('_count')
-		expect(result.zones[0]._count.methods).toBe(1)
-		expect(result.zones[1]._count.methods).toBe(0)
+		expect(result.zones[0]?._count.methods).toBe(1)
+		expect(result.zones[1]?._count.methods).toBe(0)
 	})
 
 	test('loader returns zones ordered by displayOrder then name', async () => {
@@ -138,9 +138,9 @@ describe('admin shipping zones index route', () => {
 		})
 
 		expect(result.zones).toHaveLength(3)
-		expect(result.zones[0].name).toBe('Zone A') // displayOrder 0
-		expect(result.zones[1].name).toBe('Zone B') // displayOrder 1, alphabetically first
-		expect(result.zones[2].name).toBe('Zone C') // displayOrder 1, alphabetically second
+		expect(result.zones[0]?.name).toBe('Zone A') // displayOrder 0
+		expect(result.zones[1]?.name).toBe('Zone B') // displayOrder 1, alphabetically first
+		expect(result.zones[2]?.name).toBe('Zone C') // displayOrder 1, alphabetically second
 	})
 })
 

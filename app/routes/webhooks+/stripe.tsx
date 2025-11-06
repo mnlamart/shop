@@ -3,11 +3,11 @@ import * as Sentry from '@sentry/react-router'
 import { data } from 'react-router'
 import type Stripe from 'stripe'
 import { fulfillOrder } from '#app/utils/fulfillment.server.ts'
-import { type StoreAddress } from '#app/utils/shipment.server.ts'
 import {
 	createOrderFromStripeSession,
 	StockUnavailableError,
 } from '#app/utils/order.server.ts'
+import { type StoreAddress } from '#app/utils/shipment.server.ts'
 import { stripe } from '#app/utils/stripe.server.ts'
 import { type Route } from './+types/stripe.ts'
 
@@ -55,15 +55,15 @@ export async function action({ request }: Route.ActionArgs) {
 
 		// Verify payment status before fulfilling order
 		if (fullSession.payment_status !== 'paid') {
-			// Log payment status issues for monitoring
-			Sentry.captureMessage(
-				`Payment not completed for session ${session.id}. Payment status: ${fullSession.payment_status}`,
-				{
-					level: 'warning',
-					tags: { context: 'webhook-payment-status' },
-					extra: { sessionId: session.id, paymentStatus: fullSession.payment_status },
-				},
-			)
+		// Log payment status issues for monitoring
+		void Sentry.captureMessage(
+			`Payment not completed for session ${session.id}. Payment status: ${fullSession.payment_status}`,
+			{
+				level: 'warning',
+				tags: { context: 'webhook-payment-status' },
+				extra: { sessionId: session.id, paymentStatus: fullSession.payment_status },
+			},
+		)
 			return data(
 				{
 					received: true,

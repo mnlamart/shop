@@ -6,8 +6,8 @@
 
 import { invariant } from '@epic-web/invariant'
 import * as Sentry from '@sentry/react-router'
-import { prisma } from './db.server.ts'
 import { getTrackingInfo } from './carriers/mondial-relay-api1.server.ts'
+import { prisma } from './db.server.ts'
 
 /**
  * Gets tracking information for a Mondial Relay shipment.

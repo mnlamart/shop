@@ -1,8 +1,8 @@
 import { useForm, getFormProps, getInputProps, getTextareaProps, FormProvider, useInputControl } from '@conform-to/react'
 import { parseWithZod, getZodConstraint } from '@conform-to/zod/v4'
 import { parseFormData } from '@mjackson/form-data-parser'
-import { Prisma } from '@prisma/client'
-import { Form, useSearchParams } from 'react-router'
+import  { type Prisma } from '@prisma/client'
+import { Form } from 'react-router'
 import { z } from 'zod'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
@@ -200,8 +200,8 @@ export async function action({ request }: Route.ActionArgs) {
 			carrierId: carrierId || null,
 			rateType,
 			flatRate: rateType === 'FLAT' ? flatRate : null,
-			weightRates: rateType === 'WEIGHT_BASED' ? (weightRates as Prisma.InputJsonValue) : null,
-			priceRates: rateType === 'PRICE_BASED' ? (priceRates as Prisma.InputJsonValue) : null,
+			weightRates: rateType === 'WEIGHT_BASED' ? (weightRates as Prisma.InputJsonValue) : undefined,
+			priceRates: rateType === 'PRICE_BASED' ? (priceRates as Prisma.InputJsonValue) : undefined,
 			freeShippingThreshold: rateType === 'FREE' ? freeShippingThreshold : null,
 			displayOrder,
 			estimatedDays: estimatedDays || null,
@@ -432,7 +432,7 @@ function MethodForm({
 								<Label htmlFor={fields.zoneId.id} className="text-sm font-medium">
 									Shipping Zone *
 								</Label>
-								<ZoneSelect field={fields.zoneId} zones={zones} />
+								<ZoneSelect field={fields.zoneId as any} zones={zones} />
 								<ErrorList errors={fields.zoneId.errors} />
 							</div>
 
@@ -440,7 +440,7 @@ function MethodForm({
 								<Label htmlFor={fields.carrierId.id} className="text-sm font-medium">
 									Carrier (Optional)
 								</Label>
-								<CarrierSelect field={fields.carrierId} carriers={carriers} />
+								<CarrierSelect field={fields.carrierId as any} carriers={carriers} />
 								<p className="text-xs text-muted-foreground">
 									Select a carrier if this method is specific to a shipping provider
 								</p>
@@ -452,7 +452,7 @@ function MethodForm({
 							<Label htmlFor={fields.rateType.id} className="text-sm font-medium">
 								Rate Type *
 							</Label>
-							<RateTypeSelect field={fields.rateType} />
+							<RateTypeSelect field={fields.rateType as any} />
 							<ErrorList errors={fields.rateType.errors} />
 						</div>
 

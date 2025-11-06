@@ -2,8 +2,8 @@
  * @vitest-environment node
  */
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
-import { consoleError } from '#tests/setup/setup-test-env'
 import { prisma } from '#app/utils/db.server.ts'
+import { consoleError } from '#tests/setup/setup-test-env'
 import { fulfillOrder } from './fulfillment.server.ts'
 import * as shipmentServer from './shipment.server.ts'
 import * as shippingEmailServer from './shipping-email.server.tsx'

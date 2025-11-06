@@ -88,7 +88,7 @@ async function createProduct(categoryId: string) {
 			
 			usedCombinations.add(combination)
 			
-			const variant = await prisma.productVariant.create({
+			await prisma.productVariant.create({
 				data: {
 					productId: product.id,
 					sku: `${product.sku}-${combination}-${faker.string.alphanumeric(4)}`,

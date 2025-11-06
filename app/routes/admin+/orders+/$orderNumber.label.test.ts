@@ -2,12 +2,12 @@
  * @vitest-environment node
  */
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
-import { consoleError } from '#tests/setup/setup-test-env'
-import { prisma } from '#app/utils/db.server.ts'
 import { getSessionExpirationDate, sessionKey } from '#app/utils/auth.server.ts'
-import { authSessionStorage } from '#app/utils/session.server.ts'
-import { loader } from './$orderNumber.label.ts'
+import { prisma } from '#app/utils/db.server.ts'
 import * as labelServer from '#app/utils/label.server.ts'
+import { authSessionStorage } from '#app/utils/session.server.ts'
+import { consoleError } from '#tests/setup/setup-test-env'
+import { loader } from './$orderNumber.label.ts'
 
 // Mock the label server
 vi.mock('#app/utils/label.server.ts', () => ({

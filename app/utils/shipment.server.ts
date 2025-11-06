@@ -7,8 +7,8 @@
 
 import { invariant } from '@epic-web/invariant'
 import * as Sentry from '@sentry/react-router'
-import { prisma } from './db.server.ts'
 import { createShipment, type ShipmentRequest } from './carriers/mondial-relay-api2.server.ts'
+import { prisma } from './db.server.ts'
 
 /**
  * Store address information for shipment creation.

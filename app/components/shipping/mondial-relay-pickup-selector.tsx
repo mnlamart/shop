@@ -4,15 +4,15 @@
  * Allows users to search for and select a Mondial Relay pickup point (Point Relais®)
  */
 
-import { useFetcher } from 'react-router'
 import { useEffect, useState } from 'react'
+import { useFetcher } from 'react-router'
+import { ErrorList } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent } from '#app/components/ui/card.tsx'
+import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
-import { Icon } from '#app/components/ui/icon.tsx'
-import { ErrorList } from '#app/components/forms.tsx'
-import type { PickupPoint } from '#app/utils/carriers/mondial-relay-api1.server.ts'
+import  { type PickupPoint } from '#app/utils/carriers/mondial-relay-api1.server.ts'
 
 interface MondialRelayPickupSelectorProps {
 	postalCode: string

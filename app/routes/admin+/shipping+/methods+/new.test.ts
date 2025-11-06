@@ -90,8 +90,8 @@ describe('admin shipping methods new route', () => {
 		expect(result).toHaveProperty('carriers')
 		expect(result.zones).toHaveLength(1)
 		expect(result.carriers).toHaveLength(1)
-		expect(result.zones[0].id).toBe(zoneId)
-		expect(result.carriers[0].id).toBe(carrierId)
+		expect(result.zones[0]?.id).toBe(zoneId)
+		expect(result.carriers[0]?.id).toBe(carrierId)
 	})
 
 	test('action creates a new flat rate shipping method', async () => {
@@ -120,6 +120,9 @@ describe('admin shipping methods new route', () => {
 		})
 
 		expect(result).toHaveProperty('headers')
+		if (!('headers' in result)) {
+			throw new Error('Expected result to have headers')
+		}
 		expect(result.headers.get('location')).toContain('/admin/shipping/methods/')
 
 		// Verify method was created
@@ -127,13 +130,13 @@ describe('admin shipping methods new route', () => {
 			where: { name: 'Test Method' },
 		})
 		expect(methods).toHaveLength(1)
-		expect(methods[0].description).toBe('Test description')
-		expect(methods[0].zoneId).toBe(zoneId)
-		expect(methods[0].carrierId).toBe(carrierId)
-		expect(methods[0].rateType).toBe('FLAT')
-		expect(methods[0].flatRate).toBe(500) // Converted to cents
-		expect(methods[0].estimatedDays).toBe(5)
-		expect(methods[0].isActive).toBe(true)
+		expect(methods[0]?.description).toBe('Test description')
+		expect(methods[0]?.zoneId).toBe(zoneId)
+		expect(methods[0]?.carrierId).toBe(carrierId)
+		expect(methods[0]?.rateType).toBe('FLAT')
+		expect(methods[0]?.flatRate).toBe(500) // Converted to cents
+		expect(methods[0]?.estimatedDays).toBe(5)
+		expect(methods[0]?.isActive).toBe(true)
 	})
 
 	test('action creates a free shipping method', async () => {
@@ -159,13 +162,16 @@ describe('admin shipping methods new route', () => {
 		})
 
 		expect(result).toHaveProperty('headers')
+		if (!('headers' in result)) {
+			throw new Error('Expected result to have headers')
+		}
 
 		const methods = await prisma.shippingMethod.findMany({
 			where: { name: 'Free Shipping' },
 		})
 		expect(methods).toHaveLength(1)
-		expect(methods[0].rateType).toBe('FREE')
-		expect(methods[0].freeShippingThreshold).toBe(5000) // Converted to cents
+		expect(methods[0]?.rateType).toBe('FREE')
+		expect(methods[0]?.freeShippingThreshold).toBe(5000) // Converted to cents
 	})
 
 	test('action validates required fields', async () => {
@@ -186,6 +192,9 @@ describe('admin shipping methods new route', () => {
 		})
 
 		expect(result).toHaveProperty('result')
+		if (!('result' in result)) {
+			throw new Error('Expected result to have result property')
+		}
 		expect(result.result?.status).toBe('error')
 	})
 })

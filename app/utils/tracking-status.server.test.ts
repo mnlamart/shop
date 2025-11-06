@@ -2,11 +2,11 @@
  * @vitest-environment node
  */
 import { describe, expect, test, beforeEach, vi } from 'vitest'
-import { consoleError } from '#tests/setup/setup-test-env'
 import { prisma } from '#app/utils/db.server.ts'
+import { consoleError } from '#tests/setup/setup-test-env'
+import * as orderServer from './order.server.ts'
 import { syncOrderStatusFromTracking, syncMultipleOrdersFromTracking } from './tracking-status.server.ts'
 import * as trackingServer from './tracking.server.ts'
-import * as orderServer from './order.server.ts'
 
 // Mock the tracking and order servers
 vi.mock('./tracking.server.ts', () => ({

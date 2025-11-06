@@ -6,8 +6,8 @@
 
 import { invariant } from '@epic-web/invariant'
 import * as Sentry from '@sentry/react-router'
-import { prisma } from './db.server.ts'
 import { getLabel } from './carriers/mondial-relay-api2.server.ts'
+import { prisma } from './db.server.ts'
 import { createMondialRelayShipment, type StoreAddress } from './shipment.server.ts'
 
 /**
