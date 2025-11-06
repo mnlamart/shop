@@ -4,6 +4,7 @@ import { Badge } from '#app/components/ui/badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
+import { getUserImgSrc } from '#app/utils/misc.tsx'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { type Route } from './+types/$userId.ts'
@@ -107,7 +108,7 @@ export default function UserDetail({ loaderData }: Route.ComponentProps) {
 					<div className="flex items-center gap-4">
 						{user.image ? (
 							<img
-								src={`/resources/file/${user.image.objectKey}`}
+								src={getUserImgSrc(user.image.objectKey)}
 								alt={user.image.altText || user.name || user.username}
 								className="h-12 w-12 rounded-full"
 							/>

@@ -19,6 +19,11 @@ const navData = {
 					isActive: true,
 				},
 				{
+					title: 'Users',
+					url: '/admin/users',
+					icon: 'user' as IconName,
+				},
+				{
 					title: 'Orders',
 					url: '/admin/orders',
 					icon: 'file-text' as IconName,
@@ -36,7 +41,7 @@ const navData = {
 				{
 					title: 'Categories',
 					url: '/admin/categories',
-					icon: 'tags' as IconName,
+					icon: 'folder' as IconName,
 					hasSubmenu: true,
 					items: [
 						{ title: 'All Categories', url: '/admin/categories' },
@@ -46,34 +51,18 @@ const navData = {
 				{
 					title: 'Attributes',
 					url: '/admin/attributes',
-					icon: 'settings' as IconName,
+					icon: 'sliders' as IconName,
 					hasSubmenu: true,
 					items: [
 						{ title: 'All Attributes', url: '/admin/attributes' },
 						{ title: 'Add Attribute', url: '/admin/attributes/new' },
 					],
 				},
-				{
-					title: 'Users',
-					url: '/admin/users',
-					icon: 'user' as IconName,
-				},
 			],
 		},
 		{
 			title: 'System',
 			items: [
-				{
-					title: 'Settings',
-					url: '/admin/settings',
-					icon: 'settings' as IconName,
-					hasSubmenu: true,
-					items: [
-						{ title: 'General', url: '/admin/settings/general' },
-						{ title: 'Users', url: '/admin/settings/users' },
-						{ title: 'Permissions', url: '/admin/settings/permissions' },
-					],
-				},
 				{
 					title: 'View Store',
 					url: '/',
@@ -168,71 +157,91 @@ export function AppSidebar() {
 					</>
 				)}
 			</div>
-			<div className={`flex-1 overflow-auto ${isCollapsed ? 'p-1' : 'p-2'}`}>
+			<div className={`flex-1 overflow-auto ${isCollapsed ? 'p-2' : 'p-3'}`}>
 				{navData.navMain.map((group) => (
 					<div key={group.title} className="mb-4">
 						{!isCollapsed && (
-							<div className="px-2 py-1 text-xs font-medium text-sidebar-foreground/70">
+							<div className="px-3 py-2 text-xs font-medium text-sidebar-foreground/70">
 								{group.title}
 							</div>
 						)}
-						<div className="space-y-1">
-							{group.items.map((item) => (
-								<div key={item.title}>
-									{item.hasSubmenu ? (
-										<Collapsible defaultOpen className="group/collapsible">
-											<CollapsibleTrigger asChild>
-												<Button
-													variant={location.pathname.startsWith(item.url) ? "secondary" : "ghost"}
-													className={`${isCollapsed ? 'w-12 h-12 p-0 justify-center' : 'w-full justify-start px-3'}`}
-													aria-label={isCollapsed ? item.title : undefined}
-												>
-													<Icon name={item.icon} className="size-4" aria-hidden="true" />
+						<div className={`space-y-1 ${isCollapsed ? 'space-y-2' : ''}`}>
+							{group.items.map((item) => {
+								const isItemActive = location.pathname === item.url || (item.hasSubmenu && location.pathname.startsWith(item.url))
+								
+								return (
+									<div key={item.title}>
+										{item.hasSubmenu ? (
+											<Collapsible defaultOpen className="group/collapsible">
+												<div className="flex items-center gap-0 group/item rounded-md">
+													<Button
+														variant={isItemActive ? "secondary" : "ghost"}
+														asChild
+														className={`${isCollapsed ? 'w-full h-10 p-2 justify-center' : 'flex-1 justify-start px-3 py-2 h-10'} transition-colors hover:!bg-muted rounded-md`}
+														aria-label={isCollapsed ? item.title : undefined}
+													>
+														<Link to={item.url} className="flex items-center w-full">
+															<Icon name={item.icon} className="size-4 flex-shrink-0" aria-hidden="true" />
+															{!isCollapsed && <span className="ml-2 font-medium">{item.title}</span>}
+														</Link>
+													</Button>
 													{!isCollapsed && (
-														<>
-															<span className="ml-2">{item.title}</span>
-															<Icon 
-																name="chevron-down" 
-																className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-180" 
-																aria-hidden="true"
-															/>
-														</>
-													)}
-												</Button>
-											</CollapsibleTrigger>
-											{!isCollapsed && (
-												<CollapsibleContent>
-													<div className="ml-4 space-y-1">
-														{item.items?.map((subItem) => (
+														<CollapsibleTrigger asChild>
 															<Button
-																key={subItem.title}
 																variant="ghost"
-																asChild
-																className="w-full justify-start h-8"
+																size="sm"
+																className="h-10 w-8 p-0 flex-shrink-0 transition-colors hover:!bg-muted rounded-md"
+																aria-label="Toggle submenu"
+																onClick={(e) => {
+																	e.stopPropagation()
+																}}
 															>
-																<Link to={subItem.url}>
-																	<span className="text-sm">{subItem.title}</span>
-																</Link>
+																<Icon 
+																	name="chevron-down" 
+																	className="size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" 
+																	aria-hidden="true"
+																/>
 															</Button>
-														))}
-													</div>
-												</CollapsibleContent>
-											)}
-										</Collapsible>
-									) : (
-										<Button
-											variant={location.pathname === item.url ? "secondary" : "ghost"}
-											asChild
-											className={`${isCollapsed ? 'w-12 h-12 p-0 justify-center' : 'w-full justify-start px-3'}`}
-										>
-											<Link to={item.url} aria-label={isCollapsed ? item.title : undefined}>
-												<Icon name={item.icon} className="size-4" aria-hidden="true" />
-												{!isCollapsed && <span className="ml-2">{item.title}</span>}
-											</Link>
-										</Button>
-									)}
-								</div>
-							))}
+														</CollapsibleTrigger>
+													)}
+												</div>
+												{!isCollapsed && (
+													<CollapsibleContent className="overflow-hidden transition-all duration-200 ease-in-out">
+														<div className="ml-4 space-y-0.5 mt-1 pb-1">
+															{item.items?.map((subItem) => {
+																const isSubItemActive = location.pathname === subItem.url
+																return (
+																	<Button
+																		key={subItem.title}
+																		variant={isSubItemActive ? "secondary" : "ghost"}
+																		asChild
+																		className={`w-full justify-start h-8 px-3 text-sm transition-colors hover:!bg-muted rounded-md`}
+																	>
+																		<Link to={subItem.url} className="flex items-center w-full">
+																			<span className={isSubItemActive ? 'font-medium' : ''}>{subItem.title}</span>
+																		</Link>
+																	</Button>
+																)
+															})}
+														</div>
+													</CollapsibleContent>
+												)}
+											</Collapsible>
+										) : (
+											<Button
+												variant={isItemActive ? "secondary" : "ghost"}
+												asChild
+												className={`${isCollapsed ? 'w-full h-10 p-2 justify-center' : 'w-full justify-start px-3 py-2 h-10'} transition-colors hover:!bg-muted rounded-md`}
+											>
+												<Link to={item.url} aria-label={isCollapsed ? item.title : undefined} className="flex items-center w-full">
+													<Icon name={item.icon} className="size-4 flex-shrink-0" aria-hidden="true" />
+													{!isCollapsed && <span className="ml-2 font-medium">{item.title}</span>}
+												</Link>
+											</Button>
+										)}
+									</div>
+								)
+							})}
 						</div>
 					</div>
 				))}
