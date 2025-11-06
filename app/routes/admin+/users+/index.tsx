@@ -20,6 +20,7 @@ import {
 	TableHeader,
 	TableRow,
 } from '#app/components/ui/table.tsx'
+import { getUserImgSrc } from '#app/utils/misc.tsx'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { type Route } from './+types/index.ts'
@@ -218,7 +219,7 @@ export default function UsersList({ loaderData }: Route.ComponentProps) {
 									<div className="flex items-center gap-2">
 										{user.image ? (
 											<img
-												src={`/resources/file/${user.image.objectKey}`}
+												src={getUserImgSrc(user.image.objectKey)}
 												alt={user.image.altText || user.name || user.username}
 												className="h-8 w-8 rounded-full"
 											/>
