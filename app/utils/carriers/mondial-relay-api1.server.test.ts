@@ -207,6 +207,13 @@ describe('mondial-relay-api1.server', () => {
             <Pays>FR</Pays>
             <Latitude>48.8566</Latitude>
             <Longitude>2.3522</Longitude>
+            <Horaires_Lun>0900-1200,1400-1800</Horaires_Lun>
+            <Horaires_Mar>0900-1200,1400-1800</Horaires_Mar>
+            <Horaires_Mer>0900-1200,1400-1800</Horaires_Mer>
+            <Horaires_Jeu>0900-1200,1400-1800</Horaires_Jeu>
+            <Horaires_Ven>0900-1200,1400-1800</Horaires_Ven>
+            <Horaires_Sam>0900-1200</Horaires_Sam>
+            <Horaires_Dim></Horaires_Dim>
           </PointRelais>
           <PointRelais>
             <Num>67890</Num>
@@ -218,6 +225,7 @@ describe('mondial-relay-api1.server', () => {
             <Pays>FR</Pays>
             <Latitude>48.8606</Latitude>
             <Longitude>2.3376</Longitude>
+            <Horaires_Lun>0800-1900</Horaires_Lun>
           </PointRelais>
         </PointsRelais>
       </WSI2_RecherchePointRelaisResult>
@@ -235,9 +243,113 @@ describe('mondial-relay-api1.server', () => {
 				country: 'FR',
 			})
 
-			// Note: Currently returns empty array because parsePickupPointsResponse is not implemented
-			// This test documents the expected behavior once parsing is implemented
 			expect(Array.isArray(result)).toBe(true)
+			expect(result).toHaveLength(2)
+
+			// Verify first pickup point
+			expect(result[0]).toMatchObject({
+				id: '12345',
+				name: '123 Rue de Test',
+				address: '123 Rue de Test, Bâtiment A',
+				postalCode: '75001',
+				city: 'Paris',
+				country: 'FR',
+				latitude: 48.8566,
+				longitude: 2.3522,
+			})
+			expect(result[0]?.openingHours).toMatchObject({
+				monday: '0900-1200,1400-1800',
+				tuesday: '0900-1200,1400-1800',
+				wednesday: '0900-1200,1400-1800',
+				thursday: '0900-1200,1400-1800',
+				friday: '0900-1200,1400-1800',
+				saturday: '0900-1200',
+			})
+			expect(result[0]?.openingHours?.sunday).toBeUndefined()
+
+			// Verify second pickup point
+			expect(result[1]).toMatchObject({
+				id: '67890',
+				name: '456 Avenue Example',
+				address: '456 Avenue Example',
+				postalCode: '75002',
+				city: 'Paris',
+				country: 'FR',
+				latitude: 48.8606,
+				longitude: 2.3376,
+			})
+			expect(result[1]?.openingHours?.monday).toBe('0800-1900')
+		})
+
+		test('parses XML response with empty PointsRelais', async () => {
+			const xmlResponse = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <WSI2_RecherchePointRelaisResponse xmlns="http://www.mondialrelay.fr/webservice/">
+      <WSI2_RecherchePointRelaisResult>
+        <PointsRelais></PointsRelais>
+      </WSI2_RecherchePointRelaisResult>
+    </WSI2_RecherchePointRelaisResponse>
+  </soap:Body>
+</soap:Envelope>`
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				text: async () => xmlResponse,
+			})
+
+			const result = await searchPickupPoints({
+				postalCode: '75001',
+				country: 'FR',
+			})
+
+			expect(Array.isArray(result)).toBe(true)
+			expect(result).toHaveLength(0)
+		})
+
+		test('calculates distance when latitude and longitude are provided', async () => {
+			const xmlResponse = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <WSI2_RecherchePointRelaisResponse xmlns="http://www.mondialrelay.fr/webservice/">
+      <WSI2_RecherchePointRelaisResult>
+        <PointsRelais>
+          <PointRelais>
+            <Num>12345</Num>
+            <LgAdr1>123 Rue de Test</LgAdr1>
+            <LgAdr2></LgAdr2>
+            <LgAdr3></LgAdr3>
+            <CP>75001</CP>
+            <Ville>Paris</Ville>
+            <Pays>FR</Pays>
+            <Latitude>48.8566</Latitude>
+            <Longitude>2.3522</Longitude>
+          </PointRelais>
+        </PointsRelais>
+      </WSI2_RecherchePointRelaisResult>
+    </WSI2_RecherchePointRelaisResponse>
+  </soap:Body>
+</soap:Envelope>`
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				text: async () => xmlResponse,
+			})
+
+			// Search from a nearby location (about 1km away)
+			const result = await searchPickupPoints({
+				postalCode: '75001',
+				country: 'FR',
+				latitude: 48.8656, // ~1km north
+				longitude: 2.3522, // Same longitude
+			})
+
+			expect(result).toHaveLength(1)
+			expect(result[0]?.distance).toBeDefined()
+			expect(typeof result[0]?.distance).toBe('number')
+			// Distance should be approximately 1000 meters (1km)
+			expect(result[0]?.distance).toBeGreaterThan(900)
+			expect(result[0]?.distance).toBeLessThan(1100)
 		})
 	})
 
@@ -317,6 +429,30 @@ describe('mondial-relay-api1.server', () => {
         <Libelle>En cours de traitement</Libelle>
         <Relais_Num>12345</Relais_Num>
         <Relais_Pays>FR</Relais_Pays>
+        <Tracing>
+          <Libelle>En cours de livraison</Libelle>
+          <Statut>LI</Statut>
+          <EventList>
+            <Event>
+              <Date>2023-01-01</Date>
+              <Heure>10:00</Heure>
+              <Libelle>Prise en charge</Libelle>
+              <Localisation>AGENCE PARIS</Localisation>
+            </Event>
+            <Event>
+              <Date>2023-01-02</Date>
+              <Heure>14:30</Heure>
+              <Libelle>En transit</Libelle>
+              <Localisation>HUB LYON</Localisation>
+            </Event>
+            <Event>
+              <Date>2023-01-03</Date>
+              <Heure>09:15</Heure>
+              <Libelle>Arrivé au point relais</Libelle>
+              <Localisation>POINT RELAIS PARIS</Localisation>
+            </Event>
+          </EventList>
+        </Tracing>
       </WSI2_TracingColisDetailleResult>
     </WSI2_TracingColisDetailleResponse>
   </soap:Body>
@@ -329,12 +465,89 @@ describe('mondial-relay-api1.server', () => {
 
 			const result = await getTrackingInfo('123456789')
 
-			// Note: Currently returns default values because parseTrackingResponse is not implemented
-			// This test documents the expected behavior once parsing is implemented
 			expect(result).toHaveProperty('status')
 			expect(result).toHaveProperty('statusCode')
 			expect(result).toHaveProperty('events')
 			expect(Array.isArray(result.events)).toBe(true)
+
+			expect(result.status).toBe('En cours de livraison')
+			expect(result.statusCode).toBe('LI')
+			expect(result.events).toHaveLength(3)
+
+			// Verify first event
+			expect(result.events[0]).toMatchObject({
+				description: 'Prise en charge',
+				location: 'AGENCE PARIS',
+			})
+			expect(result.events[0]?.date).toBeInstanceOf(Date)
+			expect(result.events[0]?.date.toISOString()).toContain('2023-01-01')
+
+			// Verify second event
+			expect(result.events[1]).toMatchObject({
+				description: 'En transit',
+				location: 'HUB LYON',
+			})
+
+			// Verify third event
+			expect(result.events[2]).toMatchObject({
+				description: 'Arrivé au point relais',
+				location: 'POINT RELAIS PARIS',
+			})
+		})
+
+		test('parses XML response with error status', async () => {
+			const xmlResponse = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <WSI2_TracingColisDetailleResponse xmlns="http://www.mondialrelay.fr/webservice/">
+      <WSI2_TracingColisDetailleResult>
+        <Stat>1</Stat>
+        <Libelle>Numéro d'expédition invalide</Libelle>
+      </WSI2_TracingColisDetailleResult>
+    </WSI2_TracingColisDetailleResponse>
+  </soap:Body>
+</soap:Envelope>`
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				text: async () => xmlResponse,
+			})
+
+			const result = await getTrackingInfo('invalid')
+
+			expect(result.statusCode).toBe('1')
+			expect(result.status).toBe("Numéro d'expédition invalide")
+			expect(result.events).toHaveLength(0)
+		})
+
+		test('parses XML response with empty event list', async () => {
+			const xmlResponse = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <WSI2_TracingColisDetailleResponse xmlns="http://www.mondialrelay.fr/webservice/">
+      <WSI2_TracingColisDetailleResult>
+        <Stat>0</Stat>
+        <Libelle>OK</Libelle>
+        <Tracing>
+          <Libelle>En attente</Libelle>
+          <Statut>AT</Statut>
+          <EventList></EventList>
+        </Tracing>
+      </WSI2_TracingColisDetailleResult>
+    </WSI2_TracingColisDetailleResponse>
+  </soap:Body>
+</soap:Envelope>`
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				text: async () => xmlResponse,
+			})
+
+			const result = await getTrackingInfo('123456789')
+
+			expect(result.status).toBe('En attente')
+			expect(result.statusCode).toBe('AT')
+			expect(result.events).toHaveLength(0)
 		})
 	})
 })
