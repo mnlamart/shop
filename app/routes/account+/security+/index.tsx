@@ -3,13 +3,8 @@ import { Card } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { requireUserId } from '#app/utils/auth.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
-import { type BreadcrumbHandle } from '../../account.tsx'
 import { type Route } from './+types/index.ts'
 import { twoFAVerificationType } from './two-factor.tsx'
-
-export const handle: BreadcrumbHandle = {
-	breadcrumb: 'Overview',
-}
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
