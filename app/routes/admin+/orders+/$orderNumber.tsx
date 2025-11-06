@@ -549,6 +549,53 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 												)}
 											</div>
 										)}
+
+										{/* Label Management */}
+										{(order.mondialRelayShipmentNumber || order.mondialRelayPickupPointId) && (
+											<div className="mt-4 pt-4 border-t border-border">
+												<h3 className="text-sm font-medium mb-3">Shipping Label</h3>
+												<div className="flex gap-2">
+													{order.mondialRelayShipmentNumber ? (
+														<Button
+															asChild
+															variant="outline"
+															size="sm"
+															className="h-9"
+														>
+															<a
+																href={`/admin/orders/${order.orderNumber}/label`}
+																target="_blank"
+																rel="noopener noreferrer"
+															>
+																<Icon name="download" className="h-4 w-4 mr-2" />
+																Download Label
+															</a>
+														</Button>
+													) : order.mondialRelayPickupPointId ? (
+														<Button
+															asChild
+															variant="default"
+															size="sm"
+															className="h-9"
+														>
+															<a
+																href={`/admin/orders/${order.orderNumber}/label?create=true`}
+																target="_blank"
+																rel="noopener noreferrer"
+															>
+																<Icon name="plus" className="h-4 w-4 mr-2" />
+																Create & Download Label
+															</a>
+														</Button>
+													) : null}
+												</div>
+												{order.mondialRelayLabelUrl && (
+													<p className="text-xs text-muted-foreground mt-2">
+														Label URL: <a href={order.mondialRelayLabelUrl} target="_blank" rel="noopener noreferrer" className="underline">{order.mondialRelayLabelUrl}</a>
+													</p>
+												)}
+											</div>
+										)}
 										<div className="flex items-center justify-between pt-2 border-t border-border">
 											<span className="text-base font-normal text-foreground">Total</span>
 											<span className="text-lg font-normal text-foreground">
