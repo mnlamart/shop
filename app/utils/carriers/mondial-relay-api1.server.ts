@@ -8,8 +8,8 @@
  * Documentation: https://storage.mondialrelay.fr/Presentation%20of%20WebServices.pdf
  */
 
-import { invariant } from '@epic-web/invariant'
 import { createHash } from 'crypto'
+import { invariant } from '@epic-web/invariant'
 
 // API endpoints
 const API1_BASE_URL = 'https://www.mondialrelay.fr/WebService/Web_Services.asmx'
@@ -144,7 +144,7 @@ export async function searchPickupPoints({
 /**
  * Parse the SOAP XML response and extract pickup points
  */
-function parsePickupPointsResponse(xmlText: string, latitude?: number, longitude?: number): PickupPoint[] {
+function parsePickupPointsResponse(_xmlText: string, _latitude?: number, _longitude?: number): PickupPoint[] {
 	// Simple XML parsing - in production, consider using a proper XML parser like xml2js
 	// For now, we'll use regex-based parsing (not ideal but works for simple cases)
 	
@@ -235,7 +235,7 @@ export async function getTrackingInfo(shipmentNumber: string): Promise<{
 /**
  * Parse the SOAP XML tracking response
  */
-function parseTrackingResponse(xmlText: string): {
+function parseTrackingResponse(_xmlText: string): {
 	status: string
 	statusCode: string
 	events: Array<{

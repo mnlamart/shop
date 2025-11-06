@@ -147,7 +147,12 @@ export async function createShipment(request: ShipmentRequest): Promise<Shipment
 			throw new Error(`Mondial Relay API2 error: ${response.status} ${response.statusText}`)
 		}
 
-		const data = await response.json()
+		const data = (await response.json()) as {
+			Stat?: string
+			Libelle?: string
+			ExpeditionNum?: string
+			URL_Etiquette?: string
+		}
 
 		// Check if API returned an error status
 		if (data.Stat && data.Stat !== '0') {
