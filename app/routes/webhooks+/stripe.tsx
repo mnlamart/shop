@@ -2,6 +2,8 @@ import { invariant } from '@epic-web/invariant'
 import * as Sentry from '@sentry/react-router'
 import { data } from 'react-router'
 import type Stripe from 'stripe'
+import { fulfillOrder } from '#app/utils/fulfillment.server.ts'
+import { type StoreAddress } from '#app/utils/shipment.server.ts'
 import {
 	createOrderFromStripeSession,
 	StockUnavailableError,
@@ -79,6 +81,33 @@ export async function action({ request }: Route.ActionArgs) {
 				fullSession,
 				request,
 			)
+
+			// Fulfill order (create shipments, etc.) - non-blocking
+			// Don't fail webhook if fulfillment fails - it can be retried manually
+			try {
+				const storeAddress: StoreAddress = {
+					name: process.env.STORE_NAME || 'Store',
+					address1: process.env.STORE_ADDRESS1 || '',
+					address2: process.env.STORE_ADDRESS2,
+					city: process.env.STORE_CITY || '',
+					postalCode: process.env.STORE_POSTAL_CODE || '',
+					country: process.env.STORE_COUNTRY || 'FR',
+					phone: process.env.STORE_PHONE || '',
+					email: process.env.STORE_EMAIL,
+				}
+
+				await fulfillOrder(order.id, storeAddress)
+			} catch (fulfillmentError) {
+				// Log fulfillment errors but don't fail webhook
+				// Order was created successfully, fulfillment can be retried
+				Sentry.captureException(fulfillmentError, {
+					tags: { context: 'webhook-order-fulfillment' },
+					extra: {
+						orderId: order.id,
+						sessionId: session.id,
+					},
+				})
+			}
 
 			// Cart is already deleted within the transaction above
 			return data({ received: true, orderId: order.id })
