@@ -9,7 +9,8 @@ import { prisma } from '#app/utils/db.server.ts'
 import { authSessionStorage } from '#app/utils/session.server.ts'
 import { createCheckoutSession, handleStripeError } from '#app/utils/stripe.server.ts'
 import { createUser } from '#tests/db-utils.ts'
-import { loader } from './checkout.tsx'
+// Note: checkout.tsx was removed - checkout flow is now handled by checkout+/_layout.tsx and nested routes
+// Tests for the multi-step checkout are in checkout+/review.test.ts, checkout+/shipping.test.ts, etc.
 
 vi.mock('#app/utils/stripe.server.ts', async () => {
 	const actual = await import('#app/utils/stripe.server.ts')

@@ -1,5 +1,5 @@
-import { redirect, redirectDocument } from 'react-router'
-import { type Route } from './+types/checkout.ts'
+import { redirectDocument } from 'react-router'
+import { type Route } from './+types/_index.ts'
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const url = new URL(request.url)
@@ -11,9 +11,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 	}
 	
 	// Redirect to review step (first step of multi-step checkout)
-	return redirect('/shop/checkout/review')
+	return redirectDocument('/shop/checkout/review')
 }
 
 export const meta: Route.MetaFunction = () => [
 	{ title: 'Checkout' },
 ]
+

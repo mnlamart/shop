@@ -38,6 +38,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 	let currentStep: CheckoutStep = 'review'
 	if (pathname.includes('/checkout/shipping')) {
 		currentStep = 'shipping'
+	} else if (pathname.includes('/checkout/delivery')) {
+		currentStep = 'delivery'
 	} else if (pathname.includes('/checkout/payment')) {
 		currentStep = 'payment'
 	}
