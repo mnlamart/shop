@@ -7,7 +7,6 @@ import { Icon } from '#app/components/ui/icon.tsx'
 import { requireUserId } from '#app/utils/auth.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { cn } from '#app/utils/misc.tsx'
-import { useUser } from '#app/utils/user.ts'
 import { type Route } from './+types/account.ts'
 
 export const BreadcrumbHandle = z.object({ breadcrumb: z.union([z.string(), z.any()]) })
@@ -59,7 +58,6 @@ function SidebarButton({
 }
 
 export default function AccountLayout() {
-	const user = useUser()
 	const location = useLocation()
 	const matches = useMatches()
 	const breadcrumbs = matches
