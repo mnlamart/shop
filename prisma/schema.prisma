@@ -269,6 +269,7 @@ model Product {
   price         Int // price in cents
   status        ProductStatus @default(DRAFT)
   stockQuantity Int? // stock quantity for products without variants (nullable)
+  weightGrams   Int? // weight in grams (for shipping calculations)
   categoryId    String
 
   createdAt DateTime @default(now())
@@ -309,6 +310,7 @@ model ProductVariant {
   sku           String @unique
   price         Int? // price in cents (if different from product base price)
   stockQuantity Int    @default(0)
+  weightGrams   Int? // weight in grams (if different from product base weight)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
