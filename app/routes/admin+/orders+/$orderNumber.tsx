@@ -155,6 +155,12 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 		message?: string
 		shipmentNumber?: string
 	}>()
+	const syncTrackingFetcher = useFetcher<{
+		success?: boolean
+		message?: string
+		newStatus?: string
+		updated?: boolean
+	}>()
 	const [status, setStatus] = useState(order.status)
 	const [trackingNumber, setTrackingNumber] = useState(order.trackingNumber || '')
 
@@ -167,7 +173,9 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 	const isUpdating = statusFetcher.state !== 'idle'
 	const isCancelling = cancelFetcher.state !== 'idle'
 	const isCreatingShipment = createShipmentFetcher.state !== 'idle'
+	const isSyncingTracking = syncTrackingFetcher.state !== 'idle'
 	const shipmentResult = createShipmentFetcher.data
+	const syncTrackingResult = syncTrackingFetcher.data
 	const showTrackingNumber = status === 'SHIPPED' || status === 'DELIVERED'
 	const canCancel = order.status !== 'CANCELLED'
 	
@@ -178,6 +186,14 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 			window.location.reload()
 		}
 	}, [shipmentResult])
+
+	// Reload page when tracking sync updates status
+	useEffect(() => {
+		if (syncTrackingResult?.success && syncTrackingResult.updated && syncTrackingResult.newStatus) {
+			// Reload page to show updated order status
+			window.location.reload()
+		}
+	}, [syncTrackingResult])
 
 	return (
 		<div className="space-y-6 animate-slide-top">
@@ -615,6 +631,55 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 													) : (
 														<p className="text-sm text-muted-foreground">
 															Shipment created: <strong>{order.mondialRelayShipmentNumber}</strong>
+														</p>
+													)}
+												</div>
+											)}
+
+										{/* Tracking Status Sync */}
+										{order.mondialRelayShipmentNumber &&
+											order.shippingCarrierName === 'Mondial Relay' &&
+											order.status !== 'DELIVERED' &&
+											order.status !== 'CANCELLED' && (
+												<div className="mt-4 pt-4 border-t border-border">
+													<h3 className="text-sm font-medium mb-3">Tracking Status</h3>
+													<syncTrackingFetcher.Form
+														method="POST"
+														action={`/admin/orders/${order.orderNumber}/sync-tracking`}
+													>
+														<Button
+															type="submit"
+															variant="outline"
+															size="sm"
+															className="h-9"
+															disabled={isSyncingTracking}
+															aria-busy={isSyncingTracking}
+														>
+															{isSyncingTracking ? (
+																<>
+																	<Icon
+																		name="update"
+																		className="h-4 w-4 mr-2 animate-spin"
+																	/>
+																	Syncing...
+																</>
+															) : (
+																<>
+																	<Icon name="update" className="h-4 w-4 mr-2" />
+																	Sync Tracking Status
+																</>
+															)}
+														</Button>
+													</syncTrackingFetcher.Form>
+													{syncTrackingResult?.message && (
+														<p
+															className={`text-sm mt-2 ${
+																syncTrackingResult.success && syncTrackingResult.updated
+																	? 'text-green-600'
+																	: 'text-muted-foreground'
+															}`}
+														>
+															{syncTrackingResult.message}
 														</p>
 													)}
 												</div>
