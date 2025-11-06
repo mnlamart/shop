@@ -149,6 +149,12 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 	const { order, currency } = loaderData
 	const statusFetcher = useFetcher()
 	const cancelFetcher = useFetcher()
+	const createShipmentFetcher = useFetcher<{
+		success?: boolean
+		error?: string
+		message?: string
+		shipmentNumber?: string
+	}>()
 	const [status, setStatus] = useState(order.status)
 	const [trackingNumber, setTrackingNumber] = useState(order.trackingNumber || '')
 
@@ -160,8 +166,18 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 
 	const isUpdating = statusFetcher.state !== 'idle'
 	const isCancelling = cancelFetcher.state !== 'idle'
+	const isCreatingShipment = createShipmentFetcher.state !== 'idle'
+	const shipmentResult = createShipmentFetcher.data
 	const showTrackingNumber = status === 'SHIPPED' || status === 'DELIVERED'
 	const canCancel = order.status !== 'CANCELLED'
+	
+	// Show success/error messages for shipment creation
+	useEffect(() => {
+		if (shipmentResult?.success && shipmentResult.shipmentNumber) {
+			// Reload page to show updated order with shipment number
+			window.location.reload()
+		}
+	}, [shipmentResult])
 
 	return (
 		<div className="space-y-6 animate-slide-top">
@@ -549,6 +565,60 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 												)}
 											</div>
 										)}
+
+										{/* Shipment Management */}
+										{order.mondialRelayPickupPointId &&
+											order.shippingCarrierName === 'Mondial Relay' && (
+												<div className="mt-4 pt-4 border-t border-border">
+													<h3 className="text-sm font-medium mb-3">Shipment Management</h3>
+													{!order.mondialRelayShipmentNumber ? (
+														<div className="space-y-3">
+															<createShipmentFetcher.Form
+																method="POST"
+																action={`/admin/orders/${order.orderNumber}/create-shipment`}
+															>
+																<Button
+																	type="submit"
+																	variant="default"
+																	size="sm"
+																	className="h-9"
+																	disabled={isCreatingShipment}
+																	aria-busy={isCreatingShipment}
+																>
+																	{isCreatingShipment ? (
+																		<>
+																			<Icon
+																				name="update"
+																				className="h-4 w-4 mr-2 animate-spin"
+																			/>
+																			Creating...
+																		</>
+																	) : (
+																		<>
+																			<Icon name="plus" className="h-4 w-4 mr-2" />
+																			Create Shipment
+																		</>
+																	)}
+																</Button>
+															</createShipmentFetcher.Form>
+															{shipmentResult?.error && (
+																<p className="text-sm text-destructive">
+																	{shipmentResult.message || shipmentResult.error}
+																</p>
+															)}
+															{shipmentResult?.success && (
+																<p className="text-sm text-green-600">
+																	{shipmentResult.message}
+																</p>
+															)}
+														</div>
+													) : (
+														<p className="text-sm text-muted-foreground">
+															Shipment created: <strong>{order.mondialRelayShipmentNumber}</strong>
+														</p>
+													)}
+												</div>
+											)}
 
 										{/* Label Management */}
 										{(order.mondialRelayShipmentNumber || order.mondialRelayPickupPointId) && (
