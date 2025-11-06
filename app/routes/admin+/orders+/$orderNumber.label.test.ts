@@ -212,7 +212,7 @@ describe('label route', () => {
 		expect(result).toBeInstanceOf(Response)
 		if (result instanceof Response) {
 			expect(result.status).toBe(400)
-			const json = await result.json()
+			const json = (await result.json()) as { error?: string }
 			expect(json.error).toBe('Order does not have a Mondial Relay pickup point')
 		}
 	})
