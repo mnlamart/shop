@@ -122,7 +122,7 @@ export default function UserDetail({ loaderData }: Route.ComponentProps) {
 							<h1 className="text-2xl font-normal tracking-tight text-foreground">
 								{user.name || user.username}
 							</h1>
-							<p className="text-sm text-muted-foreground">{user.email}</p>
+							<p className="text-sm text-muted-foreground" data-testid="user-header-email">{user.email}</p>
 						</div>
 					</div>
 				</div>
@@ -142,16 +142,16 @@ export default function UserDetail({ loaderData }: Route.ComponentProps) {
 					<CardContent className="space-y-4">
 						<div>
 							<label className="text-sm font-medium text-muted-foreground">Email</label>
-							<p className="text-sm">{user.email}</p>
+							<p className="text-sm" data-testid="user-detail-email">{user.email}</p>
 						</div>
 						<div>
 							<label className="text-sm font-medium text-muted-foreground">Username</label>
-							<p className="text-sm">{user.username}</p>
+							<p className="text-sm" data-testid="user-detail-username">{user.username}</p>
 						</div>
 						{user.name && (
 							<div>
 								<label className="text-sm font-medium text-muted-foreground">Name</label>
-								<p className="text-sm">{user.name}</p>
+								<p className="text-sm" data-testid="user-detail-name">{user.name}</p>
 							</div>
 						)}
 						<div>
