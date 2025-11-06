@@ -6,10 +6,16 @@ import { consoleError } from '#tests/setup/setup-test-env'
 import { prisma } from '#app/utils/db.server.ts'
 import { fulfillOrder } from './fulfillment.server.ts'
 import * as shipmentServer from './shipment.server.ts'
+import * as shippingEmailServer from './shipping-email.server.tsx'
 
 // Mock the shipment server
 vi.mock('./shipment.server.ts', () => ({
 	createMondialRelayShipment: vi.fn(),
+}))
+
+// Mock the shipping email server
+vi.mock('./shipping-email.server.tsx', () => ({
+	sendShippingConfirmationEmail: vi.fn().mockResolvedValue(undefined),
 }))
 
 describe('fulfillment.server', () => {
@@ -84,6 +90,17 @@ describe('fulfillment.server', () => {
 		})
 		expect(updatedOrder?.mondialRelayShipmentNumber).toBe('MR123456789')
 		expect(updatedOrder?.mondialRelayLabelUrl).toBe('https://example.com/label.pdf')
+		expect(updatedOrder?.status).toBe('SHIPPED')
+
+		// Verify shipping confirmation email was sent
+		expect(shippingEmailServer.sendShippingConfirmationEmail).toHaveBeenCalledTimes(1)
+		const emailCall = vi.mocked(shippingEmailServer.sendShippingConfirmationEmail).mock
+			.calls[0]
+		expect(emailCall).toBeDefined()
+		if (!emailCall) throw new Error('Expected email call to be defined')
+		expect(emailCall[0]?.orderNumber).toBe(order.orderNumber)
+		expect(emailCall[0]?.shipmentNumber).toBe('MR123456789')
+		expect(emailCall[1]).toBe('test@example.com') // email address
 
 		// Cleanup
 		await prisma.order.delete({ where: { id: order.id } }).catch(() => {})
@@ -122,6 +139,9 @@ describe('fulfillment.server', () => {
 
 		// Should not call shipment creation
 		expect(shipmentServer.createMondialRelayShipment).not.toHaveBeenCalled()
+
+		// Should not send shipping email
+		expect(shippingEmailServer.sendShippingConfirmationEmail).not.toHaveBeenCalled()
 
 		// Cleanup
 		await prisma.order.delete({ where: { id: order.id } }).catch(() => {})

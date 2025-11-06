@@ -10,6 +10,7 @@
 import * as Sentry from '@sentry/react-router'
 import { prisma } from './db.server.ts'
 import { createMondialRelayShipment, type StoreAddress } from './shipment.server.ts'
+import { sendShippingConfirmationEmail } from './shipping-email.server.tsx'
 
 /**
  * Fulfills an order by creating shipments and performing other fulfillment tasks.
@@ -29,9 +30,13 @@ export async function fulfillOrder(
 		select: {
 			id: true,
 			orderNumber: true,
+			email: true,
+			shippingName: true,
 			mondialRelayPickupPointId: true,
+			mondialRelayPickupPointName: true,
 			mondialRelayShipmentNumber: true,
 			shippingCarrierName: true,
+			status: true,
 		},
 	})
 
@@ -52,8 +57,38 @@ export async function fulfillOrder(
 
 	if (needsMondialRelayShipment) {
 		try {
-			await createMondialRelayShipment(order.id, storeAddress)
+			const shipmentResult = await createMondialRelayShipment(order.id, storeAddress)
 			// Shipment creation updates the order with shipment number and label URL
+
+			// Update order status to SHIPPED
+			await prisma.order.update({
+				where: { id: order.id },
+				data: { status: 'SHIPPED' },
+			})
+
+			// Send shipping confirmation email (non-blocking)
+			try {
+				await sendShippingConfirmationEmail(
+					{
+						orderNumber: order.orderNumber,
+						customerName: order.shippingName,
+						carrierName: order.shippingCarrierName || 'Mondial Relay',
+						shipmentNumber: shipmentResult.shipmentNumber,
+						pickupPointName: order.mondialRelayPickupPointName || undefined,
+						trackingUrl: undefined, // Could be added if Mondial Relay provides tracking URL
+					},
+					order.email,
+				)
+			} catch (emailError) {
+				// Log email error but don't fail fulfillment
+				Sentry.captureException(emailError, {
+					tags: { context: 'order-fulfillment-email' },
+					extra: {
+						orderId: order.id,
+						orderNumber: order.orderNumber,
+					},
+				})
+			}
 		} catch (error) {
 			// Log error but don't fail fulfillment
 			// Admin can manually create shipment later if needed
@@ -69,7 +104,6 @@ export async function fulfillOrder(
 	}
 
 	// Future: Add other fulfillment tasks here:
-	// - Send fulfillment confirmation email
 	// - Update inventory systems
 	// - Trigger warehouse notifications
 	// - etc.
