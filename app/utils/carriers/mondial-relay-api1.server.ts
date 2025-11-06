@@ -10,6 +10,7 @@
 
 import { createHash } from 'crypto'
 import { invariant } from '@epic-web/invariant'
+import { XMLParser } from 'fast-xml-parser'
 
 // API endpoints
 const API1_BASE_URL = 'https://www.mondialrelay.fr/WebService/Web_Services.asmx'
@@ -142,39 +143,122 @@ export async function searchPickupPoints({
 }
 
 /**
+ * Calculate distance between two coordinates using Haversine formula
+ * Returns distance in meters
+ */
+function calculateDistance(
+	lat1: number,
+	lon1: number,
+	lat2: number,
+	lon2: number,
+): number {
+	const R = 6371000 // Earth radius in meters
+	const dLat = ((lat2 - lat1) * Math.PI) / 180
+	const dLon = ((lon2 - lon1) * Math.PI) / 180
+	const a =
+		Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+		Math.cos((lat1 * Math.PI) / 180) *
+			Math.cos((lat2 * Math.PI) / 180) *
+			Math.sin(dLon / 2) *
+			Math.sin(dLon / 2)
+	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+	return R * c
+}
+
+/**
  * Parse the SOAP XML response and extract pickup points
  */
-function parsePickupPointsResponse(_xmlText: string, _latitude?: number, _longitude?: number): PickupPoint[] {
-	// Simple XML parsing - in production, consider using a proper XML parser like xml2js
-	// For now, we'll use regex-based parsing (not ideal but works for simple cases)
-	
+function parsePickupPointsResponse(
+	xmlText: string,
+	latitude?: number,
+	longitude?: number,
+): PickupPoint[] {
+	const parser = new XMLParser({
+		ignoreAttributes: false,
+		attributeNamePrefix: '@_',
+		textNodeName: '#text',
+		parseAttributeValue: false,
+		trimValues: true,
+	})
+
+	const parsed = parser.parse(xmlText)
+
+	// Navigate through SOAP envelope structure
+	const envelope =
+		parsed['soap:Envelope'] || parsed['soap:envelope'] || parsed.Envelope
+	const body = envelope?.['soap:Body'] || envelope?.Body
+	const response =
+		body?.['WSI2_RecherchePointRelaisResponse'] ||
+		body?.['ws:WSI2_RecherchePointRelaisResponse']
+	const result =
+		response?.WSI2_RecherchePointRelaisResult ||
+		response?.['ws:WSI2_RecherchePointRelaisResult']
+	const pointsRelais = result?.PointsRelais || result?.pointsRelais
+
+	if (!pointsRelais) {
+		return []
+	}
+
+	// Handle both single point and array of points
+	const pointRelaisArray = Array.isArray(pointsRelais.PointRelais)
+		? pointsRelais.PointRelais
+		: pointsRelais.PointRelais
+		? [pointsRelais.PointRelais]
+		: []
+
 	const pickupPoints: PickupPoint[] = []
-	
-	// Extract points from XML (simplified - real implementation should use proper XML parser)
-	// This is a placeholder - actual implementation depends on the exact XML structure
-	// from Mondial Relay's API response
-	
-	// TODO: Implement proper XML parsing using xml2js or similar
-	// The response structure should be:
-	// <WSI2_RecherchePointRelaisResponse>
-	//   <WSI2_RecherchePointRelaisResult>
-	//     <PointsRelais>
-	//       <PointRelais>
-	//         <Num>...</Num>
-	//         <LgAdr1>...</LgAdr1>
-	//         <LgAdr2>...</LgAdr2>
-	//         <LgAdr3>...</LgAdr3>
-	//         <CP>...</CP>
-	//         <Ville>...</Ville>
-	//         <Pays>...</Pays>
-	//         <Latitude>...</Latitude>
-	//         <Longitude>...</Longitude>
-	//         ...
-	//       </PointRelais>
-	//     </PointsRelais>
-	//   </WSI2_RecherchePointRelaisResult>
-	// </WSI2_RecherchePointRelaisResponse>
-	
+
+	for (const point of pointRelaisArray) {
+		if (!point?.Num) continue // Skip invalid points
+
+		// Build address from LgAdr1, LgAdr2, LgAdr3
+		const addressParts = [
+			point.LgAdr1,
+			point.LgAdr2,
+			point.LgAdr3,
+		].filter(Boolean)
+		const address = addressParts.join(', ')
+
+		// Parse opening hours
+		const openingHours: PickupPoint['openingHours'] = {}
+		if (point.Horaires_Lun) openingHours.monday = point.Horaires_Lun
+		if (point.Horaires_Mar) openingHours.tuesday = point.Horaires_Mar
+		if (point.Horaires_Mer) openingHours.wednesday = point.Horaires_Mer
+		if (point.Horaires_Jeu) openingHours.thursday = point.Horaires_Jeu
+		if (point.Horaires_Ven) openingHours.friday = point.Horaires_Ven
+		if (point.Horaires_Sam) openingHours.saturday = point.Horaires_Sam
+		if (point.Horaires_Dim) openingHours.sunday = point.Horaires_Dim
+
+		const pointLat = parseFloat(point.Latitude)
+		const pointLon = parseFloat(point.Longitude)
+
+		const pickupPoint: PickupPoint = {
+			id: String(point.Num),
+			name: point.LgAdr1 || '',
+			address,
+			postalCode: String(point.CP || ''),
+			city: point.Ville || '',
+			country: String(point.Pays || ''),
+			latitude: pointLat,
+			longitude: pointLon,
+			openingHours: Object.keys(openingHours).length > 0 ? openingHours : undefined,
+		}
+
+		// Calculate distance if user coordinates provided
+		if (
+			latitude !== undefined &&
+			longitude !== undefined &&
+			!isNaN(pointLat) &&
+			!isNaN(pointLon)
+		) {
+			pickupPoint.distance = Math.round(
+				calculateDistance(latitude, longitude, pointLat, pointLon),
+			)
+		}
+
+		pickupPoints.push(pickupPoint)
+	}
+
 	return pickupPoints
 }
 
@@ -235,7 +319,7 @@ export async function getTrackingInfo(shipmentNumber: string): Promise<{
 /**
  * Parse the SOAP XML tracking response
  */
-function parseTrackingResponse(_xmlText: string): {
+function parseTrackingResponse(xmlText: string): {
 	status: string
 	statusCode: string
 	events: Array<{
@@ -244,13 +328,112 @@ function parseTrackingResponse(_xmlText: string): {
 		location?: string
 	}>
 } {
-	// TODO: Implement proper XML parsing
-	// This is a placeholder - actual implementation depends on the exact XML structure
-	
+	const parser = new XMLParser({
+		ignoreAttributes: false,
+		attributeNamePrefix: '@_',
+		textNodeName: '#text',
+		parseAttributeValue: false,
+		trimValues: true,
+	})
+
+	const parsed = parser.parse(xmlText)
+
+	// Navigate through SOAP envelope structure
+	const envelope =
+		parsed['soap:Envelope'] || parsed['soap:envelope'] || parsed.Envelope
+	const body = envelope?.['soap:Body'] || envelope?.Body
+	const response =
+		body?.['WSI2_TracingColisDetailleResponse'] ||
+		body?.['ws:WSI2_TracingColisDetailleResponse']
+	const result =
+		response?.WSI2_TracingColisDetailleResult ||
+		response?.['ws:WSI2_TracingColisDetailleResult']
+
+	if (!result) {
+		return {
+			status: 'Unknown',
+			statusCode: '0',
+			events: [],
+		}
+	}
+
+	// Check for error status
+	const stat = result.Stat || result.stat || '0'
+	const libelle = result.Libelle || result.libelle || 'Unknown'
+
+	// If error status (non-zero), return error info
+	if (stat !== '0') {
+		return {
+			status: libelle,
+			statusCode: String(stat),
+			events: [],
+		}
+	}
+
+	// Parse tracking details
+	const tracing = result.Tracing || result.tracing
+	if (!tracing) {
+		return {
+			status: libelle,
+			statusCode: String(stat),
+			events: [],
+		}
+	}
+
+	const status = tracing.Libelle || tracing.libelle || 'Unknown'
+	const statusCode = tracing.Statut || tracing.statut || '0'
+
+	// Parse events
+	const events: Array<{
+		date: Date
+		description: string
+		location?: string
+	}> = []
+
+	const eventList = tracing.EventList || tracing.eventList
+	if (eventList) {
+		const eventArray = Array.isArray(eventList.Event)
+			? eventList.Event
+			: eventList.Event
+			? [eventList.Event]
+			: []
+
+		for (const event of eventArray) {
+			if (!event?.Date || !event?.Libelle) continue
+
+			// Parse date and time
+			const dateStr = event.Date || ''
+			const timeStr = event.Heure || '00:00'
+			const dateTimeStr = `${dateStr}T${timeStr}:00`
+
+			let eventDate: Date
+			try {
+				// Try parsing as ISO format first
+				eventDate = new Date(dateTimeStr)
+				// If invalid, try parsing date separately
+				if (isNaN(eventDate.getTime())) {
+					// Try YYYY-MM-DD format
+					const [year, month, day] = dateStr.split('-').map(Number)
+					const [hours, minutes] = timeStr.split(':').map(Number)
+					eventDate = new Date(year, month - 1, day, hours || 0, minutes || 0)
+				}
+			} catch {
+				// Fallback to current date if parsing fails
+				eventDate = new Date()
+			}
+
+			events.push({
+				date: eventDate,
+				description: event.Libelle || '',
+				location: event.Localisation || event.localisation || undefined,
+			})
+		}
+	}
+
 	return {
-		status: 'Unknown',
-		statusCode: '0',
-		events: [],
+		status,
+		statusCode: String(statusCode),
+		events,
 	}
 }
 
