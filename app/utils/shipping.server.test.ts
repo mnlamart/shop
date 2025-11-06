@@ -274,6 +274,7 @@ describe('shipping.server', () => {
 			const method = {
 				rateType: 'FLAT',
 				flatRate: 500,
+				weightRates: null,
 				priceRates: null,
 				freeShippingThreshold: null,
 			}
@@ -287,6 +288,7 @@ describe('shipping.server', () => {
 			const method = {
 				rateType: 'FLAT',
 				flatRate: null,
+				weightRates: null,
 				priceRates: null,
 				freeShippingThreshold: null,
 			}
@@ -300,6 +302,7 @@ describe('shipping.server', () => {
 			const method = {
 				rateType: 'PRICE_BASED',
 				flatRate: null,
+				weightRates: null,
 				priceRates: [
 					{ minPrice: 0, maxPrice: 5000, rate: 500 },
 					{ minPrice: 5001, maxPrice: 10000, rate: 1000 },
@@ -317,6 +320,7 @@ describe('shipping.server', () => {
 			const method = {
 				rateType: 'PRICE_BASED',
 				flatRate: null,
+				weightRates: null,
 				priceRates: [{ minPrice: 0, maxPrice: 5000, rate: 500 }],
 				freeShippingThreshold: null,
 			}
@@ -330,6 +334,7 @@ describe('shipping.server', () => {
 			const method = {
 				rateType: 'FREE',
 				flatRate: 700,
+				weightRates: null,
 				priceRates: null,
 				freeShippingThreshold: 5000,
 			}
@@ -343,6 +348,7 @@ describe('shipping.server', () => {
 			const method = {
 				rateType: 'FREE',
 				flatRate: 700,
+				weightRates: null,
 				priceRates: null,
 				freeShippingThreshold: 5000,
 			}
@@ -356,6 +362,7 @@ describe('shipping.server', () => {
 			const method = {
 				rateType: 'FREE',
 				flatRate: 700,
+				weightRates: null,
 				priceRates: null,
 				freeShippingThreshold: null,
 			}
@@ -435,6 +442,7 @@ describe('shipping.server', () => {
 			const method = {
 				rateType: 'UNKNOWN',
 				flatRate: 500,
+				weightRates: null,
 				priceRates: null,
 				freeShippingThreshold: null,
 			}

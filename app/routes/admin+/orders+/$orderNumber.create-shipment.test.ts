@@ -4,9 +4,8 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest'
 import { getSessionExpirationDate, sessionKey } from '#app/utils/auth.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
-import * as shipmentServer from '#app/utils/shipment.server.ts'
-import { sendShippingConfirmationEmail } from '#app/utils/shipping-email.server.tsx'
 import { authSessionStorage } from '#app/utils/session.server.ts'
+import * as shipmentServer from '#app/utils/shipment.server.ts'
 import { consoleError } from '#tests/setup/setup-test-env'
 import { action } from './$orderNumber.create-shipment.ts'
 

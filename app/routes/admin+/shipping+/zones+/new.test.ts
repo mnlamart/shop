@@ -87,6 +87,9 @@ describe('admin shipping zones new route', () => {
 
 		// Should redirect with success toast
 		expect(result).toHaveProperty('headers')
+		if (!('headers' in result)) {
+			throw new Error('Expected result to have headers')
+		}
 		expect(result.headers.get('location')).toContain('/admin/shipping/zones/')
 
 		// Verify zone was created
@@ -94,10 +97,10 @@ describe('admin shipping zones new route', () => {
 			where: { name: 'Test Zone' },
 		})
 		expect(zones).toHaveLength(1)
-		expect(zones[0].description).toBe('Test description')
-		expect(zones[0].countries).toEqual(['FR', 'BE', 'DE'])
-		expect(zones[0].displayOrder).toBe(5)
-		expect(zones[0].isActive).toBe(true)
+		expect(zones[0]?.description).toBe('Test description')
+		expect(zones[0]?.countries).toEqual(['FR', 'BE', 'DE'])
+		expect(zones[0]?.displayOrder).toBe(5)
+		expect(zones[0]?.isActive).toBe(true)
 	})
 
 	test('action validates required fields', async () => {
@@ -123,6 +126,9 @@ describe('admin shipping zones new route', () => {
 		})
 
 		expect(result).toHaveProperty('result')
+		if (!('result' in result)) {
+			throw new Error('Expected result to have result property')
+		}
 		expect(result.result?.status).toBe('error')
 	})
 
@@ -157,7 +163,7 @@ describe('admin shipping zones new route', () => {
 			where: { name: 'International Zone' },
 		})
 		expect(zones).toHaveLength(1)
-		expect(zones[0].countries).toEqual([])
+		expect(zones[0]?.countries).toEqual([])
 	})
 })
 

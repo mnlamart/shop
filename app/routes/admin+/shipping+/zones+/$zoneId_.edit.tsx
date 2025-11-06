@@ -7,7 +7,6 @@ import { z } from 'zod'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
-import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
 import { Textarea } from '#app/components/ui/textarea.tsx'
@@ -67,7 +66,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	return { zone }
 }
 
-export async function action({ params, request }: Route.ActionArgs) {
+export async function action({ params: _params, request }: Route.ActionArgs) {
 	await requireUserWithRole(request, 'admin')
 
 	const formData = await parseFormData(request)

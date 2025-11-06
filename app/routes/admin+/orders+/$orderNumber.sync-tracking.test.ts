@@ -2,12 +2,12 @@
  * @vitest-environment node
  */
 import { describe, expect, test, beforeEach, vi } from 'vitest'
-import { consoleError } from '#tests/setup/setup-test-env'
-import { prisma } from '#app/utils/db.server.ts'
 import { getSessionExpirationDate, sessionKey } from '#app/utils/auth.server.ts'
+import { prisma } from '#app/utils/db.server.ts'
 import { authSessionStorage } from '#app/utils/session.server.ts'
-import { action } from './$orderNumber.sync-tracking.ts'
 import * as trackingStatusServer from '#app/utils/tracking-status.server.ts'
+import { consoleError } from '#tests/setup/setup-test-env'
+import { action } from './$orderNumber.sync-tracking.ts'
 
 // Mock the tracking status server
 vi.mock('#app/utils/tracking-status.server.ts', () => ({

@@ -2,8 +2,8 @@
  * @vitest-environment node
  */
 import { describe, expect, test, beforeEach, vi } from 'vitest'
-import { sendShippingConfirmationEmail } from './shipping-email.server.tsx'
 import { sendEmail } from './email.server.ts'
+import { sendShippingConfirmationEmail } from './shipping-email.server.tsx'
 
 // Mock the email service
 vi.mock('./email.server.ts', () => ({

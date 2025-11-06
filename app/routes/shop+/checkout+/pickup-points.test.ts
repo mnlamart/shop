@@ -2,9 +2,9 @@
  * @vitest-environment node
  */
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
+import * as mondialRelayApi1 from '#app/utils/carriers/mondial-relay-api1.server.ts'
 import { consoleError } from '#tests/setup/setup-test-env'
 import { loader } from './pickup-points.ts'
-import * as mondialRelayApi1 from '#app/utils/carriers/mondial-relay-api1.server.ts'
 
 // Mock the Mondial Relay API1 client
 vi.mock('#app/utils/carriers/mondial-relay-api1.server.ts', () => ({

@@ -3,7 +3,7 @@
  */
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
 import { consoleError } from '#tests/setup/setup-test-env'
-import { searchPickupPoints, getTrackingInfo, type PickupPoint } from './mondial-relay-api1.server.ts'
+import { searchPickupPoints, getTrackingInfo } from './mondial-relay-api1.server.ts'
 
 // Mock fetch globally
 const mockFetch = vi.fn()

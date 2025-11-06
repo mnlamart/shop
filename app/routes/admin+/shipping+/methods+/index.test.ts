@@ -68,7 +68,7 @@ describe('admin shipping methods index route', () => {
 	})
 
 	test('loader returns all shipping methods', async () => {
-		const method1 = await prisma.shippingMethod.create({
+		await prisma.shippingMethod.create({
 			data: {
 				zoneId,
 				carrierId,
@@ -80,7 +80,7 @@ describe('admin shipping methods index route', () => {
 			},
 		})
 
-		const method2 = await prisma.shippingMethod.create({
+		await prisma.shippingMethod.create({
 			data: {
 				zoneId,
 				name: 'Method 2',
@@ -109,8 +109,8 @@ describe('admin shipping methods index route', () => {
 		expect(result.methods[0]).toHaveProperty('carrier')
 		expect(result.methods[0]).toHaveProperty('zone')
 		expect(result.methods[0]).toHaveProperty('_count')
-		expect(result.methods[0].carrier?.displayName).toBe('Test Carrier')
-		expect(result.methods[1].carrier).toBeNull() // Generic method
+		expect(result.methods[0]?.carrier?.displayName).toBe('Test Carrier')
+		expect(result.methods[1]?.carrier).toBeNull() // Generic method
 	})
 
 	test('loader returns methods ordered by zone displayOrder, then method displayOrder, then name', async () => {
@@ -169,9 +169,9 @@ describe('admin shipping methods index route', () => {
 		})
 
 		expect(result.methods).toHaveLength(3)
-		expect(result.methods[0].name).toBe('Zone 1 Method A') // Zone 1, displayOrder 0
-		expect(result.methods[1].name).toBe('Zone 1 Method B') // Zone 1, displayOrder 1
-		expect(result.methods[2].name).toBe('Zone 2 Method') // Zone 2, displayOrder 0
+		expect(result.methods[0]?.name).toBe('Zone 1 Method A') // Zone 1, displayOrder 0
+		expect(result.methods[1]?.name).toBe('Zone 1 Method B') // Zone 1, displayOrder 1
+		expect(result.methods[2]?.name).toBe('Zone 2 Method') // Zone 2, displayOrder 0
 	})
 })
 

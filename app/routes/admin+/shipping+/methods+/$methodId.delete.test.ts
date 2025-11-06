@@ -91,6 +91,9 @@ describe('admin shipping methods delete route', () => {
 		})
 
 		expect(result).toHaveProperty('headers')
+		if (!('headers' in result)) {
+			throw new Error('Expected result to have headers')
+		}
 		expect(result.headers.get('location')).toBe('/admin/shipping/methods')
 
 		// Verify method was deleted

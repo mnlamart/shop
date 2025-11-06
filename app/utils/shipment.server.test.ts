@@ -2,10 +2,10 @@
  * @vitest-environment node
  */
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
-import { consoleError } from '#tests/setup/setup-test-env'
 import { prisma } from '#app/utils/db.server.ts'
-import { createMondialRelayShipment } from './shipment.server.ts'
+import { consoleError } from '#tests/setup/setup-test-env'
 import * as mondialRelayApi2 from './carriers/mondial-relay-api2.server.ts'
+import { createMondialRelayShipment } from './shipment.server.ts'
 
 // Mock the Mondial Relay API2 client
 vi.mock('./carriers/mondial-relay-api2.server.ts', () => ({

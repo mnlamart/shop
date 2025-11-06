@@ -69,9 +69,9 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 		if (!showTracking && order.mondialRelayShipmentNumber) {
 			const url = new URL(window.location.href)
 			const email = url.searchParams.get('email')
-			const trackingUrl = `/shop/orders/${order.orderNumber}/tracking${email ? `?email=${encodeURIComponent(email)}` : ''}`
-			trackingFetcher.load(trackingUrl)
-			setShowTracking(true)
+		const trackingUrl = `/shop/orders/${order.orderNumber}/tracking${email ? `?email=${encodeURIComponent(email)}` : ''}`
+		void trackingFetcher.load(trackingUrl)
+		setShowTracking(true)
 		}
 	}
 
