@@ -83,14 +83,16 @@ describe('mondial-relay-api1.server', () => {
 
 			expect(mockFetch).toHaveBeenCalledTimes(1)
 			const call = mockFetch.mock.calls[0]
+			expect(call).toBeDefined()
+			if (!call) throw new Error('Expected call to be defined')
 			expect(call[0]).toBe('https://www.mondialrelay.fr/WebService/Web_Services.asmx')
-			expect(call[1].method).toBe('POST')
-			expect(call[1].headers['Content-Type']).toBe('text/xml; charset=utf-8')
-			expect(call[1].headers['SOAPAction']).toBe(
+			expect(call[1]?.method).toBe('POST')
+			expect(call[1]?.headers['Content-Type']).toBe('text/xml; charset=utf-8')
+			expect(call[1]?.headers['SOAPAction']).toBe(
 				'http://www.mondialrelay.fr/webservice/WSI2_RecherchePointRelais',
 			)
 
-			const soapBody = call[1].body
+			const soapBody = call[1]?.body
 			expect(soapBody).toContain('<Enseigne>TEST_STORE</Enseigne>')
 			expect(soapBody).toContain('<Pays>FR</Pays>')
 			expect(soapBody).toContain('<CP>75001</CP>')
@@ -120,7 +122,9 @@ describe('mondial-relay-api1.server', () => {
 			})
 
 			const call = mockFetch.mock.calls[0]
-			const soapBody = call[1].body
+			expect(call).toBeDefined()
+			if (!call) throw new Error('Expected call to be defined')
+			const soapBody = call[1]?.body
 			expect(soapBody).toContain('<Ville></Ville>')
 			expect(soapBody).toContain('<Taille>10</Taille>') // Default maxResults
 		})
@@ -148,7 +152,9 @@ describe('mondial-relay-api1.server', () => {
 
 			// Verify security hash is present in SOAP body (32 char hex string)
 			const call = mockFetch.mock.calls[0]
-			const soapBody = call[1].body
+			expect(call).toBeDefined()
+			if (!call) throw new Error('Expected call to be defined')
+			const soapBody = call[1]?.body
 			expect(soapBody).toMatch(/<Security>[A-F0-9]{32}<\/Security>/)
 		})
 
@@ -267,11 +273,13 @@ describe('mondial-relay-api1.server', () => {
 
 			expect(mockFetch).toHaveBeenCalledTimes(1)
 			const call = mockFetch.mock.calls[0]
-			expect(call[1].headers['SOAPAction']).toBe(
+			expect(call).toBeDefined()
+			if (!call) throw new Error('Expected call to be defined')
+			expect(call[1]?.headers['SOAPAction']).toBe(
 				'http://www.mondialrelay.fr/webservice/WSI2_TracingColisDetaille',
 			)
 
-			const soapBody = call[1].body
+			const soapBody = call[1]?.body
 			expect(soapBody).toContain('<Enseigne>TEST_STORE</Enseigne>')
 			expect(soapBody).toContain('<Expedition>123456789</Expedition>')
 			expect(soapBody).toContain('<Security>')

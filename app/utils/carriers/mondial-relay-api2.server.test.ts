@@ -7,8 +7,6 @@ import {
 	createShipment,
 	getLabel,
 	type ShipmentRequest,
-	type ShipmentResponse,
-	type LabelResponse,
 } from './mondial-relay-api2.server.ts'
 
 // Mock fetch globally
@@ -108,11 +106,25 @@ describe('mondial-relay-api2.server', () => {
 
 			expect(mockFetch).toHaveBeenCalledTimes(1)
 			const call = mockFetch.mock.calls[0]
+			expect(call).toBeDefined()
+			if (!call) throw new Error('Expected call to be defined')
 			expect(call[0]).toContain('mondialrelay.fr')
-			expect(call[1].method).toBe('POST')
-			expect(call[1].headers['Content-Type']).toBe('application/json')
+			expect(call[1]?.method).toBe('POST')
+			expect(call[1]?.headers['Content-Type']).toBe('application/json')
 
-			const requestBody = JSON.parse(call[1].body as string)
+			const requestBody = JSON.parse((call[1]?.body as string) || '{}') as {
+				BrandId: string
+				Login: string
+				Password: string
+				CustomerId: string
+				Expedition: {
+					Shipper: unknown
+					Recipient: unknown
+					PointRelais_Num: string
+					Poids: number
+					Ref: string
+				}
+			}
 			expect(requestBody).toHaveProperty('BrandId', 'TEST_BRAND_ID')
 			expect(requestBody).toHaveProperty('Login', 'TEST_LOGIN')
 			expect(requestBody).toHaveProperty('Password', 'TEST_PASSWORD')
@@ -294,9 +306,11 @@ describe('mondial-relay-api2.server', () => {
 
 			expect(mockFetch).toHaveBeenCalledTimes(1)
 			const call = mockFetch.mock.calls[0]
+			expect(call).toBeDefined()
+			if (!call) throw new Error('Expected call to be defined')
 			expect(call[0]).toContain('mondialrelay.fr')
 			expect(call[0]).toContain('123456789')
-			expect(call[1].method).toBe('GET')
+			expect(call[1]?.method).toBe('GET')
 		})
 
 		test('returns label blob on success', async () => {
