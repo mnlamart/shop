@@ -111,6 +111,9 @@ type CartItemWithDetails = {
 export async function createCheckoutSession({
 	cart,
 	shippingInfo,
+	shippingMethodId,
+	shippingCost,
+	mondialRelayPickupPointId,
 	currency,
 	domainUrl,
 	userId,
@@ -128,6 +131,9 @@ export async function createCheckoutSession({
 		postal: string
 		country: string
 	}
+	shippingMethodId: string
+	shippingCost: number // in cents
+	mondialRelayPickupPointId?: string | null
 	currency: {
 		code: string
 	}
@@ -154,6 +160,21 @@ export async function createCheckoutSession({
 		},
 	)
 
+	// Add shipping as a line item if cost > 0
+	if (shippingCost > 0) {
+		lineItems.push({
+			price_data: {
+				currency: currency.code.toLowerCase(),
+				product_data: {
+					name: 'Shipping',
+					description: 'Shipping cost',
+				},
+				unit_amount: shippingCost,
+			},
+			quantity: 1,
+		})
+	}
+
 	// Create checkout session
 	const sessionParams: Stripe.Checkout.SessionCreateParams = {
 		line_items: lineItems,
@@ -170,6 +191,11 @@ export async function createCheckoutSession({
 			shippingState: shippingInfo.state || '',
 			shippingPostal: shippingInfo.postal,
 			shippingCountry: shippingInfo.country,
+			shippingMethodId: shippingMethodId,
+			shippingCost: shippingCost.toString(),
+			...(mondialRelayPickupPointId && {
+				mondialRelayPickupPointId: mondialRelayPickupPointId,
+			}),
 		},
 		payment_intent_data: {
 			metadata: {

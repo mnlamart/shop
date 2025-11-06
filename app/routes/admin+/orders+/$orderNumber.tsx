@@ -514,7 +514,42 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 												{formatPrice(order.subtotal, currency)}
 											</span>
 										</div>
-										<div className="flex items-center justify-between pt-2">
+										{order.shippingCost !== null && order.shippingCost !== undefined && (
+											<div className="flex items-center justify-between">
+												<span className="text-sm text-[var(--text-medium)]">Shipping</span>
+												<span className="text-sm font-normal text-[var(--text-dark)]">
+													{order.shippingCost === 0 ? (
+														<span className="text-green-600">Free</span>
+													) : (
+														formatPrice(order.shippingCost, currency)
+													)}
+												</span>
+											</div>
+										)}
+										{order.shippingMethodName && (
+											<div className="pt-2 border-t border-border space-y-1">
+												{order.shippingCarrierName && (
+													<div className="text-xs text-[var(--text-medium)]">
+														<strong>Carrier:</strong> {order.shippingCarrierName}
+													</div>
+												)}
+												<div className="text-xs text-[var(--text-medium)]">
+													<strong>Method:</strong> {order.shippingMethodName}
+												</div>
+												{order.mondialRelayPickupPointName && (
+													<div className="text-xs text-[var(--text-medium)]">
+														<strong>Pickup Point:</strong>{' '}
+														{order.mondialRelayPickupPointName}
+													</div>
+												)}
+												{order.mondialRelayShipmentNumber && (
+													<div className="text-xs text-[var(--text-medium)]">
+														<strong>Tracking:</strong> {order.mondialRelayShipmentNumber}
+													</div>
+												)}
+											</div>
+										)}
+										<div className="flex items-center justify-between pt-2 border-t border-border">
 											<span className="text-base font-normal text-foreground">Total</span>
 											<span className="text-lg font-normal text-foreground">
 												{formatPrice(order.total, currency)}

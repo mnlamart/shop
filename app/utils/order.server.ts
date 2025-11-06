@@ -658,6 +658,40 @@ export async function createOrderFromStripeSession(
 				}
 			}
 
+			// Extract shipping information from metadata
+			const shippingMethodId = session.metadata?.shippingMethodId || null
+			const shippingCost = session.metadata?.shippingCost
+				? parseInt(session.metadata.shippingCost, 10)
+				: 0
+			const mondialRelayPickupPointId =
+				session.metadata?.mondialRelayPickupPointId || null
+
+			// Get shipping method details if available
+			let shippingMethodName: string | null = null
+			let shippingCarrierName: string | null = null
+			let mondialRelayPickupPointName: string | null = null
+
+			if (shippingMethodId) {
+				const shippingMethod = await tx.shippingMethod.findUnique({
+					where: { id: shippingMethodId },
+					include: {
+						carrier: {
+							select: {
+								displayName: true,
+							},
+						},
+					},
+				})
+
+				if (shippingMethod) {
+					shippingMethodName = shippingMethod.name
+					shippingCarrierName = shippingMethod.carrier?.displayName || null
+				}
+			}
+
+			// Calculate subtotal (total - shipping)
+			const calculatedSubtotal = (session.amount_subtotal ?? 0) - shippingCost
+
 			const newOrder = await tx.order.create({
 				data: {
 					orderNumber,
@@ -666,7 +700,7 @@ export async function createOrderFromStripeSession(
 						session.customer_email ||
 						session.metadata?.email ||
 						'',
-					subtotal: session.amount_subtotal ?? 0,
+					subtotal: calculatedSubtotal,
 					total: session.amount_total ?? 0,
 					shippingName: session.metadata?.shippingName || '',
 					shippingStreet: session.metadata?.shippingStreet || '',
@@ -674,6 +708,12 @@ export async function createOrderFromStripeSession(
 					shippingState: session.metadata?.shippingState || null,
 					shippingPostal: session.metadata?.shippingPostal || '',
 					shippingCountry: session.metadata?.shippingCountry || 'US',
+					shippingMethodId,
+					shippingCost,
+					shippingMethodName,
+					shippingCarrierName,
+					mondialRelayPickupPointId,
+					mondialRelayPickupPointName,
 					stripeCheckoutSessionId: session.id,
 					stripePaymentIntentId: paymentIntentId,
 					stripeChargeId: chargeId,

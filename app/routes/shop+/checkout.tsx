@@ -3,7 +3,7 @@ import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import * as Sentry from '@sentry/react-router'
 import { useEffect, useState } from 'react'
-import { data, Form, Outlet, redirect, redirectDocument, useLocation } from 'react-router'
+import { data, Form, Outlet, redirect, redirectDocument, useFetcher, useLocation } from 'react-router'
 import { z } from 'zod'
 import { ErrorList, Field } from '#app/components/forms.tsx'
 import {
@@ -24,6 +24,10 @@ import {
 } from '#app/utils/order.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
+import {
+	getShippingMethodsForCountry,
+	getShippingCost,
+} from '#app/utils/shipping.server.ts'
 import { createCheckoutSession, handleStripeError } from '#app/utils/stripe.server.ts'
 import { type Route } from './+types/checkout.ts'
 
@@ -129,6 +133,17 @@ const ShippingFormSchema = z.object({
 				error: 'Country must be a 2-letter ISO code (e.g., US, GB)',
 			}),
 	),
+	shippingMethodId: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z.string({
+			error: (issue) =>
+				issue.input === undefined ? 'Shipping method is required' : 'Not a string',
+		}).min(1, { error: 'Shipping method is required' }),
+	),
+	mondialRelayPickupPointId: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z.string().optional(),
+	), // Optional - only for Mondial Relay
 })
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -252,6 +267,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 		defaultShippingAddress = savedAddresses.find((a) => a.isDefaultShipping) || null
 	}
 
+	// Get available shipping methods for default country (or US as fallback)
+	const defaultCountry = defaultShippingAddress?.country || 'US'
+	const shippingMethods = await getShippingMethodsForCountry(defaultCountry)
+
 	return {
 		cart: cartWithItems,
 		currency,
@@ -259,6 +278,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 		userEmail,
 		savedAddresses,
 		defaultShippingAddress,
+		shippingMethods,
 		canceled,
 	}
 }
@@ -403,6 +423,30 @@ export async function action({ request }: Route.ActionArgs) {
 	const currency = await getStoreCurrency()
 	invariantResponse(currency, 'Currency not configured', { status: 500 })
 
+	// Calculate subtotal
+	const subtotal = cartWithItems.items.reduce((sum, item) => {
+		const price = item.variant?.price ?? item.product.price
+		return sum + (price ?? 0) * item.quantity
+	}, 0)
+
+	// Calculate shipping cost
+	const shippingCost = await getShippingCost(shippingData.shippingMethodId, subtotal)
+
+	// Get shipping method details for metadata
+	const shippingMethod = await prisma.shippingMethod.findUnique({
+		where: { id: shippingData.shippingMethodId },
+		include: {
+			carrier: {
+				select: {
+					name: true,
+					displayName: true,
+				},
+			},
+		},
+	})
+
+	invariantResponse(shippingMethod, 'Shipping method not found', { status: 400 })
+
 	// Create Stripe Checkout Session
 	try {
 		const domainUrl = getDomainUrl(request)
@@ -417,6 +461,9 @@ export async function action({ request }: Route.ActionArgs) {
 				postal: finalShippingData.postal,
 				country: finalShippingData.country,
 			},
+			shippingMethodId: shippingData.shippingMethodId,
+			shippingCost,
+			mondialRelayPickupPointId: shippingData.mondialRelayPickupPointId,
 			currency,
 			domainUrl,
 			userId: userId || undefined,
@@ -464,6 +511,7 @@ export default function Checkout({
 		userEmail,
 		savedAddresses = [],
 		defaultShippingAddress,
+		shippingMethods: initialShippingMethods = [],
 	} = loaderData || {}
 	
 	const [selectedAddressId, setSelectedAddressId] = useState<string>(
@@ -471,6 +519,17 @@ export default function Checkout({
 	)
 	const [useNewAddress, setUseNewAddress] = useState(!defaultShippingAddress)
 	const [saveAddressChecked, setSaveAddressChecked] = useState(false)
+	const [selectedShippingMethodId, setSelectedShippingMethodId] = useState<string>('')
+	const [currentCountry, setCurrentCountry] = useState<string>(
+		defaultShippingAddress?.country || 'US',
+	)
+	const [shippingMethods, setShippingMethods] = useState(initialShippingMethods)
+	const [shippingCost, setShippingCost] = useState<number>(0)
+
+	// Fetcher for loading shipping methods when country changes
+	const shippingMethodsFetcher = useFetcher<{
+		shippingMethods: typeof initialShippingMethods
+	}>()
 
 	const selectedAddress = savedAddresses.find((a) => a.id === selectedAddressId)
 
@@ -530,11 +589,82 @@ export default function Checkout({
 			postalInput.change(selectedAddress.postal)
 			countryInput.change(selectedAddress.country)
 			addressIdInput.change(selectedAddress.id)
+			setCurrentCountry(selectedAddress.country)
 		} else if (useNewAddress) {
 			// IMPORTANT: Clear addressId when using new address to ensure it's empty
 			addressIdInput.change('')
 		}
 	}, [selectedAddress, useNewAddress, nameInput, streetInput, cityInput, stateInput, postalInput, countryInput, addressIdInput])
+
+	// Update country when form field changes
+	useEffect(() => {
+		const country = countryInput.value as string
+		if (country && country.length === 2) {
+			setCurrentCountry(country.toUpperCase())
+		}
+	}, [countryInput.value])
+
+	// Fetch shipping methods when country changes
+	useEffect(() => {
+		if (currentCountry && currentCountry.length === 2) {
+			void shippingMethodsFetcher.load(`/shop/checkout/shipping-methods?country=${currentCountry}`)
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [currentCountry])
+
+	// Update shipping methods when fetcher data arrives
+	useEffect(() => {
+		if (shippingMethodsFetcher.data?.shippingMethods) {
+			setShippingMethods(shippingMethodsFetcher.data.shippingMethods)
+			// Reset selected method when methods change
+			setSelectedShippingMethodId('')
+			setShippingCost(0)
+		}
+	}, [shippingMethodsFetcher.data])
+
+	// Calculate shipping cost when method or subtotal changes
+	useEffect(() => {
+		if (selectedShippingMethodId && shippingMethods.length > 0) {
+			const method = shippingMethods.find((m) => m.id === selectedShippingMethodId)
+			if (method) {
+				let cost = 0
+				switch (method.rateType) {
+					case 'FLAT':
+						cost = method.flatRate ?? 0
+						break
+					case 'FREE':
+						if (
+							method.freeShippingThreshold &&
+							subtotal >= method.freeShippingThreshold
+						) {
+							cost = 0
+						} else {
+							cost = method.flatRate ?? 0
+						}
+						break
+					case 'PRICE_BASED': {
+						if (method.priceRates && Array.isArray(method.priceRates)) {
+							const priceRates = method.priceRates as Array<{
+								minPrice: number
+								maxPrice: number
+								rate: number
+							}>
+							const matchingRate = priceRates.find(
+								(rate) => subtotal >= rate.minPrice && subtotal <= rate.maxPrice,
+							)
+							cost = matchingRate?.rate ?? 0
+						}
+						break
+					}
+					default:
+						cost = 0
+				}
+				setShippingCost(cost)
+			}
+		} else {
+			setShippingCost(0)
+		}
+	}, [selectedShippingMethodId, shippingMethods, subtotal])
 
 	// Handle external redirect to Stripe Checkout
 	useEffect(() => {
@@ -818,6 +948,111 @@ export default function Checkout({
 								/>
 							)}
 
+							{/* Shipping Method Selection */}
+							<div className="space-y-4">
+								<h3 className="text-lg font-semibold">Shipping Method</h3>
+								{shippingMethodsFetcher.state === 'loading' ? (
+									<div className="text-sm text-muted-foreground">
+										Loading shipping options...
+									</div>
+								) : shippingMethods.length === 0 ? (
+									<div className="text-sm text-muted-foreground">
+										No shipping methods available for this country.
+									</div>
+								) : (
+									<div className="space-y-3">
+										{shippingMethods.map((method) => {
+											let methodCost = 0
+											if (method.rateType === 'FLAT') {
+												methodCost = method.flatRate ?? 0
+											} else if (method.rateType === 'FREE') {
+												if (
+													method.freeShippingThreshold &&
+													subtotal >= method.freeShippingThreshold
+												) {
+													methodCost = 0
+												} else {
+													methodCost = method.flatRate ?? 0
+												}
+											} else if (method.rateType === 'PRICE_BASED') {
+												if (method.priceRates && Array.isArray(method.priceRates)) {
+													const priceRates = method.priceRates as Array<{
+														minPrice: number
+														maxPrice: number
+														rate: number
+													}>
+													const matchingRate = priceRates.find(
+														(rate) =>
+															subtotal >= rate.minPrice &&
+															subtotal <= rate.maxPrice,
+													)
+													methodCost = matchingRate?.rate ?? 0
+												}
+											}
+
+											return (
+												<label
+													key={method.id}
+													className={`flex items-start space-x-3 p-4 border rounded-lg cursor-pointer transition-colors ${
+														selectedShippingMethodId === method.id
+															? 'border-primary bg-primary/5'
+															: 'border-gray-200 hover:border-gray-300'
+													}`}
+												>
+													<input
+														type="radio"
+														name="shippingMethodId"
+														value={method.id}
+														checked={selectedShippingMethodId === method.id}
+														onChange={(e) => {
+															setSelectedShippingMethodId(e.target.value)
+														}}
+														className="mt-1 h-4 w-4 text-primary focus:ring-2 focus:ring-primary/20"
+													/>
+													<div className="flex-1">
+														<div className="flex items-center justify-between">
+															<div>
+																<div className="font-medium">{method.name}</div>
+																{method.carrier && (
+																	<div className="text-sm text-muted-foreground">
+																		{method.carrier.displayName}
+																	</div>
+																)}
+																{method.description && (
+																	<div className="text-sm text-muted-foreground mt-1">
+																		{method.description}
+																	</div>
+																)}
+																{method.estimatedDays && (
+																	<div className="text-sm text-muted-foreground">
+																		Estimated delivery: {method.estimatedDays} business days
+																	</div>
+																)}
+															</div>
+															<div className="font-semibold">
+																{methodCost === 0
+																	? 'Free'
+																	: formatPrice(methodCost, currency)}
+															</div>
+														</div>
+													</div>
+												</label>
+											)
+										})}
+									</div>
+								)}
+								{fields.shippingMethodId.errors && (
+									<div className="text-sm text-destructive">
+										{fields.shippingMethodId.errors}
+									</div>
+								)}
+								{/* Hidden input for form submission */}
+								<input
+									{...getInputProps(fields.shippingMethodId, { type: 'hidden' })}
+									value={selectedShippingMethodId}
+								/>
+							</div>
+
 							<ErrorList errors={form.errors} id={form.errorId} />
 
 							<StatusButton
@@ -867,9 +1102,27 @@ export default function Checkout({
 									{formatPrice(subtotal, currency)}
 								</span>
 							</div>
-							<div className="flex justify-between text-lg font-bold">
+							<div className="flex justify-between">
+								<span>Shipping</span>
+								<span className="font-semibold">
+									{selectedShippingMethodId ? (
+										shippingCost === 0 ? (
+											<span className="text-green-600">Free</span>
+										) : (
+											formatPrice(shippingCost, currency)
+										)
+									) : (
+										<span className="text-muted-foreground">—</span>
+									)}
+								</span>
+							</div>
+							<div className="flex justify-between text-lg font-bold border-t pt-2">
 								<span>Total</span>
-								<span>{formatPrice(subtotal, currency)}</span>
+								<span>
+									{selectedShippingMethodId
+										? formatPrice(subtotal + shippingCost, currency)
+										: formatPrice(subtotal, currency)}
+								</span>
 							</div>
 						</div>
 					</div>

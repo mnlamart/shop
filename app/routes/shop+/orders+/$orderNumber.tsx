@@ -108,6 +108,41 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 								<span className="text-muted-foreground">Subtotal</span>
 								<span>{formatPrice(order.subtotal)}</span>
 							</div>
+							{order.shippingCost !== null && order.shippingCost !== undefined && (
+								<div className="flex justify-between">
+									<span className="text-muted-foreground">Shipping</span>
+									<span>
+										{order.shippingCost === 0 ? (
+											<span className="text-green-600 font-semibold">Free</span>
+										) : (
+											formatPrice(order.shippingCost)
+										)}
+									</span>
+								</div>
+							)}
+							{order.shippingMethodName && (
+								<div className="text-sm text-muted-foreground pt-2 border-t">
+									{order.shippingCarrierName && (
+										<p>
+											<strong>Carrier:</strong> {order.shippingCarrierName}
+										</p>
+									)}
+									<p>
+										<strong>Method:</strong> {order.shippingMethodName}
+									</p>
+									{order.mondialRelayPickupPointName && (
+										<p className="mt-1">
+											<strong>Pickup Point:</strong>{' '}
+											{order.mondialRelayPickupPointName}
+										</p>
+									)}
+									{order.mondialRelayShipmentNumber && (
+										<p className="mt-1">
+											<strong>Tracking:</strong> {order.mondialRelayShipmentNumber}
+										</p>
+									)}
+								</div>
+							)}
 							<div className="border-t pt-4 flex justify-between text-lg font-bold">
 								<span>Total</span>
 								<span>{formatPrice(order.total)}</span>

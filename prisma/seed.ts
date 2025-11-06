@@ -489,7 +489,221 @@ async function seed() {
 	await seedProductData()
 	console.timeEnd(`🛍️ Created product data...`)
 
+	// Seed Shipping Data
+	console.time(`📦 Created shipping data...`)
+	await seedShippingData()
+	console.timeEnd(`📦 Created shipping data...`)
+
 	console.timeEnd(`🌱 Database has been seeded`)
+}
+
+async function seedShippingData() {
+	// Create shipping zones (using findFirst + create pattern since name is not unique)
+	let europeZone = await prisma.shippingZone.findFirst({
+		where: { name: 'Europe' },
+	})
+	if (!europeZone) {
+		europeZone = await prisma.shippingZone.create({
+			data: {
+				name: 'Europe',
+				description: 'European Union and European countries',
+				countries: [
+					'FR', 'BE', 'DE', 'IT', 'ES', 'NL', 'AT', 'PT', 'GR', 'IE',
+					'FI', 'DK', 'SE', 'PL', 'CZ', 'HU', 'RO', 'BG', 'HR', 'SK',
+					'SI', 'EE', 'LV', 'LT', 'LU', 'MT', 'CY',
+				],
+				isActive: true,
+				displayOrder: 1,
+			},
+		})
+	}
+
+	let franceZone = await prisma.shippingZone.findFirst({
+		where: { name: 'France' },
+	})
+	if (!franceZone) {
+		franceZone = await prisma.shippingZone.create({
+			data: {
+				name: 'France',
+				description: 'France only',
+				countries: ['FR'],
+				isActive: true,
+				displayOrder: 0,
+			},
+		})
+	}
+
+	let internationalZone = await prisma.shippingZone.findFirst({
+		where: { name: 'International' },
+	})
+	if (!internationalZone) {
+		internationalZone = await prisma.shippingZone.create({
+			data: {
+				name: 'International',
+				description: 'All other countries worldwide',
+				countries: [], // Empty means all countries not in other zones
+				isActive: true,
+				displayOrder: 10,
+			},
+		})
+	}
+
+	// Create Mondial Relay carrier
+	const mondialRelayCarrier = await prisma.carrier.upsert({
+		where: { name: 'mondial_relay' },
+		create: {
+			name: 'mondial_relay',
+			displayName: 'Mondial Relay',
+			description: 'Mondial Relay shipping services',
+			availableCountries: ['FR'],
+			availableZoneIds: [franceZone.id],
+			hasApiIntegration: true,
+			apiProvider: 'mondial_relay',
+			isActive: true,
+			displayOrder: 0,
+		},
+		update: {},
+	})
+
+	// Create shipping methods for France zone
+	await prisma.shippingMethod.upsert({
+		where: {
+			carrierId_name: {
+				carrierId: mondialRelayCarrier.id,
+				name: 'Mondial Relay Standard',
+			},
+		},
+		create: {
+			carrierId: mondialRelayCarrier.id,
+			zoneId: franceZone.id,
+			name: 'Mondial Relay Standard',
+			description: 'Standard delivery to Point Relais® (3-5 business days)',
+			rateType: 'FLAT',
+			flatRate: 500, // €5.00 in cents
+			isActive: true,
+			displayOrder: 0,
+			estimatedDays: 5,
+		},
+		update: {},
+	})
+
+	await prisma.shippingMethod.upsert({
+		where: {
+			carrierId_name: {
+				carrierId: mondialRelayCarrier.id,
+				name: 'Mondial Relay Express',
+			},
+		},
+		create: {
+			carrierId: mondialRelayCarrier.id,
+			zoneId: franceZone.id,
+			name: 'Mondial Relay Express',
+			description: 'Express delivery to Point Relais® (1-2 business days)',
+			rateType: 'FLAT',
+			flatRate: 1000, // €10.00 in cents
+			isActive: true,
+			displayOrder: 1,
+			estimatedDays: 2,
+		},
+		update: {},
+	})
+
+	// Create generic shipping methods for Europe zone
+	// Note: For methods without carriers, we need to check existence manually
+	// since Prisma's unique constraint with nullable fields doesn't work well with upsert
+	const existingStandardEurope = await prisma.shippingMethod.findFirst({
+		where: {
+			zoneId: europeZone.id,
+			name: 'Standard Shipping',
+			carrierId: null,
+		},
+	})
+
+	if (!existingStandardEurope) {
+		await prisma.shippingMethod.create({
+			data: {
+				zoneId: europeZone.id,
+				name: 'Standard Shipping',
+				description: 'Standard shipping within Europe (5-7 business days)',
+				rateType: 'FLAT',
+				flatRate: 700, // €7.00 in cents
+				isActive: true,
+				displayOrder: 0,
+				estimatedDays: 7,
+			},
+		})
+	}
+
+	const existingExpressEurope = await prisma.shippingMethod.findFirst({
+		where: {
+			zoneId: europeZone.id,
+			name: 'Express Shipping',
+			carrierId: null,
+		},
+	})
+
+	if (!existingExpressEurope) {
+		await prisma.shippingMethod.create({
+			data: {
+				zoneId: europeZone.id,
+				name: 'Express Shipping',
+				description: 'Express shipping within Europe (2-3 business days)',
+				rateType: 'FLAT',
+				flatRate: 1200, // €12.00 in cents
+				isActive: true,
+				displayOrder: 1,
+				estimatedDays: 3,
+			},
+		})
+	}
+
+	// Create free shipping method for Europe (over €50)
+	const existingFreeEurope = await prisma.shippingMethod.findFirst({
+		where: {
+			zoneId: europeZone.id,
+			name: 'Free Shipping',
+			carrierId: null,
+		},
+	})
+
+	if (!existingFreeEurope) {
+		await prisma.shippingMethod.create({
+			data: {
+				zoneId: europeZone.id,
+				name: 'Free Shipping',
+				description: 'Free shipping on orders over €50 (5-7 business days)',
+				rateType: 'FREE',
+				freeShippingThreshold: 5000, // €50.00 in cents
+				isActive: true,
+				displayOrder: 2,
+				estimatedDays: 7,
+			},
+		})
+	}
+
+	// Create generic shipping method for International zone
+	const existingInternational = await prisma.shippingMethod.findFirst({
+		where: {
+			zoneId: internationalZone.id,
+			name: 'International Shipping',
+			carrierId: null,
+		},
+	})
+
+	if (!existingInternational) {
+		await prisma.shippingMethod.create({
+			data: {
+				zoneId: internationalZone.id,
+				name: 'International Shipping',
+				description: 'Standard international shipping (10-14 business days)',
+				rateType: 'FLAT',
+				flatRate: 2000, // €20.00 in cents
+				isActive: true,
+				displayOrder: 0,
+				estimatedDays: 14,
+			},
+		})
+	}
 }
 
 seed()
