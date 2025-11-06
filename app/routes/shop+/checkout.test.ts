@@ -42,35 +42,38 @@ describe('Checkout', () => {
 		})
 	})
 
-	afterEach(async () => {
-		await prisma.cartItem.deleteMany({
-			where: {
-				cart: {
+		afterEach(async () => {
+			await prisma.cartItem.deleteMany({
+				where: {
+					cart: {
+						userId: testUser.id,
+					},
+				},
+			})
+			await prisma.cart.deleteMany({
+				where: {
 					userId: testUser.id,
 				},
-			},
+			})
+			await prisma.shippingMethod.deleteMany({})
+			await prisma.carrier.deleteMany({})
+			await prisma.shippingZone.deleteMany({})
+			await prisma.product.deleteMany({
+				where: {
+					categoryId: testCategory.id,
+				},
+			})
+			await prisma.category.deleteMany({
+				where: {
+					id: testCategory.id,
+				},
+			})
+			await prisma.user.deleteMany({
+				where: {
+					id: testUser.id,
+				},
+			})
 		})
-		await prisma.cart.deleteMany({
-			where: {
-				userId: testUser.id,
-			},
-		})
-		await prisma.product.deleteMany({
-			where: {
-				categoryId: testCategory.id,
-			},
-		})
-		await prisma.category.deleteMany({
-			where: {
-				id: testCategory.id,
-			},
-		})
-		await prisma.user.deleteMany({
-			where: {
-				id: testUser.id,
-			},
-		})
-	})
 
 	describe('loader', () => {
 		test('redirects to cart when cart is empty', async () => {
@@ -272,6 +275,27 @@ describe('Checkout', () => {
 			authSession.set(sessionKey, session.id)
 			const cookieHeader = await authSessionStorage.commitSession(authSession)
 
+			// Create shipping zone and method for US
+			const usZone = await prisma.shippingZone.create({
+				data: {
+					name: `Test US Zone ${Date.now()}`,
+					countries: ['US'],
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
+			const shippingMethod = await prisma.shippingMethod.create({
+				data: {
+					zoneId: usZone.id,
+					name: 'Standard Shipping',
+					rateType: 'FLAT',
+					flatRate: 500,
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
 			// Mock Stripe checkout session creation BEFORE calling action
 			vi.mocked(createCheckoutSession).mockResolvedValueOnce({
 				url: 'https://checkout.stripe.com/c/pay/cs_test_mock123',
@@ -284,6 +308,7 @@ describe('Checkout', () => {
 			formData.set('city', 'New York')
 			formData.set('postal', '10001')
 			formData.set('country', 'US')
+			formData.set('shippingMethodId', shippingMethod.id)
 
 			const request = new Request('http://localhost:3000/shop/checkout', {
 				method: 'POST',
@@ -363,6 +388,27 @@ describe('Checkout', () => {
 			authSession.set(sessionKey, session.id)
 			const cookieHeader = await authSessionStorage.commitSession(authSession)
 
+			// Create shipping zone and method for US
+			const usZone = await prisma.shippingZone.create({
+				data: {
+					name: `Test US Zone Stock ${Date.now()}`,
+					countries: ['US'],
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
+			const shippingMethod = await prisma.shippingMethod.create({
+				data: {
+					zoneId: usZone.id,
+					name: 'Standard Shipping',
+					rateType: 'FLAT',
+					flatRate: 500,
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
 			const formData = new FormData()
 			formData.set('name', 'Test User')
 			formData.set('email', 'test@example.com')
@@ -370,6 +416,7 @@ describe('Checkout', () => {
 			formData.set('city', 'New York')
 			formData.set('postal', '10001')
 			formData.set('country', 'US')
+			formData.set('shippingMethodId', shippingMethod.id)
 
 			const request = new Request('http://localhost:3000/shop/checkout', {
 				method: 'POST',
@@ -446,6 +493,27 @@ describe('Checkout', () => {
 			authSession.set(sessionKey, session.id)
 			const cookieHeader = await authSessionStorage.commitSession(authSession)
 
+			// Create shipping zone and method for US
+			const usZone = await prisma.shippingZone.create({
+				data: {
+					name: `Test US Zone Error ${Date.now()}`,
+					countries: ['US'],
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
+			const shippingMethod = await prisma.shippingMethod.create({
+				data: {
+					zoneId: usZone.id,
+					name: 'Standard Shipping',
+					rateType: 'FLAT',
+					flatRate: 500,
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
 			const formData = new FormData()
 			formData.set('name', 'Test User')
 			formData.set('email', 'test@example.com')
@@ -453,6 +521,7 @@ describe('Checkout', () => {
 			formData.set('city', 'New York')
 			formData.set('postal', '10001')
 			formData.set('country', 'US')
+			formData.set('shippingMethodId', shippingMethod.id)
 
 			const request = new Request('http://localhost:3000/shop/checkout', {
 				method: 'POST',
@@ -587,6 +656,84 @@ describe('Checkout', () => {
 			throw new Error(`Unexpected result structure: ${JSON.stringify(result)}`)
 		})
 
+		test('validates shipping method is required', async () => {
+			const product = await prisma.product.create({
+				data: {
+					name: 'Test Product',
+					slug: 'test-product',
+					description: 'Test',
+					sku: 'SKU-001',
+					price: 1000,
+					status: 'ACTIVE',
+					categoryId: testCategory.id,
+					stockQuantity: 10,
+				},
+			})
+
+			const cart = await getOrCreateCart({ userId: testUser.id })
+			await addToCart(cart.id, product.id, null, 1)
+
+			const session = await prisma.session.create({
+				data: {
+					userId: testUser.id,
+					expirationDate: getSessionExpirationDate(),
+				},
+			})
+
+			// Create proper auth session cookie
+			const authSession = await authSessionStorage.getSession()
+			authSession.set(sessionKey, session.id)
+			const cookieHeader = await authSessionStorage.commitSession(authSession)
+
+			const formData = new FormData()
+			formData.set('name', 'Test User')
+			formData.set('email', 'test@example.com')
+			formData.set('street', '123 Main St')
+			formData.set('city', 'New York')
+			formData.set('postal', '10001')
+			formData.set('country', 'US')
+			// shippingMethodId is missing
+
+			const request = new Request('http://localhost:3000/shop/checkout', {
+				method: 'POST',
+				headers: {
+					Cookie: cookieHeader,
+				},
+				body: formData,
+			})
+
+			const result = await action({
+				request,
+				params: {},
+				context: {},
+			})
+
+			// data() returns a DataWithResponseInit object with structure: { type: "DataWithResponseInit", data: {...}, init: {...} }
+			// Check if it's a Response first
+			if (result instanceof Response) {
+				const json = (await result.json()) as { result: { status: string; error: { fieldErrors?: { shippingMethodId?: string[] } } } }
+				expect(json).toHaveProperty('result')
+				expect(json.result.status).toBe('error')
+				expect(json.result.error).toBeTruthy()
+				expect(json.result.error.fieldErrors?.shippingMethodId).toBeTruthy()
+				return
+			}
+
+			// If not a Response, it's a DataWithResponseInit object with data property
+			if (typeof result === 'object' && result !== null && 'data' in result) {
+				const dataResult = result as { data: { result: any } }
+				expect(dataResult.data.result.status).toBe('error')
+				expect(dataResult.data.result.error).toBeTruthy()
+				const fieldErrors = dataResult.data.result.error?.fieldErrors || dataResult.data.result.error?.fieldErrors
+				if (fieldErrors) {
+					expect(fieldErrors.shippingMethodId).toBeTruthy()
+				}
+				return
+			}
+
+			throw new Error(`Unexpected result structure: ${JSON.stringify(result)}`)
+		})
+
 		test('validates country code format', async () => {
 			const product = await prisma.product.create({
 				data: {
@@ -623,6 +770,7 @@ describe('Checkout', () => {
 			formData.set('city', 'New York')
 			formData.set('postal', '10001')
 			formData.set('country', 'USA') // Invalid - should be 2 letters
+			// Note: shippingMethodId not set to test country validation
 
 			const request = new Request('http://localhost:3000/shop/checkout', {
 				method: 'POST',

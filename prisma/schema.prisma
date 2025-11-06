@@ -19,8 +19,8 @@ model User {
 
   // Notification preferences
   emailNotificationsEnabled Boolean @default(true)
-  orderUpdateEmailsEnabled   Boolean @default(true)
-  marketingEmailsEnabled     Boolean @default(false)
+  orderUpdateEmailsEnabled  Boolean @default(true)
+  marketingEmailsEnabled    Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -194,32 +194,32 @@ model Passkey {
 }
 
 model Address {
-  id          String   @id @default(cuid())
-  userId      String
-  
+  id     String @id @default(cuid())
+  userId String
+
   // Address fields
-  name        String   // Full name for this address
-  street      String
-  city        String
-  state       String?
-  postal      String
-  country     String  // ISO 2-letter code
-  
+  name    String // Full name for this address
+  street  String
+  city    String
+  state   String?
+  postal  String
+  country String // ISO 2-letter code
+
   // Address type
-  type        AddressType @default(SHIPPING) // SHIPPING, BILLING, BOTH
-  
+  type AddressType @default(SHIPPING) // SHIPPING, BILLING, BOTH
+
   // Default flags
   isDefaultShipping Boolean @default(false)
   isDefaultBilling  Boolean @default(false)
-  
+
   // Labels for easy identification
-  label       String?  // e.g., "Home", "Work", "Mom's House"
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  label String? // e.g., "Home", "Work", "Mom's House"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
   @@index([userId, isDefaultShipping])
   @@index([userId, isDefaultBilling])
@@ -234,9 +234,9 @@ enum AddressType {
 // E-commerce Product Models
 
 model Settings {
-  id        String   @id @default("settings")
+  id         String @id @default("settings")
   currencyId String
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -246,12 +246,12 @@ model Settings {
 }
 
 model Currency {
-  id        String   @id @default(cuid())
-  code      String   @unique // e.g., "USD", "EUR", "GBP"
-  name      String   // e.g., "US Dollar"
-  symbol    String   // e.g., "$", "€", "£"
-  decimals  Int      @default(2) // Number of decimal places to display
-  
+  id       String @id @default(cuid())
+  code     String @unique // e.g., "USD", "EUR", "GBP"
+  name     String // e.g., "US Dollar"
+  symbol   String // e.g., "$", "€", "£"
+  decimals Int    @default(2) // Number of decimal places to display
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -261,24 +261,24 @@ model Currency {
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
-  sku         String   @unique
-  price       Int      // price in cents
-  status      ProductStatus @default(DRAFT)
-  stockQuantity Int?   // stock quantity for products without variants (nullable)
-  categoryId  String
-  
+  id            String        @id @default(cuid())
+  name          String
+  slug          String        @unique
+  description   String?
+  sku           String        @unique
+  price         Int // price in cents
+  status        ProductStatus @default(DRAFT)
+  stockQuantity Int? // stock quantity for products without variants (nullable)
+  categoryId    String
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  category Category   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  images   ProductImage[]
-  variants ProductVariant[]
-  tags     ProductToTag[]
-  cartItems CartItem[]
+  category   Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images     ProductImage[]
+  variants   ProductVariant[]
+  tags       ProductToTag[]
+  cartItems  CartItem[]
   orderItems OrderItem[]
 
   @@index([categoryId])
@@ -304,19 +304,19 @@ model ProductImage {
 }
 
 model ProductVariant {
-  id            String  @id @default(cuid())
+  id            String @id @default(cuid())
   productId     String
-  sku           String  @unique
-  price         Int?     // price in cents (if different from product base price)
-  stockQuantity Int     @default(0)
+  sku           String @unique
+  price         Int? // price in cents (if different from product base price)
+  stockQuantity Int    @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  product           Product                 @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  attributeValues   VariantAttributeValue[]
-  cartItems         CartItem[]
-  orderItems        OrderItem[]
+  product         Product                 @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  attributeValues VariantAttributeValue[]
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
 
   @@index([productId])
   @@index([sku])
@@ -326,12 +326,12 @@ model Attribute {
   id           String @id @default(cuid())
   name         String @unique
   displayOrder Int    @default(0)
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   values AttributeValue[]
-  
+
   @@index([name])
 }
 
@@ -340,13 +340,13 @@ model AttributeValue {
   attributeId  String
   value        String
   displayOrder Int    @default(0)
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  attribute Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  attribute Attribute               @relation(fields: [attributeId], references: [id], onDelete: Cascade)
   variants  VariantAttributeValue[]
-  
+
   @@unique([attributeId, value])
   @@index([attributeId])
 }
@@ -354,12 +354,12 @@ model AttributeValue {
 model VariantAttributeValue {
   variantId        String
   attributeValueId String
-  
+
   createdAt DateTime @default(now())
-  
+
   variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   attributeValue AttributeValue @relation(fields: [attributeValueId], references: [id], onDelete: Cascade)
-  
+
   @@id([variantId, attributeValueId])
   @@index([variantId])
   @@index([attributeValueId])
@@ -411,16 +411,16 @@ enum ProductStatus {
 }
 
 model Cart {
-  id        String   @id @default(cuid())
-  userId    String?  @unique // Null for guest carts
-  sessionId String?  @unique // For guest carts
-  
+  id        String  @id @default(cuid())
+  userId    String? @unique // Null for guest carts
+  sessionId String? @unique // For guest carts
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  user  User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user  User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   items CartItem[]
-  
+
   @@index([userId])
   @@index([sessionId])
 }
@@ -431,52 +431,65 @@ model CartItem {
   productId String
   variantId String?
   quantity  Int     @default(1)
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  cart    Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  
+
   @@unique([cartId, productId, variantId])
   @@index([cartId])
   @@index([productId])
 }
 
 model Order {
-  id          String   @id @default(cuid())
-  orderNumber String   @unique // Human-readable: "ORD-001234"
-  userId      String?  // Null for guest orders
-  email       String   // Required for guest orders, copied from user for auth users
-  
+  id          String  @id @default(cuid())
+  orderNumber String  @unique // Human-readable: "ORD-001234"
+  userId      String? // Null for guest orders
+  email       String // Required for guest orders, copied from user for auth users
+
   // Price snapshots (stored in cents)
-  subtotal    Int      // Sum of item prices
-  total       Int      // Subtotal + shipping + tax (future)
-  
+  subtotal Int // Sum of item prices
+  total    Int // Subtotal + shipping + tax (future)
+
   // Shipping information
-  shippingName     String
-  shippingStreet   String
-  shippingCity     String
-  shippingState    String?
-  shippingPostal   String
-  shippingCountry  String
-  
+  shippingName    String
+  shippingStreet  String
+  shippingCity    String
+  shippingState   String?
+  shippingPostal  String
+  shippingCountry String
+
   // Payment information (Stripe)
-  stripeCheckoutSessionId String @unique // Stripe Checkout Session ID
-  stripePaymentIntentId   String?        // Stripe PaymentIntent ID (from webhook)
-  stripeChargeId          String?        // Stripe Charge ID (from webhook)
-  
+  stripeCheckoutSessionId String  @unique // Stripe Checkout Session ID
+  stripePaymentIntentId   String? // Stripe PaymentIntent ID (from webhook)
+  stripeChargeId          String? // Stripe Charge ID (from webhook)
+
   // Status tracking
-  status      OrderStatus @default(CONFIRMED) // Auto-confirmed on successful payment
-  trackingNumber String?  // Tracking number for shipped orders
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  items       OrderItem[]
-  
+  status         OrderStatus @default(CONFIRMED) // Auto-confirmed on successful payment
+  trackingNumber String? // Tracking number for shipped orders
+
+  // Shipping information
+  shippingMethodId    String? // Selected shipping method
+  shippingCost        Int     @default(0) // Shipping cost in cents (snapshot)
+  shippingMethodName  String? // Snapshot of method name for historical accuracy
+  shippingCarrierName String? // Snapshot of carrier name (e.g., "Mondial Relay")
+
+  // Mondial Relay specific (nullable - only populated if using Mondial Relay)
+  mondialRelayPickupPointId   String? // Selected Point Relais® ID
+  mondialRelayPickupPointName String? // Snapshot of pickup point name/address
+  mondialRelayShipmentNumber  String? // Mondial Relay shipment number (from API2)
+  mondialRelayLabelUrl        String? // URL to shipping label PDF
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  shippingMethod ShippingMethod? @relation(fields: [shippingMethodId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
   @@index([userId])
   @@index([orderNumber])
   @@index([status])
@@ -484,32 +497,144 @@ model Order {
   @@index([createdAt])
   @@index([stripeCheckoutSessionId])
   @@index([stripePaymentIntentId])
+  @@index([shippingMethodId])
 }
 
 model OrderItem {
-  id          String  @id @default(cuid())
-  orderId     String
-  productId   String
-  variantId   String?
-  
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  variantId String?
+
   // Price snapshots (in cents) - captured at order time
-  price       Int     // Price per unit at time of order
-  quantity    Int     @default(1)
-  
-  createdAt   DateTime @default(now())
-  
-  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product     Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
-  variant     ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  
+  price    Int // Price per unit at time of order
+  quantity Int @default(1)
+
+  createdAt DateTime @default(now())
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
   @@index([orderId])
   @@index([productId])
 }
 
 enum OrderStatus {
-  PENDING      // Order created, awaiting confirmation
-  CONFIRMED    // Order confirmed, processing
-  SHIPPED      // Order shipped
-  DELIVERED    // Order delivered
-  CANCELLED    // Order cancelled
+  PENDING // Order created, awaiting confirmation
+  CONFIRMED // Order confirmed, processing
+  SHIPPED // Order shipped
+  DELIVERED // Order delivered
+  CANCELLED // Order cancelled
+}
+
+// Shipping System Models
+
+model Carrier {
+  id          String  @id @default(cuid())
+  name        String  @unique // e.g., "mondial_relay", "colissimo", "dhl"
+  displayName String // e.g., "Mondial Relay", "Colissimo (La Poste)", "DHL"
+  description String? // Optional description
+
+  // Geographic availability
+  // Note: Using Json type (stored as JSON in SQLite) for configuration data
+  availableCountries Json // Array of ISO 2-letter country codes (e.g., ["FR", "BE"])
+  availableZoneIds   Json // Array of ShippingZone IDs
+
+  // API Integration Configuration
+  // Note: API credentials are stored in ENVIRONMENT VARIABLES, not in database
+  // This follows the same pattern as Stripe, AWS, GitHub credentials in this codebase
+  hasApiIntegration Boolean @default(false)
+  apiProvider       String? // e.g., "mondial_relay", "colissimo_api", "dhl_api"
+  // This field indicates which environment variable prefix to use
+  // e.g., "mondial_relay" -> uses MONDIAL_RELAY_API1_*, MONDIAL_RELAY_API2_*
+
+  // Display and status
+  isActive     Boolean @default(true)
+  displayOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  methods ShippingMethod[]
+
+  @@index([isActive])
+  @@index([name])
+}
+
+model ShippingZone {
+  id           String  @id @default(cuid())
+  name         String  @unique // e.g., "Europe", "Africa", "United States"
+  description  String? // Optional description
+  // Note: Using Json type (stored as JSON) for configuration data
+  countries    Json // Array of ISO 2-letter country codes in this zone
+  isActive     Boolean @default(true)
+  displayOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  methods ShippingMethod[]
+
+  @@index([isActive])
+  @@index([name])
+}
+
+model ShippingMethod {
+  id String @id @default(cuid())
+
+  // Carrier relationship (nullable for manual/generic methods)
+  carrierId String?
+  carrier   Carrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  // Zone relationship (required)
+  zoneId String
+  zone   ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  // Method name - unique per carrier (e.g., "Mondial Relay Standard")
+  // Note: SQLite allows multiple NULLs in unique constraints, so multiple
+  // generic methods (carrierId=null) can have the same name if needed
+  name        String // e.g., "Mondial Relay Standard", "DHL Express", "Standard Shipping"
+  description String? // Optional description
+
+  // Rate calculation strategy
+  rateType ShippingRateType // FLAT, WEIGHT_BASED, PRICE_BASED, FREE
+
+  // Flat rate (when rateType is FLAT)
+  flatRate Int? // Price in cents
+
+  // Weight-based rates (when rateType is WEIGHT_BASED)
+  // Stored as JSON: [{ minWeight: 0, maxWeight: 500, rate: 500 }, ...]
+  weightRates Json? // Array of weight ranges and rates
+
+  // Price-based rates (when rateType is PRICE_BASED)
+  // Stored as JSON: [{ minPrice: 0, maxPrice: 5000, rate: 500 }, ...]
+  priceRates Json? // Array of price ranges and rates
+
+  // Free shipping threshold (when rateType is FREE or as override)
+  freeShippingThreshold Int? // Order total in cents
+
+  // Display and ordering
+  isActive      Boolean @default(true)
+  displayOrder  Int     @default(0)
+  estimatedDays Int? // Estimated delivery days (e.g., "3-5")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+
+  // Unique constraint: method name must be unique per carrier
+  // Note: NULL carrierId allows multiple generic methods with same name
+  @@unique([carrierId, name])
+  @@index([carrierId])
+  @@index([zoneId])
+  @@index([isActive])
+}
+
+enum ShippingRateType {
+  FLAT // Fixed rate regardless of order
+  WEIGHT_BASED // Rate based on total weight
+  PRICE_BASED // Rate based on order total
+  FREE // Free shipping (with optional threshold)
 }
