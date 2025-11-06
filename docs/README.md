@@ -37,7 +37,7 @@ Original implementation plan with status updates and completion notes. Shows the
 Implementation plan for the shopping cart system, including guest and authenticated user flows, cart merging, and checkout integration.
 
 ### [Checkout Test Refactoring Plan](checkout-test-refactoring-plan.md)
-Plan for refactoring checkout tests when they are re-enabled. Currently, checkout tests are skipped and will be re-implemented when payment provider is integrated.
+Documentation of the checkout test refactoring process. ✅ **Completed** - All checkout tests are now active and passing.
 
 ## Quick Reference
 
@@ -45,10 +45,12 @@ Plan for refactoring checkout tests when they are re-enabled. Currently, checkou
 - **Product Management**: Full CRUD with variants, images, and inventory
 - **Category System**: Hierarchical categories with cascade behavior
 - **Attribute System**: Flexible, relational attribute management
+- **User Management**: Admin interface for viewing and editing users, managing roles
 - **Shopping Cart**: Guest and authenticated user carts with merge on login
 - **Checkout Flow**: Stripe integration with webhook handling and fallback mechanism
 - **Order Management**: Complete order lifecycle with status tracking and notifications
 - **Image Handling**: Fixture system for development, Tigris storage for production
+- **Admin Navigation**: Improved sidebar with direct links, better UX, and updated icons
 - **Admin Security**: Role-based access control with ARIA compliance
 - **Accessibility**: WCAG 2.1 Level AA compliance with axe-core testing
 - **Schema Validation**: Zod v4 syntax with user-friendly error messages
