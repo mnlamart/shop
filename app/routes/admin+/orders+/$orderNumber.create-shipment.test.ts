@@ -2,13 +2,13 @@
  * @vitest-environment node
  */
 import { describe, expect, test, beforeEach, vi } from 'vitest'
-import { consoleError } from '#tests/setup/setup-test-env'
-import { prisma } from '#app/utils/db.server.ts'
 import { getSessionExpirationDate, sessionKey } from '#app/utils/auth.server.ts'
-import { authSessionStorage } from '#app/utils/session.server.ts'
-import { action } from './$orderNumber.create-shipment.ts'
+import { prisma } from '#app/utils/db.server.ts'
 import * as shipmentServer from '#app/utils/shipment.server.ts'
-import * as shippingEmailServer from '#app/utils/shipping-email.server.tsx'
+import { sendShippingConfirmationEmail } from '#app/utils/shipping-email.server.tsx'
+import { authSessionStorage } from '#app/utils/session.server.ts'
+import { consoleError } from '#tests/setup/setup-test-env'
+import { action } from './$orderNumber.create-shipment.ts'
 
 // Mock the shipment and email services
 vi.mock('#app/utils/shipment.server.ts', () => ({
