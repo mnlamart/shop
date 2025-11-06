@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { data, Form, Outlet, redirect, redirectDocument, useFetcher, useLocation } from 'react-router'
 import { z } from 'zod'
 import { ErrorList, Field } from '#app/components/forms.tsx'
+import { MondialRelayPickupSelector } from '#app/components/shipping/mondial-relay-pickup-selector.tsx'
 import {
 	Select,
 	SelectContent,
@@ -525,6 +526,7 @@ export default function Checkout({
 	)
 	const [shippingMethods, setShippingMethods] = useState(initialShippingMethods)
 	const [shippingCost, setShippingCost] = useState<number>(0)
+	const [selectedPickupPointId, setSelectedPickupPointId] = useState<string>('')
 
 	// Fetcher for loading shipping methods when country changes
 	const shippingMethodsFetcher = useFetcher<{
@@ -619,8 +621,14 @@ export default function Checkout({
 			// Reset selected method when methods change
 			setSelectedShippingMethodId('')
 			setShippingCost(0)
+			setSelectedPickupPointId('') // Reset pickup point when methods change
 		}
 	}, [shippingMethodsFetcher.data])
+
+	// Reset pickup point when shipping method changes
+	useEffect(() => {
+		setSelectedPickupPointId('')
+	}, [selectedShippingMethodId])
 
 	// Calculate shipping cost when method or subtotal changes
 	useEffect(() => {
@@ -1052,6 +1060,48 @@ export default function Checkout({
 									value={selectedShippingMethodId}
 								/>
 							</div>
+
+							{/* Mondial Relay Pickup Point Selector */}
+							{selectedShippingMethodId && (() => {
+								const selectedMethod = shippingMethods.find((m) => m.id === selectedShippingMethodId)
+								const isMondialRelay = selectedMethod?.carrier?.apiProvider === 'mondial_relay'
+								
+								if (!isMondialRelay) return null
+
+								const postalCode = useNewAddress || savedAddresses.length === 0
+									? (Array.isArray(postalInput.value) ? postalInput.value[0] : postalInput.value) || ''
+									: selectedAddress?.postal || ''
+								const country = useNewAddress || savedAddresses.length === 0
+									? (Array.isArray(countryInput.value) ? countryInput.value[0] : countryInput.value) || 'US'
+									: selectedAddress?.country || 'US'
+								const city = useNewAddress || savedAddresses.length === 0
+									? (Array.isArray(cityInput.value) ? cityInput.value[0] : cityInput.value) || ''
+									: selectedAddress?.city || ''
+
+								return (
+									<div className="space-y-4 mt-6">
+										<h3 className="text-lg font-semibold">Pickup Point Selection</h3>
+										<p className="text-sm text-muted-foreground">
+											Select a Mondial Relay pickup point for your delivery.
+										</p>
+										<MondialRelayPickupSelector
+											postalCode={postalCode}
+											country={country}
+											city={city}
+											selectedPickupPointId={selectedPickupPointId}
+											onPickupPointSelect={(pickupPoint) => {
+												setSelectedPickupPointId(pickupPoint?.id || '')
+											}}
+											errors={fields.mondialRelayPickupPointId?.errors}
+										/>
+										{/* Hidden input for pickup point ID */}
+										<input
+											{...getInputProps(fields.mondialRelayPickupPointId, { type: 'hidden' })}
+											value={selectedPickupPointId}
+										/>
+									</div>
+								)
+							})()}
 
 							<ErrorList errors={form.errors} id={form.errorId} />
 
