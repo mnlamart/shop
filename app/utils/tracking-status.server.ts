@@ -13,8 +13,12 @@ import { getMondialRelayTrackingInfo } from './tracking.server.ts'
 /**
  * Checks if a tracking status indicates the package has been delivered.
  * 
+ * Mondial Relay uses status codes to indicate delivery state:
+ * - Status code '4' typically indicates "Livré" (delivered)
+ * - We also check status descriptions and events as fallback
+ * 
  * @param status - The tracking status description
- * @param statusCode - The tracking status code
+ * @param statusCode - The tracking status code from Mondial Relay API
  * @param events - Array of tracking events
  * @returns true if the package appears to be delivered
  */
@@ -23,7 +27,14 @@ function isDelivered(
 	statusCode: string,
 	events: Array<{ date: Date; description: string; location?: string }>,
 ): boolean {
-	// Check status description for delivery keywords
+	// Primary check: Mondial Relay status codes
+	// Status code '4' indicates "Livré" (delivered) according to Mondial Relay API
+	// Status code '5' may also indicate delivery in some cases
+	if (statusCode === '4' || statusCode === '5') {
+		return true
+	}
+
+	// Secondary check: status description keywords (fallback for other carriers or edge cases)
 	const statusLower = status.toLowerCase()
 	if (
 		statusLower.includes('livré') ||
@@ -34,7 +45,7 @@ function isDelivered(
 		return true
 	}
 
-	// Check events for delivery-related descriptions
+	// Tertiary check: delivery-related events (fallback)
 	const hasDeliveryEvent = events.some((event) => {
 		const descLower = event.description.toLowerCase()
 		return (
