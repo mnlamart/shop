@@ -2,7 +2,7 @@
 
 ## Overview
 
-The admin dashboard provides a comprehensive interface for managing e-commerce products, categories, and attributes. Built with role-based access control and ARIA-compliant UI components following Epic Stack patterns.
+The admin dashboard provides a comprehensive interface for managing e-commerce products, categories, attributes, users, and orders. Built with role-based access control and ARIA-compliant UI components following Epic Stack patterns.
 
 ## Route Structure
 
@@ -51,6 +51,20 @@ The admin dashboard provides a comprehensive interface for managing e-commerce p
   - Value management for each attribute
   - Used across all products for variant creation
 
+### User Management
+- **Base Route**: `/admin/users/`
+- **Routes**:
+  - `index.tsx` - User list with search, filtering, and pagination
+  - `$userId.tsx` - View user details (read-only)
+  - `$userId_.edit.tsx` - Edit user information and roles
+- **Features**:
+  - View all users with pagination (25 per page)
+  - Search users by name, username, or email
+  - Edit user profile information (name, username, email)
+  - Manage user roles (admin/user)
+  - View user profile images with proper image URL handling
+  - Comprehensive E2E test coverage with faker-generated test data
+
 ## Security Architecture
 
 ### Role-Based Access Control
@@ -68,7 +82,7 @@ export async function action({ request }: Route.ActionArgs) {
 ```
 
 ### Permission Levels
-- **Admin Role**: Full access to all product management features
+- **Admin Role**: Full access to all admin features (products, categories, attributes, users, orders)
 - **User Role**: No access to admin routes (403 Forbidden)
 - **Unauthenticated**: Redirected to login with return URL
 
@@ -77,12 +91,45 @@ export async function action({ request }: Route.ActionArgs) {
 - **Individual Routes**: Each route validates admin role in loader/action
 - **UI Components**: Conditional rendering based on user role
 
+## Navigation & Sidebar
+
+### Sidebar Navigation (`app/components/app-sidebar.tsx`)
+The admin sidebar provides consistent navigation across all admin pages with improved UX:
+
+#### Navigation Structure
+- **Platform Section**:
+  - Dashboard (`/admin`) - Main admin dashboard
+  - Users (`/admin/users`) - User management (positioned above Orders)
+  - Orders (`/admin/orders`) - Order management
+  - Products (`/admin/products`) - Product management with submenu
+  - Categories (`/admin/categories`) - Category management with submenu
+  - Attributes (`/admin/attributes`) - Attribute management with submenu
+- **System Section**:
+  - View Store (`/`) - Link to public-facing store
+
+#### UX Improvements
+- **Direct Links**: Products, Categories, and Attributes titles are clickable links to their index pages
+- **Collapsible Submenus**: Expandable sections for "All Products", "Add Product", etc.
+- **Hover Effects**: Consistent background color transitions (`hover:!bg-muted`) on all interactive elements
+- **Active States**: Visual indication of current page with `secondary` variant for active items
+- **Improved Padding**: Consistent spacing (`p-2`/`p-3`, `px-3 py-2`) throughout
+- **Icon Updates**:
+  - Categories: `folder` icon (replaced `tags`)
+  - Attributes: `sliders` icon (replaced `settings`)
+- **Responsive Design**: Collapsible sidebar with icon-only mode for smaller screens
+
+#### Icon Management
+- Icons managed via `sly` CLI (`@sly-cli/sly`)
+- SVG icons stored in `other/svg-icons/`
+- Icon sprite automatically generated from SVG files
+- Unused icons removed to keep sprite clean
+
 ## UI Components Architecture
 
 ### Design System Integration
 - **Radix UI**: All components built on Radix primitives for accessibility
 - **Tailwind CSS**: Consistent styling with Epic Stack design tokens
-- **SVG Icons**: Epic Stack's sprite system with additional Radix icons
+- **SVG Icons**: Epic Stack's sprite system with Lucide icons via `sly` CLI
 
 ### Key Components
 
@@ -192,6 +239,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 ### Image Handling
 - **Fixture System**: Fast local images in development
 - **Optimized Serving**: Production images via signed URLs
+- **User Images**: Proper URL formatting using `getUserImgSrc()` helper (`/resources/images?objectKey=...`)
 - **Lazy Loading**: Images loaded on demand
 - **Caching**: Browser and CDN caching strategies
 
@@ -245,8 +293,12 @@ export async function loader({ params }: Route.LoaderArgs) {
 ### E2E Testing
 - **Playwright**: Full user journey testing
 - **Admin Flows**: Complete CRUD operations
+- **User Management**: Comprehensive E2E tests with faker-generated test data
+- **Test Isolation**: Each test creates and cleans up its own data
+- **Robust Locators**: Uses `getByTestId()`, `getByRole()`, `getByLabel()` for reliable element selection
 - **Permission Testing**: Role-based access validation
 - **Form Validation**: Error handling and success flows
+- **Test Utilities**: Centralized helpers in `tests/user-utils.ts` for user creation and login
 
 ### Component Testing
 - **React Testing Library**: Component behavior testing
@@ -273,16 +325,46 @@ app/routes/admin+/
 │   ├── new.tsx                 # Create category
 │   ├── $categoryId.edit.tsx    # Edit category
 │   └── $categoryId.delete.ts   # Delete action
-└── attributes/
-    ├── index.tsx               # Attribute list
-    ├── new.tsx                 # Create attribute
-    └── $attributeId.edit.tsx   # Edit attribute
+├── attributes/
+│   ├── index.tsx               # Attribute list
+│   ├── new.tsx                 # Create attribute
+│   └── $attributeId.edit.tsx   # Edit attribute
+└── users/
+    ├── index.tsx               # User list
+    ├── $userId.tsx             # View user
+    └── $userId_.edit.tsx       # Edit user
 ```
 
 ## Related Files
 
 - `app/utils/permissions.server.ts` - Role-based access control
 - `app/components/ui/` - Reusable UI components
+- `app/components/app-sidebar.tsx` - Admin sidebar navigation
 - `app/utils/storage.server.ts` - File upload and management
+- `app/utils/misc.tsx` - Utility functions including `getUserImgSrc()`
 - `prisma/schema.prisma` - Database schema
 - `tests/e2e/admin/` - E2E test suites
+- `tests/user-utils.ts` - Test utilities for user creation and login
+
+## Recent Updates
+
+### Sidebar UX Improvements (Latest)
+- Added direct links to Products, Categories, and Attributes titles
+- Reordered navigation: Users now appears above Orders
+- Improved hover effects with consistent background color transitions
+- Enhanced active state styling for better visual feedback
+- Updated padding and spacing for better visual hierarchy
+- Updated icons: Categories (`folder`), Attributes (`sliders`)
+- Removed non-existent Settings section
+
+### User Management (Latest)
+- Added comprehensive user management pages (list, view, edit)
+- Fixed user image 404 errors by using `getUserImgSrc()` helper
+- Implemented role management (admin/user) with checkbox interface
+- Added E2E tests with faker-generated test data for reliability
+- Improved test isolation and cleanup strategies
+- Added `data-testid` attributes for robust Playwright locators
+
+### Order Management
+- Fixed tracking number handling: always set when order status is SHIPPED
+- Improved order status update flow with proper validation
