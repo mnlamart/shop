@@ -828,4 +828,226 @@ describe('Checkout', () => {
 			expect(result).toBeTruthy()
 		})
 	})
+
+	describe('action - Mondial Relay pickup point integration', () => {
+		test('accepts checkout with Mondial Relay method and pickup point', async () => {
+			// Create cart with items
+			const cart = await getOrCreateCart({ userId: testUser.id })
+			const product = await prisma.product.create({
+				data: {
+					name: 'Test Product',
+					slug: `test-product-${Date.now()}`,
+					description: 'Test',
+					sku: 'SKU-001',
+					price: 1000,
+					status: 'ACTIVE',
+					categoryId: testCategory.id,
+					stockQuantity: 10,
+				},
+			})
+			await addToCart(cart.id, product.id, null, 1)
+
+			// Create shipping zone
+			const franceZone = await prisma.shippingZone.create({
+				data: {
+					name: `Test France Zone ${Date.now()}`,
+					countries: ['FR'],
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
+			// Create Mondial Relay carrier
+			const mondialRelayCarrier = await prisma.carrier.create({
+				data: {
+					name: `mondial_relay_${Date.now()}`,
+					displayName: 'Mondial Relay',
+					availableCountries: ['FR'],
+					availableZoneIds: [franceZone.id],
+					hasApiIntegration: true,
+					apiProvider: 'mondial_relay',
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
+			// Create Mondial Relay shipping method
+			const mondialRelayMethod = await prisma.shippingMethod.create({
+				data: {
+					zoneId: franceZone.id,
+					carrierId: mondialRelayCarrier.id,
+					name: 'Mondial Relay Standard',
+					rateType: 'FLAT',
+					flatRate: 500,
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
+			// Mock Stripe checkout session creation
+			vi.mocked(createCheckoutSession).mockResolvedValueOnce({
+				url: 'https://checkout.stripe.com/c/pay/cs_test_mock123',
+			} as any)
+
+			// Create session
+			const session = await prisma.session.create({
+				data: {
+					userId: testUser.id,
+					expirationDate: getSessionExpirationDate(),
+				},
+			})
+
+			const authSession = await authSessionStorage.getSession()
+			authSession.set(sessionKey, session.id)
+			const cookieHeader = await authSessionStorage.commitSession(authSession)
+
+			const formData = new FormData()
+			formData.set('name', 'Test User')
+			formData.set('email', 'test@example.com')
+			formData.set('street', '123 Main St')
+			formData.set('city', 'Paris')
+			formData.set('postal', '75001')
+			formData.set('country', 'FR')
+			formData.set('shippingMethodId', mondialRelayMethod.id)
+			formData.set('mondialRelayPickupPointId', '12345')
+
+			const request = new Request('http://localhost:3000/shop/checkout', {
+				method: 'POST',
+				headers: {
+					Cookie: cookieHeader,
+				},
+				body: formData,
+			})
+
+			const result = await action({
+				request,
+				params: {},
+				context: {},
+			})
+
+			// Action returns DataWithResponseInit with redirectUrl
+			if (typeof result === 'object' && result !== null && 'data' in result) {
+				const dataResult = result as { data: { redirectUrl: string } }
+				expect(dataResult.data.redirectUrl).toBeTruthy()
+				expect(dataResult.data.redirectUrl).toContain('checkout.stripe.com')
+			} else {
+				throw new Error(`Unexpected result structure: ${JSON.stringify(result)}`)
+			}
+
+			// Verify pickup point ID was passed to Stripe
+			expect(createCheckoutSession).toHaveBeenCalledWith(
+				expect.objectContaining({
+					mondialRelayPickupPointId: '12345',
+				}),
+			)
+		})
+
+		test('accepts checkout with Mondial Relay method without pickup point (optional)', async () => {
+			// Create cart with items
+			const cart = await getOrCreateCart({ userId: testUser.id })
+			const product = await prisma.product.create({
+				data: {
+					name: 'Test Product',
+					slug: `test-product-${Date.now()}`,
+					description: 'Test',
+					sku: 'SKU-001',
+					price: 1000,
+					status: 'ACTIVE',
+					categoryId: testCategory.id,
+					stockQuantity: 10,
+				},
+			})
+			await addToCart(cart.id, product.id, null, 1)
+
+			// Create shipping zone
+			const franceZone = await prisma.shippingZone.create({
+				data: {
+					name: `Test France Zone ${Date.now()}`,
+					countries: ['FR'],
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
+			// Create Mondial Relay carrier
+			const mondialRelayCarrier = await prisma.carrier.create({
+				data: {
+					name: `mondial_relay_${Date.now()}`,
+					displayName: 'Mondial Relay',
+					availableCountries: ['FR'],
+					availableZoneIds: [franceZone.id],
+					hasApiIntegration: true,
+					apiProvider: 'mondial_relay',
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
+			// Create Mondial Relay shipping method
+			const mondialRelayMethod = await prisma.shippingMethod.create({
+				data: {
+					zoneId: franceZone.id,
+					carrierId: mondialRelayCarrier.id,
+					name: 'Mondial Relay Standard',
+					rateType: 'FLAT',
+					flatRate: 500,
+					isActive: true,
+					displayOrder: 0,
+				},
+			})
+
+			// Mock Stripe checkout session creation
+			vi.mocked(createCheckoutSession).mockResolvedValueOnce({
+				url: 'https://checkout.stripe.com/c/pay/cs_test_mock123',
+			} as any)
+
+			// Create session
+			const session = await prisma.session.create({
+				data: {
+					userId: testUser.id,
+					expirationDate: getSessionExpirationDate(),
+				},
+			})
+
+			const authSession = await authSessionStorage.getSession()
+			authSession.set(sessionKey, session.id)
+			const cookieHeader = await authSessionStorage.commitSession(authSession)
+
+			const formData = new FormData()
+			formData.set('name', 'Test User')
+			formData.set('email', 'test@example.com')
+			formData.set('street', '123 Main St')
+			formData.set('city', 'Paris')
+			formData.set('postal', '75001')
+			formData.set('country', 'FR')
+			formData.set('shippingMethodId', mondialRelayMethod.id)
+			// No mondialRelayPickupPointId - should still work
+
+			const request = new Request('http://localhost:3000/shop/checkout', {
+				method: 'POST',
+				headers: {
+					Cookie: cookieHeader,
+				},
+				body: formData,
+			})
+
+			const result = await action({
+				request,
+				params: {},
+				context: {},
+			})
+
+			// Action returns DataWithResponseInit with redirectUrl
+			if (typeof result === 'object' && result !== null && 'data' in result) {
+				const dataResult = result as { data: { redirectUrl: string } }
+				expect(dataResult.data.redirectUrl).toBeTruthy()
+				expect(dataResult.data.redirectUrl).toContain('checkout.stripe.com')
+			} else {
+				throw new Error(`Unexpected result structure: ${JSON.stringify(result)}`)
+			}
+
+			// Verify checkout session was created (pickup point is optional)
+			expect(createCheckoutSession).toHaveBeenCalled()
+		})
+	})
 })
