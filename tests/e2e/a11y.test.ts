@@ -281,6 +281,27 @@ test.describe('Accessibility', () => {
 				})
 			}
 		})
+
+		test('user edit page should be accessible', async ({ page, insertNewUser }) => {
+			// Create a test user for edit page
+			const testUser = await prisma.user.create({
+				data: {
+					username: `testuser-edit-a11y-${Date.now()}`,
+					email: `testuser-edit-a11y-${Date.now()}@example.com`,
+					name: 'Test User Edit A11y',
+				},
+			})
+
+			try {
+				await loginAndNavigateToAdminPage(page, insertNewUser, `/admin/users/${testUser.id}/edit`)
+				await expectPageToBeAccessible(page)
+			} finally {
+				// Cleanup
+				await prisma.user.deleteMany({
+					where: { id: testUser.id },
+				})
+			}
+		})
 	})
 
 		test.describe('Shop Pages', () => {
