@@ -4,7 +4,7 @@
  * Allows users to search for and select a Mondial Relay pickup point (Point Relais®)
  */
 
-import { useEffect, useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useFetcher } from 'react-router'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
@@ -12,7 +12,7 @@ import { Card, CardContent } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
-import  { type PickupPoint } from '#app/utils/carriers/mondial-relay-api1.server.ts'
+import { type PickupPoint } from '#app/utils/carriers/mondial-relay-api1.server.ts'
 
 interface MondialRelayPickupSelectorProps {
 	postalCode: string
@@ -33,17 +33,45 @@ export function MondialRelayPickupSelector({
 }: MondialRelayPickupSelectorProps) {
 	const [searchPostalCode, setSearchPostalCode] = useState(postalCode)
 	const [searchCity, setSearchCity] = useState(city || '')
-	const [selectedPoint, setSelectedPoint] = useState<PickupPoint | null>(null)
+	const [userSelectedPoint, setUserSelectedPoint] = useState<PickupPoint | null>(null)
 
 	const pickupPointsFetcher = useFetcher<{
 		pickupPoints?: PickupPoint[]
 		error?: string
+		message?: string
 		details?: Array<{ path: string[]; message: string }>
 	}>()
 
-	// Search for pickup points when postal code or country changes
-	useEffect(() => {
-		if (searchPostalCode && country && country.length === 2) {
+	// Derive selected point from props and fetcher data (replaces useEffect)
+	// When selectedPickupPointId prop changes, find the matching point from fetched data
+	const propSelectedPoint = useMemo(() => {
+		if (selectedPickupPointId && pickupPointsFetcher.data?.pickupPoints) {
+			return pickupPointsFetcher.data.pickupPoints.find(
+				(p) => p.id === selectedPickupPointId,
+			) || null
+		}
+		return null
+	}, [selectedPickupPointId, pickupPointsFetcher.data?.pickupPoints])
+
+	// Use prop-selected point if available, otherwise use user-selected point
+	// This handles both prop-driven selection and user interaction
+	const displaySelectedPoint = propSelectedPoint || userSelectedPoint
+
+	// Call callback when prop-selected point changes (handled in event handlers, not render)
+	const handlePointSelect = (point: PickupPoint | null) => {
+		setUserSelectedPoint(point)
+		onPickupPointSelect(point)
+	}
+
+	// Function to trigger search (replaces useEffect auto-search)
+	const triggerSearch = () => {
+		// Only search if we have a valid postal code (at least 2 characters) and country code
+		if (
+			searchPostalCode &&
+			searchPostalCode.length >= 2 &&
+			country &&
+			country.length === 2
+		) {
 			const params = new URLSearchParams({
 				postalCode: searchPostalCode,
 				country: country.toUpperCase(),
@@ -51,24 +79,12 @@ export function MondialRelayPickupSelector({
 			if (searchCity) {
 				params.append('city', searchCity)
 			}
-			void pickupPointsFetcher.load(`/shop/checkout/pickup-points?${params.toString()}`)
+			pickupPointsFetcher.load(`/shop/checkout/pickup-points?${params.toString()}`).catch((error) => {
+				// Error is handled by the fetcher's error state
+				console.error('Failed to load pickup points:', error)
+			})
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [searchPostalCode, country, searchCity])
-
-	// Update selected point when selectedPickupPointId changes
-	useEffect(() => {
-		if (selectedPickupPointId && pickupPointsFetcher.data?.pickupPoints) {
-			const point = pickupPointsFetcher.data.pickupPoints.find(
-				(p) => p.id === selectedPickupPointId,
-			)
-			if (point) {
-				setSelectedPoint(point)
-				onPickupPointSelect(point)
-			}
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [selectedPickupPointId, pickupPointsFetcher.data])
+	}
 
 	const pickupPoints = pickupPointsFetcher.data?.pickupPoints || []
 	const isLoading = pickupPointsFetcher.state === 'loading'
@@ -103,18 +119,7 @@ export function MondialRelayPickupSelector({
 					<Button
 						type="button"
 						variant="outline"
-						onClick={() => {
-							if (searchPostalCode && country) {
-								const params = new URLSearchParams({
-									postalCode: searchPostalCode,
-									country: country.toUpperCase(),
-								})
-								if (searchCity) {
-									params.append('city', searchCity)
-								}
-								void pickupPointsFetcher.load(`/shop/checkout/pickup-points?${params.toString()}`)
-							}
-						}}
+						onClick={triggerSearch}
 						disabled={isLoading || !searchPostalCode || !country}
 						className="transition-all duration-200"
 					>
@@ -133,9 +138,14 @@ export function MondialRelayPickupSelector({
 
 			{hasError && (
 				<div className="p-4 border border-destructive/50 rounded-lg bg-destructive/10">
-					<p className="text-sm text-destructive">
+					<p className="text-sm font-semibold text-destructive mb-1">
 						{pickupPointsFetcher.data?.error || 'Failed to search pickup points'}
 					</p>
+					{pickupPointsFetcher.data?.message && (
+						<p className="text-xs text-destructive/80">
+							{pickupPointsFetcher.data.message}
+						</p>
+					)}
 				</div>
 			)}
 
@@ -145,21 +155,18 @@ export function MondialRelayPickupSelector({
 						<Card
 							key={point.id}
 							className={`cursor-pointer transition-all duration-200 ${
-								selectedPoint?.id === point.id
+								displaySelectedPoint?.id === point.id
 									? 'border-primary ring-2 ring-primary/20'
 									: 'hover:border-primary/50'
 							}`}
-							onClick={() => {
-								setSelectedPoint(point)
-								onPickupPointSelect(point)
-							}}
+							onClick={() => handlePointSelect(point)}
 						>
 							<CardContent className="p-4">
 								<div className="flex items-start justify-between">
 									<div className="flex-1">
 										<div className="flex items-center gap-2 mb-2">
 											<h4 className="font-semibold">{point.name}</h4>
-											{selectedPoint?.id === point.id && (
+											{displaySelectedPoint?.id === point.id && (
 												<Icon name="check" className="h-4 w-4 text-primary" />
 											)}
 										</div>
@@ -187,24 +194,21 @@ export function MondialRelayPickupSelector({
 				</div>
 			)}
 
-			{selectedPoint && (
+			{displaySelectedPoint && (
 				<div className="p-4 border rounded-lg bg-muted/50">
 					<div className="flex items-start justify-between">
 						<div>
 							<p className="font-semibold text-sm mb-1">Selected Pickup Point</p>
-							<p className="text-sm">{selectedPoint.name}</p>
+							<p className="text-sm">{displaySelectedPoint.name}</p>
 							<p className="text-xs text-muted-foreground">
-								{selectedPoint.address}, {selectedPoint.postalCode} {selectedPoint.city}
+								{displaySelectedPoint.address}, {displaySelectedPoint.postalCode} {displaySelectedPoint.city}
 							</p>
 						</div>
 						<Button
 							type="button"
 							variant="ghost"
 							size="sm"
-							onClick={() => {
-								setSelectedPoint(null)
-								onPickupPointSelect(null)
-							}}
+							onClick={() => handlePointSelect(null)}
 							className="transition-all duration-200"
 						>
 							<Icon name="cross-1" className="h-4 w-4" />

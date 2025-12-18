@@ -1,8 +1,8 @@
 import { getFormProps, getInputProps, useForm, useInputControl } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
-import { useEffect, useState } from 'react'
-import { Form, redirect, redirectDocument, useActionData, useLoaderData } from 'react-router'
+import { useEffect, useMemo, useState } from 'react'
+import { Form, redirect, redirectDocument, useLoaderData } from 'react-router'
 import { z } from 'zod'
 import { ErrorList } from '#app/components/forms.tsx'
 import { MondialRelayPickupSelector } from '#app/components/shipping/mondial-relay-pickup-selector.tsx'
@@ -14,7 +14,12 @@ import { prisma } from '#app/utils/db.server.ts'
 import { useIsPending } from '#app/utils/misc.tsx'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
-import { getShippingCost, getShippingMethodsForCountry } from '#app/utils/shipping.server.ts'
+import {
+	getShippingCost,
+	getShippingMethodsForCountry,
+	type PriceRate,
+	type WeightRate,
+} from '#app/utils/shipping.server.ts'
 import { type Route } from './+types/delivery.ts'
 
 const DeliveryFormSchema = z.object({
@@ -26,6 +31,11 @@ const DeliveryFormSchema = z.object({
 		}).min(1, { error: 'Shipping method is required' }),
 	),
 	mondialRelayPickupPointId: z.preprocess(
+		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
+		z.string().optional(),
+	),
+	// Pickup point address fields (stored as JSON string for URL param passing)
+	mondialRelayPickupPointData: z.preprocess(
 		(val) => (Array.isArray(val) ? val[0] : val === '' ? undefined : val),
 		z.string().optional(),
 	),
@@ -101,6 +111,7 @@ export async function action({ request }: Route.ActionArgs) {
 
 	const shippingMethodId = submission.value.shippingMethodId
 	const mondialRelayPickupPointId = submission.value.mondialRelayPickupPointId || ''
+	const mondialRelayPickupPointData = submission.value.mondialRelayPickupPointData || ''
 
 	// Get cart for weight calculation
 	const { cart } = await getOrCreateCartFromRequest(request)
@@ -165,28 +176,81 @@ export async function action({ request }: Route.ActionArgs) {
 		`country=${encodeURIComponent(country)}&` +
 		`shippingMethodId=${encodeURIComponent(shippingMethodId)}&` +
 		`shippingCost=${shippingCost}&` +
-		`mondialRelayPickupPointId=${encodeURIComponent(mondialRelayPickupPointId)}`
+		`mondialRelayPickupPointId=${encodeURIComponent(mondialRelayPickupPointId)}&` +
+		`mondialRelayPickupPointData=${encodeURIComponent(mondialRelayPickupPointData)}`
 	)
 }
 
 export const meta: Route.MetaFunction = () => [{ title: 'Delivery | Checkout' }]
 
+/**
+ * Calculates shipping cost for a given shipping method, subtotal, and optional weight.
+ * @param method - The shipping method
+ * @param subtotal - The order subtotal in cents
+ * @param totalWeightGrams - Optional total weight in grams (required for WEIGHT_BASED rate type)
+ * @returns The shipping cost in cents
+ */
+function calculateShippingCost(
+	method: {
+		rateType: 'FLAT' | 'FREE' | 'PRICE_BASED' | 'WEIGHT_BASED'
+		flatRate?: number | null
+		freeShippingThreshold?: number | null
+		priceRates?: PriceRate[] | null
+		weightRates?: WeightRate[] | null
+	},
+	subtotal: number,
+	totalWeightGrams?: number,
+): number {
+	if (method.rateType === 'FLAT') {
+		return method.flatRate ?? 0
+	}
+	
+	if (method.rateType === 'FREE') {
+		if (method.freeShippingThreshold && subtotal >= method.freeShippingThreshold) {
+			return 0
+		}
+		return method.flatRate ?? 0
+	}
+	
+	if (method.rateType === 'PRICE_BASED') {
+		if (!method.priceRates) return 0
+		const matchingRate = method.priceRates.find(
+			(rate) => subtotal >= rate.minPrice && subtotal <= rate.maxPrice,
+		)
+		return matchingRate?.rate ?? 0
+	}
+	
+	if (method.rateType === 'WEIGHT_BASED') {
+		if (!method.weightRates || totalWeightGrams === undefined) {
+			// Fallback to flat rate if weight rates not configured or weight not provided
+			return method.flatRate ?? 0
+		}
+		// Find matching weight range
+		const matchingRate = method.weightRates.find((rate) => {
+			const inMinRange = totalWeightGrams >= rate.minWeightGrams
+			const inMaxRange = rate.maxWeightGrams === null || totalWeightGrams <= rate.maxWeightGrams
+			return inMinRange && inMaxRange
+		})
+		return matchingRate?.rateCents ?? method.flatRate ?? 0
+	}
+	
+	return 0
+}
+
 export default function CheckoutDelivery() {
 	const loaderData = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
 	const isPending = useIsPending()
 
 	// Initialize hooks before early return
 	const [selectedShippingMethodId, setSelectedShippingMethodId] = useState<string>('')
 	const [shippingMethods, setShippingMethods] = useState(loaderData?.shippingMethods || [])
-	const [shippingCost, setShippingCost] = useState<number>(0)
 	const [selectedPickupPointId, setSelectedPickupPointId] = useState<string>('')
 	const [mondialRelayCarrierId, setMondialRelayCarrierId] = useState<string | undefined>(undefined)
 
 	const [form, fields] = useForm({
 		id: 'delivery-form',
 		constraint: getZodConstraint(DeliveryFormSchema),
-		lastResult: actionData && typeof actionData === 'object' && 'result' in actionData ? (actionData as { result?: unknown }).result : undefined,
+		lastResult: undefined, // Action always redirects on success, validation errors handled client-side
 		onValidate({ formData }) {
 			return parseWithZod(formData, { schema: DeliveryFormSchema })
 		},
@@ -198,6 +262,7 @@ export default function CheckoutDelivery() {
 
 	const shippingMethodInput = useInputControl(fields.shippingMethodId as any)
 	const pickupPointInput = useInputControl(fields.mondialRelayPickupPointId as any)
+	const pickupPointDataInput = useInputControl(fields.mondialRelayPickupPointData as any)
 
 	// Update shipping methods when loaderData changes
 	useEffect(() => {
@@ -206,57 +271,57 @@ export default function CheckoutDelivery() {
 		}
 	}, [loaderData?.shippingMethods])
 
-	useEffect(() => {
-		if (!loaderData) return
-		
-		const subtotal = loaderData.subtotal
-		if (selectedShippingMethodId && shippingMethods.length > 0) {
-			const method = shippingMethods.find((m) => m.id === selectedShippingMethodId)
-			if (method) {
-				// Calculate shipping cost based on method rate type
-				let cost = 0
-				if (method.rateType === 'FLAT') {
-					cost = method.flatRate ?? 0
-				} else if (method.rateType === 'FREE') {
-					if (
-						method.freeShippingThreshold &&
-						subtotal >= method.freeShippingThreshold
-					) {
-						cost = 0
-					} else {
-						cost = method.flatRate ?? 0
-					}
-				} else if (method.rateType === 'PRICE_BASED') {
-					if (method.priceRates && Array.isArray(method.priceRates)) {
-						const priceRates = method.priceRates as Array<{
-							minPrice: number
-							maxPrice: number
-							rate: number
-						}>
-						const matchingRate = priceRates.find(
-							(rate) =>
-								subtotal >= rate.minPrice &&
-								subtotal <= rate.maxPrice,
-						)
-						cost = matchingRate?.rate ?? 0
-					}
-				}
-				setShippingCost(cost)
+	// Calculate total weight from cart items
+	const totalWeightGrams = useMemo(() => {
+		if (!loaderData?.cart?.items) return undefined
+		const DEFAULT_WEIGHT_GRAMS = 500
+		return loaderData.cart.items.reduce((sum, item) => {
+			const itemWeight =
+				item.variant?.weightGrams ??
+				item.product.weightGrams ??
+				DEFAULT_WEIGHT_GRAMS
+			return sum + itemWeight * item.quantity
+		}, 0)
+	}, [loaderData?.cart?.items])
 
-				// Check if this is a Mondial Relay method
-				if (method.carrier?.apiProvider === 'mondial_relay') {
-					setMondialRelayCarrierId(method.carrier.id)
-				} else {
-					setMondialRelayCarrierId(undefined)
-					setSelectedPickupPointId('')
-				}
-			}
+	// Calculate shipping cost using useMemo for derived state
+	const shippingCost = useMemo(() => {
+		if (!loaderData || !selectedShippingMethodId || shippingMethods.length === 0) {
+			return 0
+		}
+		const method = shippingMethods.find((m) => m.id === selectedShippingMethodId)
+		if (!method) {
+			return 0
+		}
+		return calculateShippingCost(
+			{
+				rateType: method.rateType,
+				flatRate: method.flatRate,
+				freeShippingThreshold: method.freeShippingThreshold,
+				priceRates: method.priceRates as PriceRate[] | null,
+				weightRates: method.weightRates as WeightRate[] | null,
+			},
+			loaderData.subtotal,
+			totalWeightGrams,
+		)
+	}, [selectedShippingMethodId, shippingMethods, loaderData, totalWeightGrams])
+
+	// Update Mondial Relay carrier ID when shipping method changes
+	useEffect(() => {
+		if (!selectedShippingMethodId || shippingMethods.length === 0) {
+			setMondialRelayCarrierId(undefined)
+			setSelectedPickupPointId('')
+			return
+		}
+		
+		const method = shippingMethods.find((m) => m.id === selectedShippingMethodId)
+		if (method?.carrier?.apiProvider === 'mondial_relay') {
+			setMondialRelayCarrierId(method.carrier.id)
 		} else {
-			setShippingCost(0)
 			setMondialRelayCarrierId(undefined)
 			setSelectedPickupPointId('')
 		}
-	}, [selectedShippingMethodId, shippingMethods, loaderData])
+	}, [selectedShippingMethodId, shippingMethods])
 
 	if (!loaderData) {
 		return (
@@ -292,33 +357,17 @@ export default function CheckoutDelivery() {
 						) : (
 							<div className="space-y-3">
 								{shippingMethods.map((method) => {
-									let methodCost = 0
-									if (method.rateType === 'FLAT') {
-										methodCost = method.flatRate ?? 0
-									} else if (method.rateType === 'FREE') {
-										if (
-											method.freeShippingThreshold &&
-											subtotal >= method.freeShippingThreshold
-										) {
-											methodCost = 0
-										} else {
-											methodCost = method.flatRate ?? 0
-										}
-									} else if (method.rateType === 'PRICE_BASED') {
-										if (method.priceRates && Array.isArray(method.priceRates)) {
-											const priceRates = method.priceRates as Array<{
-												minPrice: number
-												maxPrice: number
-												rate: number
-											}>
-											const matchingRate = priceRates.find(
-												(rate) =>
-													subtotal >= rate.minPrice &&
-													subtotal <= rate.maxPrice,
-											)
-											methodCost = matchingRate?.rate ?? 0
-										}
-									}
+									const methodCost = calculateShippingCost(
+										{
+											rateType: method.rateType,
+											flatRate: method.flatRate,
+											freeShippingThreshold: method.freeShippingThreshold,
+											priceRates: method.priceRates as PriceRate[] | null,
+											weightRates: method.weightRates as WeightRate[] | null,
+										},
+										subtotal,
+										totalWeightGrams,
+									)
 
 									return (
 										<label
@@ -399,12 +448,32 @@ export default function CheckoutDelivery() {
 									const id = pickupPoint?.id || ''
 									setSelectedPickupPointId(id)
 									pickupPointInput.change(id)
+									// Store pickup point data as JSON string for passing through URL params
+									// Store address lines separately for API2 (Streetname max 40 chars)
+									if (pickupPoint) {
+										const pickupPointData = JSON.stringify({
+											name: pickupPoint.name,
+											address: pickupPoint.address, // Keep for display/fallback
+											addressLine1: pickupPoint.addressLine1, // For AddressAdd1
+											addressLine2: pickupPoint.addressLine2, // For AddressAdd2
+											addressLine3: pickupPoint.addressLine3, // For Streetname (max 40 chars)
+											postalCode: pickupPoint.postalCode,
+											city: pickupPoint.city,
+											country: pickupPoint.country,
+										})
+										pickupPointDataInput.change(pickupPointData)
+									} else {
+										pickupPointDataInput.change('')
+									}
 								}}
 								errors={fields.mondialRelayPickupPointId?.errors}
 							/>
 							<input
 								{...getInputProps(fields.mondialRelayPickupPointId, { type: 'hidden' })}
 								value={selectedPickupPointId}
+							/>
+							<input
+								{...getInputProps(fields.mondialRelayPickupPointData, { type: 'hidden' })}
 							/>
 						</div>
 					)}

@@ -119,6 +119,105 @@ enum ShippingRateType {
 }
 ```
 
+## Rate Structure Details
+
+### Type Definitions
+
+The shipping rate structures are defined as TypeScript types in `app/utils/shipping.server.ts`:
+
+```typescript
+export type PriceRate = {
+  minPrice: number    // Minimum order subtotal in cents
+  maxPrice: number    // Maximum order subtotal in cents
+  rate: number        // Shipping cost in cents for this price range
+}
+
+export type WeightRate = {
+  minWeightGrams: number      // Minimum weight in grams
+  maxWeightGrams: number | null // Maximum weight in grams (null = open-ended)
+  rateCents: number           // Shipping cost in cents for this weight range
+}
+```
+
+### JSON Structure Examples
+
+**PriceRate Example:**
+```json
+[
+  {"minPrice": 0, "maxPrice": 5000, "rate": 500},
+  {"minPrice": 5001, "maxPrice": 10000, "rate": 1000},
+  {"minPrice": 10001, "maxPrice": 999999, "rate": 0}
+]
+```
+
+**WeightRate Example:**
+```json
+[
+  {"minWeightGrams": 0, "maxWeightGrams": 1000, "rateCents": 500},
+  {"minWeightGrams": 1001, "maxWeightGrams": 5000, "rateCents": 1000},
+  {"minWeightGrams": 5001, "maxWeightGrams": null, "rateCents": 2000}
+]
+```
+
+Note: `maxWeightGrams: null` indicates an open-ended range (e.g., "5001g and above").
+
+### Rate Calculation Logic
+
+The `calculateShippingRate()` function in `app/utils/shipping.server.ts` handles rate calculation:
+
+- **FLAT**: Returns `flatRate` directly
+- **PRICE_BASED**: Finds the first `PriceRate` where `subtotal >= minPrice && subtotal <= maxPrice`
+- **WEIGHT_BASED**: Finds the first `WeightRate` where weight falls within the range (with null handling for open-ended ranges)
+- **FREE**: Returns 0 if `subtotal >= freeShippingThreshold`, otherwise returns `flatRate`
+
+**Fallback Behavior:**
+- If no matching rate is found for PRICE_BASED or WEIGHT_BASED, returns 0
+- If `weightRates` is null/empty for WEIGHT_BASED, falls back to `flatRate`
+- If weight is not provided for WEIGHT_BASED, falls back to `flatRate`
+
+### Zod Validation
+
+Rate structures are validated using Zod schemas in `app/routes/admin+/shipping+/methods+/new.tsx`:
+
+```typescript
+const PriceRateSchema = z.object({
+  minPrice: z.number().int().min(0),
+  maxPrice: z.number().int().min(0),
+  rate: z.number().int().min(0),
+})
+
+const WeightRateSchema = z.object({
+  minWeightGrams: z.number().int().min(0),
+  maxWeightGrams: z.number().int().min(0).nullable(),
+  rateCents: z.number().int().min(0),
+})
+```
+
+The form uses `z.preprocess()` to parse JSON strings and validate the structure:
+
+```typescript
+weightRates: z.preprocess(
+  (val) => {
+    // Parse JSON string
+    if (!val || val === '' || val === null || val === undefined) return null
+    const str = String(val)
+    if (str.trim() === '') return null
+    try {
+      const parsed = JSON.parse(str)
+      return Array.isArray(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  },
+  z.array(WeightRateSchema).nullable().optional(),
+)
+```
+
+This ensures:
+- JSON strings are properly parsed
+- Arrays are validated against the schema structure
+- Type inference works correctly (returns `WeightRate[] | null | undefined`)
+
 ### Order Model Updates
 
 ```prisma
@@ -131,11 +230,17 @@ model Order {
   shippingMethodName String? // Snapshot of method name
   shippingCarrierName String? // Snapshot of carrier name
   
-  // Mondial Relay specific
-  mondialRelayPickupPointId String? // Selected Point Relais® ID
-  mondialRelayPickupPointName String? // Snapshot of pickup point name/address
-  mondialRelayShipmentNumber String? // Mondial Relay shipment number (from API2)
-  mondialRelayLabelUrl String? // URL to shipping label PDF
+  // Mondial Relay specific (nullable - only populated if using Mondial Relay)
+  mondialRelayPickupPointId       String? // Selected Point Relais® ID
+  mondialRelayPickupPointName     String? // Snapshot of pickup point name
+  mondialRelayPickupPointAddress  String? // Pickup point street address
+  mondialRelayPickupPointPostalCode String? // Pickup point postal code
+  mondialRelayPickupPointCity     String? // Pickup point city
+  mondialRelayPickupPointCountry  String? // Pickup point country code
+  mondialRelayPickupPointData     String? // Full pickup point data as JSON (includes addressLine1, addressLine2, addressLine3)
+  
+  // Note: Shipment numbers and label URLs are NOT stored in orders
+  // These are created on-demand when admins initiate shipment (see ADR 003)
   
   // ... rest of existing fields ...
   
@@ -182,10 +287,12 @@ MONDIAL_RELAY_API2_CUSTOMER_ID=...     # CustomerId (2-8 characters)
 - Manage shipping methods and rates
 
 ### Phase 5: Mondial Relay API Integration
-- API1: Pickup point search and selection
-- API2: Shipment creation and label generation
+- API1: Pickup point search and selection (completed)
+- API2: Shipment creation and label generation (manual, not automatic)
 - Tracking integration (API1)
-- Admin interface for label management
+- Admin interface for manual shipment and label management
+
+**Note**: Shipments and labels are created manually by admins, not automatically upon order creation. See [ADR 003: Manual Shipment Fulfillment](../decisions/003-manual-shipment-fulfillment.md) for the decision rationale.
 
 ## Key Files to Create/Modify
 

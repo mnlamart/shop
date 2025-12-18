@@ -96,6 +96,47 @@ onBlur={(e) => {
 - Simplified to signed storage URLs only
 - Fixture images handled by mock server
 
+### 6. Shipping Rate Calculation
+
+**Decision**: Use range-based rate calculation with fallback behavior for shipping methods.
+
+**Reasoning**:
+- **Flexibility**: Supports multiple rate calculation strategies (FLAT, WEIGHT_BASED, PRICE_BASED, FREE)
+- **User Experience**: Provides predictable shipping costs based on order characteristics
+- **Admin Control**: Allows fine-grained rate configuration per shipping method
+- **Error Handling**: Fallback behavior prevents shipping cost calculation failures
+
+**Implementation**:
+- Rate structures defined as TypeScript types (`PriceRate`, `WeightRate`) in `app/utils/shipping.server.ts`
+- Range matching logic finds first matching rate for PRICE_BASED and WEIGHT_BASED
+- Fallback to `flatRate` when weight not provided or no matching range found
+- Nullable `maxWeightGrams` supports open-ended weight ranges (e.g., "5000g and above")
+- Zod validation ensures rate structures are properly formatted
+
+**Pattern**:
+```typescript
+// Find matching rate for PRICE_BASED
+const matchingRate = priceRates.find(
+  (rate) => subtotal >= rate.minPrice && subtotal <= rate.maxPrice
+)
+return matchingRate?.rate ?? 0
+
+// Find matching rate for WEIGHT_BASED with nullable maxWeightGrams
+const matchingRate = weightRates.find((rate) => {
+  const inMinRange = totalWeightGrams >= rate.minWeightGrams
+  const inMaxRange = rate.maxWeightGrams === null || totalWeightGrams <= rate.maxWeightGrams
+  return inMinRange && inMaxRange
+})
+return matchingRate?.rateCents ?? method.flatRate ?? 0
+```
+
+**Trade-offs**:
+- ✅ Flexible rate configuration
+- ✅ Supports complex pricing scenarios
+- ✅ Graceful fallback behavior
+- ⚠️ Requires careful range configuration to avoid gaps
+- ⚠️ Admin must understand range matching logic
+
 ## Performance Considerations
 
 ### Database Optimization

@@ -1,10 +1,7 @@
 import { invariantResponse } from '@epic-web/invariant'
-import { useState } from 'react'
-import { useFetcher } from 'react-router'
 import { OrderStatusBadge } from '#app/components/order-status-badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
-import { Icon } from '#app/components/ui/icon.tsx'
 import { getUserId } from '#app/utils/auth.server.ts'
 import { getOrderByOrderNumber } from '#app/utils/order.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
@@ -48,32 +45,6 @@ export const meta: Route.MetaFunction = ({ loaderData }) => {
 
 export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 	const { order } = loaderData
-	const [showTracking, setShowTracking] = useState(false)
-
-	const trackingFetcher = useFetcher<{
-		trackingInfo?: {
-			status: string
-			statusCode: string
-			events: Array<{
-				date: Date
-				description: string
-				location?: string
-			}>
-		}
-		error?: string
-		message?: string
-	}>()
-
-	// Fetch tracking info when button is clicked
-	const handleLoadTracking = () => {
-		if (!showTracking && order.mondialRelayShipmentNumber) {
-			const url = new URL(window.location.href)
-			const email = url.searchParams.get('email')
-		const trackingUrl = `/shop/orders/${order.orderNumber}/tracking${email ? `?email=${encodeURIComponent(email)}` : ''}`
-		void trackingFetcher.load(trackingUrl)
-		setShowTracking(true)
-		}
-	}
 
 	return (
 		<div className="container mx-auto px-4 py-8 space-y-8">
@@ -165,32 +136,6 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 											{order.mondialRelayPickupPointName}
 										</p>
 									)}
-									{order.mondialRelayShipmentNumber && (
-										<div className="mt-2">
-											<p className="mb-2">
-												<strong>Shipment Number:</strong> {order.mondialRelayShipmentNumber}
-											</p>
-											<Button
-												type="button"
-												variant="outline"
-												size="sm"
-												onClick={handleLoadTracking}
-												disabled={trackingFetcher.state === 'loading'}
-											>
-												{trackingFetcher.state === 'loading' ? (
-													<>
-														<Icon name="update" className="h-4 w-4 animate-spin mr-2" />
-														Loading...
-													</>
-												) : (
-													<>
-														<Icon name="magnifying-glass" className="h-4 w-4 mr-2" />
-														{showTracking ? 'Refresh Tracking' : 'View Tracking'}
-													</>
-												)}
-											</Button>
-										</div>
-									)}
 								</div>
 							)}
 							<div className="border-t pt-4 flex justify-between text-lg font-bold">
@@ -245,79 +190,6 @@ export default function OrderDetail({ loaderData }: Route.ComponentProps) {
 						</CardContent>
 					</Card>
 
-					{/* Tracking Information */}
-					{showTracking && order.mondialRelayShipmentNumber && (
-						<Card>
-							<CardHeader>
-								<h2>Tracking Information</h2>
-							</CardHeader>
-							<CardContent>
-								{trackingFetcher.state === 'loading' && (
-									<div className="text-center py-4">
-										<Icon name="update" className="h-6 w-6 animate-spin mx-auto mb-2" />
-										<p className="text-sm text-muted-foreground">Loading tracking information...</p>
-									</div>
-								)}
-
-								{trackingFetcher.data?.error && (
-									<div className="p-4 border border-destructive/50 rounded-lg bg-destructive/10">
-										<p className="text-sm text-destructive">
-											{trackingFetcher.data.error}
-											{trackingFetcher.data.message && `: ${trackingFetcher.data.message}`}
-										</p>
-									</div>
-								)}
-
-								{trackingFetcher.data?.trackingInfo && (
-									<div className="space-y-4">
-										<div>
-											<p className="text-sm text-muted-foreground">Status</p>
-											<p className="font-semibold">{trackingFetcher.data.trackingInfo.status}</p>
-										</div>
-
-										{trackingFetcher.data.trackingInfo.events.length > 0 && (
-											<div>
-												<p className="text-sm text-muted-foreground mb-2">Tracking Events</p>
-												<div className="space-y-3">
-													{trackingFetcher.data.trackingInfo.events.map((event, index) => (
-														<div
-															key={index}
-															className="flex items-start gap-3 pb-3 border-b last:border-0"
-														>
-															<div className="flex-shrink-0 w-2 h-2 rounded-full bg-primary mt-2" />
-															<div className="flex-1">
-																<p className="font-medium">{event.description}</p>
-																{event.location && (
-																	<p className="text-sm text-muted-foreground">
-																		{event.location}
-																	</p>
-																)}
-																<p className="text-xs text-muted-foreground">
-																	{new Date(event.date).toLocaleString('en-US', {
-																		year: 'numeric',
-																		month: 'short',
-																		day: 'numeric',
-																		hour: '2-digit',
-																		minute: '2-digit',
-																	})}
-																</p>
-															</div>
-														</div>
-													))}
-												</div>
-											</div>
-										)}
-
-										{trackingFetcher.data.trackingInfo.events.length === 0 && (
-											<p className="text-sm text-muted-foreground">
-												No tracking events available yet.
-											</p>
-										)}
-									</div>
-								)}
-							</CardContent>
-						</Card>
-					)}
 				</div>
 			</div>
 

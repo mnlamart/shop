@@ -28,6 +28,17 @@ Documentation of the checkout success page fallback mechanism, including polling
 ### [Schema Validation](implementation-notes.md#schema-validation)
 All schemas use Zod v4 syntax with the `error` parameter for consistent, user-friendly validation messages. See [Implementation Notes](implementation-notes.md) for details.
 
+### [Shipping System Implementation](plans/shipping-system-implementation.md)
+Complete documentation of the shipping system, including carriers, zones, methods, rate calculation, and Mondial Relay API integration.
+
+## Architecture Decision Records (ADRs)
+
+Architecture Decision Records document significant architectural decisions and their rationale:
+
+- **[ADR 001: Price Storage as Integer Cents](decisions/001-price-storage-as-integer-cents.md)** - Decision to store prices as integers (cents) instead of Decimal types
+- **[ADR 002: Store-Level Currency Configuration](decisions/002-store-level-currency.md)** - Decision to implement currency at store level rather than product level
+- **[ADR 003: Manual Shipment Fulfillment](decisions/003-manual-shipment-fulfillment.md)** - Decision to use manual shipment and label creation instead of automatic fulfillment
+
 ## Planning Documentation
 
 ### [Admin Product Management Plan](plans/001-admin-product-management.md)
@@ -35,6 +46,9 @@ Original implementation plan with status updates and completion notes. Shows the
 
 ### [Shopping Cart System Plan](plans/002-shopping-cart-system.md)
 Implementation plan for the shopping cart system, including guest and authenticated user flows, cart merging, and checkout integration.
+
+### [Shipping System Implementation Plan](plans/shipping-system-implementation.md)
+Implementation plan for the shipping system, including carriers, zones, methods, rate structures, and Mondial Relay API integration.
 
 ### [Checkout Test Refactoring Plan](checkout-test-refactoring-plan.md)
 Documentation of the checkout test refactoring process. ✅ **Completed** - All checkout tests are now active and passing.
@@ -49,6 +63,7 @@ Documentation of the checkout test refactoring process. ✅ **Completed** - All 
 - **Shopping Cart**: Guest and authenticated user carts with merge on login
 - **Checkout Flow**: Stripe integration with webhook handling and fallback mechanism
 - **Order Management**: Complete order lifecycle with status tracking and notifications
+- **Shipping System**: Flexible carrier-based shipping with zones, methods, and rate calculation
 - **Image Handling**: Fixture system for development, Tigris storage for production
 - **Admin Navigation**: Improved sidebar with direct links, better UX, and updated icons
 - **Admin Security**: Role-based access control with ARIA compliance

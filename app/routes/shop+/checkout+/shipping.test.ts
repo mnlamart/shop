@@ -118,6 +118,11 @@ describe('Checkout Shipping Step', () => {
 				context: {},
 			})
 
+			// Check if result is a Response (redirect) or data object
+			if (result instanceof Response) {
+				throw new Error('Expected data object, got Response')
+			}
+
 			expect(result).toHaveProperty('cart')
 			expect(result).toHaveProperty('currency')
 			expect(result).toHaveProperty('subtotal')
@@ -218,6 +223,11 @@ describe('Checkout Shipping Step', () => {
 				context: {},
 			})
 
+			// Check if result is a Response (redirect) or data object
+			if (result instanceof Response) {
+				throw new Error('Expected data object, got Response')
+			}
+
 			expect(result.savedAddresses).toHaveLength(1)
 			expect(result.savedAddresses[0]?.name).toBe('John Doe')
 			expect(result.defaultShippingAddress?.name).toBe('John Doe')
@@ -282,7 +292,7 @@ describe('Checkout Shipping Step', () => {
 			}
 		})
 
-		test('redirects to payment step with shipping data', async () => {
+		test('redirects to delivery step with shipping address data', async () => {
 			// Create product and cart
 			const product = await prisma.product.create({
 				data: {
@@ -312,7 +322,7 @@ describe('Checkout Shipping Step', () => {
 			authSession.set(sessionKey, session.id)
 			const cookieHeader = await authSessionStorage.commitSession(authSession)
 
-			// Submit form with valid data
+			// Submit form with valid data (no shippingMethodId - that's selected in delivery step)
 			const formData = new FormData()
 			formData.append('name', 'John Doe')
 			formData.append('email', 'john@example.com')
@@ -321,7 +331,6 @@ describe('Checkout Shipping Step', () => {
 			formData.append('state', 'NY')
 			formData.append('postal', '10001')
 			formData.append('country', 'US')
-			formData.append('shippingMethodId', testMethod.id)
 			formData.append('addressId', 'new')
 
 			const request = new Request('http://localhost:3000/shop/checkout/shipping', {
@@ -343,16 +352,13 @@ describe('Checkout Shipping Step', () => {
 			if (result instanceof Response) {
 				expect(result.status).toBe(302)
 				const location = result.headers.get('location')
-				expect(location).toContain('/shop/checkout/payment')
+				expect(location).toContain('/shop/checkout/delivery')
 				expect(location).toContain('name=John%20Doe')
 				expect(location).toContain('email=john%40example.com')
-				expect(location).toContain(`shippingMethodId=${testMethod.id}`)
-				expect(location).toContain('shippingCost=500')
-				expect(mockGetShippingCost).toHaveBeenCalledWith(
-					testMethod.id,
-					expect.any(Number),
-					expect.any(Number),
-				)
+				expect(location).toContain('street=123%20Main%20St')
+				expect(location).toContain('city=New%20York')
+				expect(location).toContain('postal=10001')
+				expect(location).toContain('country=US')
 			}
 		})
 
@@ -469,10 +475,14 @@ describe('Checkout Shipping Step', () => {
 			authSession.set(sessionKey, session.id)
 			const cookieHeader = await authSessionStorage.commitSession(authSession)
 
-			// Submit form with addressId
+			// Submit form with addressId - provide all required fields (they'll be replaced with saved address data)
 			const formData = new FormData()
 			formData.append('email', 'test@example.com')
-			formData.append('shippingMethodId', testMethod.id)
+			formData.append('name', 'Temp Name') // Will be replaced with saved address
+			formData.append('street', 'Temp Street') // Will be replaced with saved address
+			formData.append('city', 'Temp City') // Will be replaced with saved address
+			formData.append('postal', '00000') // Will be replaced with saved address
+			formData.append('country', 'US') // Will be replaced with saved address
 			formData.append('addressId', savedAddress.id)
 
 			const request = new Request('http://localhost:3000/shop/checkout/shipping', {

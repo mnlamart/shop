@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-router'
 import { data } from 'react-router'
 import { z } from 'zod'
 import { searchPickupPoints } from '#app/utils/carriers/mondial-relay-api1.server.ts'
@@ -42,18 +43,25 @@ export async function loader({ request }: Route.LoaderArgs) {
 			postalCode: validPostalCode,
 			country: validCountry.toUpperCase(),
 			city: validCity,
-			maxResults: 20, // Limit to 20 results
 		})
 
 		return data({
 			pickupPoints,
 		})
 	} catch (error) {
-		console.error('Error searching pickup points:', error)
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+		Sentry.captureException(error, {
+			tags: { context: 'pickup-points-search' },
+			extra: {
+				postalCode: validPostalCode,
+				country: validCountry,
+				city: validCity,
+			},
+		})
 		return data(
 			{
 				error: 'Failed to search pickup points',
-				message: error instanceof Error ? error.message : 'Unknown error',
+				message: errorMessage,
 			},
 			{ status: 500 },
 		)

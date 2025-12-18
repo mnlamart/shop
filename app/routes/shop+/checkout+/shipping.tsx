@@ -27,7 +27,13 @@ const ShippingFormSchema = z.object({
 	),
 	saveAddress: z.preprocess(
 		(val) => {
-			return val === 'on' || val === true
+			if (val === 'on' || val === true || val === 'true') {
+				return true
+			}
+			if (val === 'off' || val === false || val === 'false' || val === '' || val === null || val === undefined) {
+				return false
+			}
+			return false
 		},
 		z.boolean().default(false),
 	),
@@ -461,9 +467,13 @@ export default function CheckoutShipping() {
 									<div className="flex items-center space-x-2">
 										<input
 											{...getInputProps(fields.saveAddress, { type: 'checkbox' })}
+											id={fields.saveAddress.id}
+											checked={isSaveAddressChecked}
 											className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary/20"
 											onChange={(e) => {
-												setSaveAddressChecked(e.target.checked)
+												const checked = e.target.checked
+												setSaveAddressChecked(checked)
+												saveAddressInput.change(checked ? 'on' : 'off')
 											}}
 										/>
 										<label
@@ -472,6 +482,12 @@ export default function CheckoutShipping() {
 										>
 											Save this address for future use
 										</label>
+										{/* Hidden input to ensure value is always submitted */}
+										<input
+											type="hidden"
+											name={fields.saveAddress.name}
+											value={isSaveAddressChecked ? 'on' : 'off'}
+										/>
 									</div>
 									{isSaveAddressChecked && (
 										<Field

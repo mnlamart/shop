@@ -32,6 +32,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 	const shippingMethodId = url.searchParams.get('shippingMethodId')
 	const shippingCostParam = url.searchParams.get('shippingCost')
 	const mondialRelayPickupPointId = url.searchParams.get('mondialRelayPickupPointId')
+	const mondialRelayPickupPointData = url.searchParams.get('mondialRelayPickupPointData')
 
 	// Validate required fields
 	if (!name || !email || !street || !city || !postal || !country || !shippingMethodId || !shippingCostParam) {
@@ -62,6 +63,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 		shippingMethodId,
 		shippingCost,
 		mondialRelayPickupPointId: mondialRelayPickupPointId || undefined,
+		mondialRelayPickupPointData: mondialRelayPickupPointData || undefined,
 	}
 }
 
@@ -79,6 +81,7 @@ export async function action({ request }: Route.ActionArgs) {
 	const shippingMethodId = url.searchParams.get('shippingMethodId')
 	const shippingCostParam = url.searchParams.get('shippingCost')
 	const mondialRelayPickupPointId = url.searchParams.get('mondialRelayPickupPointId')
+	const mondialRelayPickupPointData = url.searchParams.get('mondialRelayPickupPointData')
 
 	// Validate required fields
 	if (!name || !email || !street || !city || !postal || !country || !shippingMethodId || !shippingCostParam) {
@@ -170,6 +173,7 @@ export async function action({ request }: Route.ActionArgs) {
 			shippingMethodId,
 			shippingCost,
 			mondialRelayPickupPointId: mondialRelayPickupPointId || undefined,
+			mondialRelayPickupPointData: mondialRelayPickupPointData || undefined,
 			currency,
 			domainUrl,
 			userId: userId || undefined,

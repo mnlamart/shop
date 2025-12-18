@@ -17,6 +17,19 @@ import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { type Route } from './+types/new.ts'
 
+// Zod schemas for rate structures
+const PriceRateSchema = z.object({
+	minPrice: z.number().int().min(0),
+	maxPrice: z.number().int().min(0),
+	rate: z.number().int().min(0),
+})
+
+const WeightRateSchema = z.object({
+	minWeightGrams: z.number().int().min(0),
+	maxWeightGrams: z.number().int().min(0).nullable(),
+	rateCents: z.number().int().min(0),
+})
+
 const ShippingMethodSchema = z.object({
 	name: z
 		.string({
@@ -40,28 +53,34 @@ const ShippingMethodSchema = z.object({
 		},
 		z.number().int().min(0).nullable().optional(),
 	),
-	weightRates: z
-		.string()
-		.optional()
-		.transform((val) => {
-			if (!val || val.trim() === '') return null
+	weightRates: z.preprocess(
+		(val) => {
+			if (!val || val === '' || val === null || val === undefined) return null
+			const str = String(val)
+			if (str.trim() === '') return null
 			try {
-				return JSON.parse(val)
+				const parsed = JSON.parse(str)
+				return Array.isArray(parsed) ? parsed : null
 			} catch {
 				return null
 			}
-		}),
-	priceRates: z
-		.string()
-		.optional()
-		.transform((val) => {
-			if (!val || val.trim() === '') return null
+		},
+		z.array(WeightRateSchema).nullable().optional(),
+	),
+	priceRates: z.preprocess(
+		(val) => {
+			if (!val || val === '' || val === null || val === undefined) return null
+			const str = String(val)
+			if (str.trim() === '') return null
 			try {
-				return JSON.parse(val)
+				const parsed = JSON.parse(str)
+				return Array.isArray(parsed) ? parsed : null
 			} catch {
 				return null
 			}
-		}),
+		},
+		z.array(PriceRateSchema).nullable().optional(),
+	),
 	freeShippingThreshold: z.preprocess(
 		(val) => {
 			if (val === '' || val === null || val === undefined) return null
@@ -137,20 +156,22 @@ export async function action({ request }: Route.ActionArgs) {
 				if (!data.weightRates || !Array.isArray(data.weightRates) || data.weightRates.length === 0) {
 					ctx.addIssue({
 						code: 'custom',
-						message: 'Weight rates are required',
+						message: 'Weight rates are required and must be a non-empty array',
 						path: ['weightRates'],
 					})
 				}
+				// Structure validation is handled by the schema itself (z.array(WeightRateSchema))
 			}
 
 			if (data.rateType === 'PRICE_BASED') {
 				if (!data.priceRates || !Array.isArray(data.priceRates) || data.priceRates.length === 0) {
 					ctx.addIssue({
 						code: 'custom',
-						message: 'Price rates are required',
+						message: 'Price rates are required and must be a non-empty array',
 						path: ['priceRates'],
 					})
 				}
+				// Structure validation is handled by the schema itself (z.array(PriceRateSchema))
 			}
 
 			// Check uniqueness: method name must be unique per carrier

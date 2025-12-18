@@ -665,11 +665,49 @@ export async function createOrderFromStripeSession(
 				: 0
 			const mondialRelayPickupPointId =
 				session.metadata?.mondialRelayPickupPointId || null
+			const mondialRelayPickupPointDataStr =
+				session.metadata?.mondialRelayPickupPointData || null
+
+			// Parse pickup point data if available
+			let mondialRelayPickupPointName: string | null = null
+			let mondialRelayPickupPointAddress: string | null = null
+			let mondialRelayPickupPointPostalCode: string | null = null
+			let mondialRelayPickupPointCity: string | null = null
+			let mondialRelayPickupPointCountry: string | null = null
+			let mondialRelayPickupPointData: string | null = null // Store full JSON for later use
+
+			if (mondialRelayPickupPointDataStr) {
+				try {
+					const pickupPointData = JSON.parse(mondialRelayPickupPointDataStr) as {
+						name?: string
+						address?: string
+						addressLine1?: string // For AddressAdd1 in API2
+						addressLine2?: string // For AddressAdd2 in API2
+						addressLine3?: string // For Streetname in API2 (max 40 chars)
+						postalCode?: string
+						city?: string
+						country?: string
+					}
+					mondialRelayPickupPointName = pickupPointData.name || null
+					// Use addressLine3 (street address) for the main address field, fallback to combined address
+					mondialRelayPickupPointAddress = pickupPointData.addressLine3 || pickupPointData.address || null
+					mondialRelayPickupPointPostalCode = pickupPointData.postalCode || null
+					mondialRelayPickupPointCity = pickupPointData.city || null
+					mondialRelayPickupPointCountry = pickupPointData.country || null
+					// Store full JSON data for shipment creation (needed for addressLine1, addressLine2, addressLine3)
+					mondialRelayPickupPointData = mondialRelayPickupPointDataStr
+				} catch (error) {
+					// Log but don't fail order creation if parsing fails
+					Sentry.captureException(error, {
+						tags: { context: 'order-pickup-point-data-parsing' },
+						extra: { mondialRelayPickupPointDataStr },
+					})
+				}
+			}
 
 			// Get shipping method details if available
 			let shippingMethodName: string | null = null
 			let shippingCarrierName: string | null = null
-			let mondialRelayPickupPointName: string | null = null
 
 			if (shippingMethodId) {
 				const shippingMethod = await tx.shippingMethod.findUnique({
@@ -714,6 +752,11 @@ export async function createOrderFromStripeSession(
 					shippingCarrierName,
 					mondialRelayPickupPointId,
 					mondialRelayPickupPointName,
+					mondialRelayPickupPointAddress,
+					mondialRelayPickupPointPostalCode,
+					mondialRelayPickupPointCity,
+					mondialRelayPickupPointCountry,
+					mondialRelayPickupPointData, // Store full JSON for shipment creation
 					stripeCheckoutSessionId: session.id,
 					stripePaymentIntentId: paymentIntentId,
 					stripeChargeId: chargeId,

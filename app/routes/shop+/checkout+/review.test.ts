@@ -83,6 +83,11 @@ describe('Checkout Review Step', () => {
 			context: {},
 		})
 
+		// Check if result is a Response (redirect) or data object
+		if (result instanceof Response) {
+			throw new Error('Expected data object, got Response')
+		}
+
 		expect(result).toHaveProperty('cart')
 		expect(result).toHaveProperty('currency')
 		expect(result).toHaveProperty('subtotal')
@@ -120,8 +125,9 @@ describe('Checkout Review Step', () => {
 			context: {},
 		})
 
-		expect(result).toHaveProperty('status')
-		if ('status' in result && result.status === 302) {
+		expect(result).toBeInstanceOf(Response)
+		if (result instanceof Response) {
+			expect(result.status).toBe(302)
 			expect(result.headers.get('location')).toBe('/shop/cart')
 		}
 	})
@@ -161,6 +167,11 @@ describe('Checkout Review Step', () => {
 			params: {},
 			context: {},
 		})
+
+		// Check if result is a Response (redirect) or data object
+		if (result instanceof Response) {
+			throw new Error('Expected data object, got Response')
+		}
 
 		expect(result).toHaveProperty('cart')
 		expect(result.cart.items).toHaveLength(1)
@@ -219,6 +230,11 @@ describe('Checkout Review Step', () => {
 			params: {},
 			context: {},
 		})
+
+		// Check if result is a Response (redirect) or data object
+		if (result instanceof Response) {
+			throw new Error('Expected data object, got Response')
+		}
 
 		expect(result.subtotal).toBe(4500) // 3 * $15.00 = $45.00 (uses variant price, not product price)
 		expect(result.cart.items[0]?.variant?.price).toBe(1500)

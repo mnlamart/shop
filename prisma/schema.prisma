@@ -480,10 +480,13 @@ model Order {
   shippingCarrierName String? // Snapshot of carrier name (e.g., "Mondial Relay")
 
   // Mondial Relay specific (nullable - only populated if using Mondial Relay)
-  mondialRelayPickupPointId   String? // Selected Point Relais® ID
-  mondialRelayPickupPointName String? // Snapshot of pickup point name/address
-  mondialRelayShipmentNumber  String? // Mondial Relay shipment number (from API2)
-  mondialRelayLabelUrl        String? // URL to shipping label PDF
+  mondialRelayPickupPointId       String? // Selected Point Relais® ID
+  mondialRelayPickupPointName     String? // Snapshot of pickup point name
+  mondialRelayPickupPointAddress  String? // Pickup point street address
+  mondialRelayPickupPointPostalCode String? // Pickup point postal code
+  mondialRelayPickupPointCity     String? // Pickup point city
+  mondialRelayPickupPointCountry  String? // Pickup point country code
+  mondialRelayPickupPointData     String? // Full pickup point data as JSON (includes addressLine1, addressLine2, addressLine3)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

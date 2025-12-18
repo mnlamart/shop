@@ -9,6 +9,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 	const url = new URL(request.url)
 	const pathname = url.pathname
 
+	// Skip cart validation for success page (cart is empty after checkout)
+	if (pathname.includes('/checkout/success')) {
+		return { currentStep: 'payment' as CheckoutStep }
+	}
+
 	// Check if cart exists and has items - redirect early if not
 	// Use findFirst to avoid creating empty carts or sessions
 	const userId = await getUserId(request)

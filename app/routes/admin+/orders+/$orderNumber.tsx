@@ -149,18 +149,6 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 	const { order, currency } = loaderData
 	const statusFetcher = useFetcher()
 	const cancelFetcher = useFetcher()
-	const createShipmentFetcher = useFetcher<{
-		success?: boolean
-		error?: string
-		message?: string
-		shipmentNumber?: string
-	}>()
-	const syncTrackingFetcher = useFetcher<{
-		success?: boolean
-		message?: string
-		newStatus?: string
-		updated?: boolean
-	}>()
 	const [status, setStatus] = useState(order.status)
 	const [trackingNumber, setTrackingNumber] = useState(order.trackingNumber || '')
 
@@ -172,28 +160,8 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 
 	const isUpdating = statusFetcher.state !== 'idle'
 	const isCancelling = cancelFetcher.state !== 'idle'
-	const isCreatingShipment = createShipmentFetcher.state !== 'idle'
-	const isSyncingTracking = syncTrackingFetcher.state !== 'idle'
-	const shipmentResult = createShipmentFetcher.data
-	const syncTrackingResult = syncTrackingFetcher.data
 	const showTrackingNumber = status === 'SHIPPED' || status === 'DELIVERED'
 	const canCancel = order.status !== 'CANCELLED'
-	
-	// Show success/error messages for shipment creation
-	useEffect(() => {
-		if (shipmentResult?.success && shipmentResult.shipmentNumber) {
-			// Reload page to show updated order with shipment number
-			window.location.reload()
-		}
-	}, [shipmentResult])
-
-	// Reload page when tracking sync updates status
-	useEffect(() => {
-		if (syncTrackingResult?.success && syncTrackingResult.updated && syncTrackingResult.newStatus) {
-			// Reload page to show updated order status
-			window.location.reload()
-		}
-	}, [syncTrackingResult])
 
 	return (
 		<div className="space-y-6 animate-slide-top">
@@ -574,163 +542,9 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 														{order.mondialRelayPickupPointName}
 													</div>
 												)}
-												{order.mondialRelayShipmentNumber && (
-													<div className="text-xs text-[var(--text-medium)]">
-														<strong>Tracking:</strong> {order.mondialRelayShipmentNumber}
-													</div>
-												)}
 											</div>
 										)}
 
-										{/* Shipment Management */}
-										{order.mondialRelayPickupPointId &&
-											order.shippingCarrierName === 'Mondial Relay' && (
-												<div className="mt-4 pt-4 border-t border-border">
-													<h3 className="text-sm font-medium mb-3">Shipment Management</h3>
-													{!order.mondialRelayShipmentNumber ? (
-														<div className="space-y-3">
-															<createShipmentFetcher.Form
-																method="POST"
-																action={`/admin/orders/${order.orderNumber}/create-shipment`}
-															>
-																<Button
-																	type="submit"
-																	variant="default"
-																	size="sm"
-																	className="h-9"
-																	disabled={isCreatingShipment}
-																	aria-busy={isCreatingShipment}
-																>
-																	{isCreatingShipment ? (
-																		<>
-																			<Icon
-																				name="update"
-																				className="h-4 w-4 mr-2 animate-spin"
-																			/>
-																			Creating...
-																		</>
-																	) : (
-																		<>
-																			<Icon name="plus" className="h-4 w-4 mr-2" />
-																			Create Shipment
-																		</>
-																	)}
-																</Button>
-															</createShipmentFetcher.Form>
-															{shipmentResult?.error && (
-																<p className="text-sm text-destructive">
-																	{shipmentResult.message || shipmentResult.error}
-																</p>
-															)}
-															{shipmentResult?.success && (
-																<p className="text-sm text-green-600">
-																	{shipmentResult.message}
-																</p>
-															)}
-														</div>
-													) : (
-														<p className="text-sm text-muted-foreground">
-															Shipment created: <strong>{order.mondialRelayShipmentNumber}</strong>
-														</p>
-													)}
-												</div>
-											)}
-
-										{/* Tracking Status Sync */}
-										{order.mondialRelayShipmentNumber &&
-											order.shippingCarrierName === 'Mondial Relay' &&
-											order.status !== 'DELIVERED' &&
-											order.status !== 'CANCELLED' && (
-												<div className="mt-4 pt-4 border-t border-border">
-													<h3 className="text-sm font-medium mb-3">Tracking Status</h3>
-													<syncTrackingFetcher.Form
-														method="POST"
-														action={`/admin/orders/${order.orderNumber}/sync-tracking`}
-													>
-														<Button
-															type="submit"
-															variant="outline"
-															size="sm"
-															className="h-9"
-															disabled={isSyncingTracking}
-															aria-busy={isSyncingTracking}
-														>
-															{isSyncingTracking ? (
-																<>
-																	<Icon
-																		name="update"
-																		className="h-4 w-4 mr-2 animate-spin"
-																	/>
-																	Syncing...
-																</>
-															) : (
-																<>
-																	<Icon name="update" className="h-4 w-4 mr-2" />
-																	Sync Tracking Status
-																</>
-															)}
-														</Button>
-													</syncTrackingFetcher.Form>
-													{syncTrackingResult?.message && (
-														<p
-															className={`text-sm mt-2 ${
-																syncTrackingResult.success && syncTrackingResult.updated
-																	? 'text-green-600'
-																	: 'text-muted-foreground'
-															}`}
-														>
-															{syncTrackingResult.message}
-														</p>
-													)}
-												</div>
-											)}
-
-										{/* Label Management */}
-										{(order.mondialRelayShipmentNumber || order.mondialRelayPickupPointId) && (
-											<div className="mt-4 pt-4 border-t border-border">
-												<h3 className="text-sm font-medium mb-3">Shipping Label</h3>
-												<div className="flex gap-2">
-													{order.mondialRelayShipmentNumber ? (
-														<Button
-															asChild
-															variant="outline"
-															size="sm"
-															className="h-9"
-														>
-															<a
-																href={`/admin/orders/${order.orderNumber}/label`}
-																target="_blank"
-																rel="noopener noreferrer"
-															>
-																<Icon name="download" className="h-4 w-4 mr-2" />
-																Download Label
-															</a>
-														</Button>
-													) : order.mondialRelayPickupPointId ? (
-														<Button
-															asChild
-															variant="default"
-															size="sm"
-															className="h-9"
-														>
-															<a
-																href={`/admin/orders/${order.orderNumber}/label?create=true`}
-																target="_blank"
-																rel="noopener noreferrer"
-															>
-																<Icon name="plus" className="h-4 w-4 mr-2" />
-																Create & Download Label
-															</a>
-														</Button>
-													) : null}
-												</div>
-												{order.mondialRelayLabelUrl && (
-													<p className="text-xs text-muted-foreground mt-2">
-														Label URL: <a href={order.mondialRelayLabelUrl} target="_blank" rel="noopener noreferrer" className="underline">{order.mondialRelayLabelUrl}</a>
-													</p>
-												)}
-											</div>
-										)}
 										<div className="flex items-center justify-between pt-2 border-t border-border">
 											<span className="text-base font-normal text-foreground">Total</span>
 											<span className="text-lg font-normal text-foreground">

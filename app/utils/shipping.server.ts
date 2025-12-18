@@ -1,6 +1,21 @@
 import { prisma } from './db.server.ts'
 
 /**
+ * Type definitions for shipping rate structures
+ */
+export type PriceRate = {
+	minPrice: number
+	maxPrice: number
+	rate: number
+}
+
+export type WeightRate = {
+	minWeightGrams: number
+	maxWeightGrams: number | null
+	rateCents: number
+}
+
+/**
  * Get shipping zones that contain the given country
  */
 export async function getShippingZonesForCountry(country: string) {
@@ -108,8 +123,8 @@ export function calculateShippingRate(
 	method: {
 		rateType: string
 		flatRate: number | null
-		weightRates: unknown
-		priceRates: unknown
+		weightRates: WeightRate[] | null
+		priceRates: PriceRate[] | null
 		freeShippingThreshold: number | null
 	},
 	subtotal: number,
@@ -121,12 +136,7 @@ export function calculateShippingRate(
 
 		case 'PRICE_BASED': {
 			if (!method.priceRates) return 0
-			const priceRates = method.priceRates as Array<{
-				minPrice: number
-				maxPrice: number
-				rate: number
-			}>
-			const matchingRate = priceRates.find(
+			const matchingRate = method.priceRates.find(
 				(rate) => subtotal >= rate.minPrice && subtotal <= rate.maxPrice,
 			)
 			return matchingRate?.rate ?? 0
@@ -149,13 +159,8 @@ export function calculateShippingRate(
 				// Fallback to flat rate if weight rates not configured or weight not provided
 				return method.flatRate ?? 0
 			}
-			const weightRates = method.weightRates as Array<{
-				minWeightGrams: number
-				maxWeightGrams: number | null
-				rateCents: number
-			}>
 			// Find matching weight range
-			const matchingRate = weightRates.find((rate) => {
+			const matchingRate = method.weightRates.find((rate) => {
 				const inMinRange = totalWeightGrams >= rate.minWeightGrams
 				const inMaxRange =
 					rate.maxWeightGrams === null || totalWeightGrams <= rate.maxWeightGrams
@@ -185,7 +190,17 @@ export async function getShippingCost(
 		return 0
 	}
 
-	return calculateShippingRate(method, subtotal, totalWeightGrams)
+	return calculateShippingRate(
+		{
+			rateType: method.rateType,
+			flatRate: method.flatRate,
+			weightRates: method.weightRates as WeightRate[] | null,
+			priceRates: method.priceRates as PriceRate[] | null,
+			freeShippingThreshold: method.freeShippingThreshold,
+		},
+		subtotal,
+		totalWeightGrams,
+	)
 }
 
 /**

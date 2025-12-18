@@ -53,11 +53,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 		}
 
 		// Order doesn't exist yet - return processing state
-		// DO NOT redirect - let the component handle the processing state
+		// Include order as null so component can detect when it appears
+		const userId = await getUserId(request)
 		return {
 			processing: true,
 			sessionId,
 			message: 'Your order is being processed. Please wait a moment.',
+			order: null,
+			userId: userId || null,
 		}
 	} catch (error) {
 		// Log error but still return processing state for user
@@ -67,10 +70,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 		// Return error state but still render something
 		const url = new URL(request.url)
 		const sessionId = url.searchParams.get('session_id')
+		const userId = await getUserId(request)
 		return {
 			processing: true,
 			sessionId: sessionId || null,
 			message: 'An error occurred while processing your order. Please try refreshing the page.',
+			order: null,
+			userId: userId || null,
 		}
 	}
 }
@@ -129,12 +135,28 @@ export default function CheckoutSuccess({ loaderData }: Route.ComponentProps) {
 	const processing = loaderData?.processing ?? false
 	const sessionId = loaderData?.sessionId ?? null
 	const message = loaderData?.message ?? 'Your order is being processed. Please wait a moment.'
+	// Order will be null if not found yet, or the loader will redirect if found
+	const order = loaderData && 'order' in loaderData && loaderData.order !== null 
+		? (loaderData.order as { orderNumber: string; email: string })
+		: null
 
 	const revalidator = useRevalidator()
 	const syncFetcher = useFetcher<typeof action>()
 	const [showSyncButton, setShowSyncButton] = useState(false)
 	const [hasTriggeredFallback, setHasTriggeredFallback] = useState(false)
 	const [pageLoadTime] = useState(() => Date.now())
+
+	// Redirect to order details if order is found in loader data
+	useEffect(() => {
+		if (order?.orderNumber) {
+			const userId = loaderData && 'userId' in loaderData ? (loaderData as { userId?: string }).userId : null
+			let redirectUrl = `/shop/orders/${order.orderNumber}`
+			if (!userId && order.email) {
+				redirectUrl += `?email=${encodeURIComponent(order.email)}`
+			}
+			window.location.href = redirectUrl
+		}
+	}, [order, loaderData])
 
 	const handleSyncOrder = useCallback(() => {
 		if (!sessionId) {
@@ -181,8 +203,9 @@ export default function CheckoutSuccess({ loaderData }: Route.ComponentProps) {
 				handleSyncOrder()
 				return
 			}
+			// Revalidate will trigger loader which will redirect if order is found
 			void revalidator.revalidate()
-		}, 3000) // Check every 3 seconds
+		}, 2000) // Check every 2 seconds (faster polling)
 
 		return () => clearInterval(interval)
 	}, [processing, sessionId, revalidator, hasTriggeredFallback, handleSyncOrder, pageLoadTime])

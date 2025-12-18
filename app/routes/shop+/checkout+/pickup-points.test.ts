@@ -1,9 +1,9 @@
 /**
  * @vitest-environment node
  */
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
+import * as Sentry from '@sentry/react-router'
+import { describe, expect, test, beforeEach, vi } from 'vitest'
 import * as mondialRelayApi1 from '#app/utils/carriers/mondial-relay-api1.server.ts'
-import { consoleError } from '#tests/setup/setup-test-env'
 import { loader } from './pickup-points.ts'
 
 // Mock the Mondial Relay API1 client
@@ -11,14 +11,14 @@ vi.mock('#app/utils/carriers/mondial-relay-api1.server.ts', () => ({
 	searchPickupPoints: vi.fn(),
 }))
 
+// Mock Sentry
+vi.mock('@sentry/react-router', () => ({
+	captureException: vi.fn(),
+}))
+
 describe('pickup-points route', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
-		consoleError.mockImplementation(() => {})
-	})
-
-	afterEach(() => {
-		consoleError.mockClear()
 	})
 
 	test('returns pickup points for valid postal code and country', async () => {
@@ -72,7 +72,6 @@ describe('pickup-points route', () => {
 			postalCode: '75001',
 			country: 'FR',
 			city: undefined,
-			maxResults: 20,
 		})
 	})
 
@@ -93,7 +92,6 @@ describe('pickup-points route', () => {
 			postalCode: '75001',
 			country: 'FR',
 			city: 'Paris',
-			maxResults: 20,
 		})
 	})
 
@@ -152,7 +150,7 @@ describe('pickup-points route', () => {
 			throw new Error('Expected result to have data property')
 		}
 
-		expect(consoleError).toHaveBeenCalled()
+		expect(Sentry.captureException).toHaveBeenCalled()
 	})
 
 	test('uppercases country code', async () => {

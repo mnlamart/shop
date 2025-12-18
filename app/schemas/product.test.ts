@@ -49,9 +49,8 @@ describe('productSchema', () => {
 			expect(result.success).toBe(false)
 		})
 
-		// Note: productSchema doesn't have max length validation for name
-		// Only ProductEditorSchema has MAX_NAME_LENGTH=200
-		test.skip('rejects name > 200 characters', () => {
+		// Note: productSchema DOES have max length validation for name (MAX_NAME_LENGTH=200)
+		test('rejects name > 200 characters', () => {
 			const invalidProduct = {
 				id: createId(),
 				name: 'a'.repeat(201),

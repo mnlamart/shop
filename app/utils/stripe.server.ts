@@ -114,6 +114,7 @@ export async function createCheckoutSession({
 	shippingMethodId,
 	shippingCost,
 	mondialRelayPickupPointId,
+	mondialRelayPickupPointData,
 	currency,
 	domainUrl,
 	userId,
@@ -134,6 +135,7 @@ export async function createCheckoutSession({
 	shippingMethodId: string
 	shippingCost: number // in cents
 	mondialRelayPickupPointId?: string | null
+	mondialRelayPickupPointData?: string | null // JSON string of pickup point address data
 	currency: {
 		code: string
 	}
@@ -195,6 +197,9 @@ export async function createCheckoutSession({
 			shippingCost: shippingCost.toString(),
 			...(mondialRelayPickupPointId && {
 				mondialRelayPickupPointId: mondialRelayPickupPointId,
+			}),
+			...(mondialRelayPickupPointData && {
+				mondialRelayPickupPointData: mondialRelayPickupPointData,
 			}),
 		},
 		payment_intent_data: {
