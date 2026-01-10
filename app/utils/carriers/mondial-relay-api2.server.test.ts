@@ -21,7 +21,6 @@ describe('mondial-relay-api2.server', () => {
 		// Mock console.error to not throw (since we expect it to be called in error cases)
 		consoleError.mockImplementation(() => {})
 		// Set required environment variables before each test
-		process.env.MONDIAL_RELAY_API2_BRAND_ID = 'TEST_BRAND_ID'
 		process.env.MONDIAL_RELAY_API2_LOGIN = 'TEST_LOGIN'
 		process.env.MONDIAL_RELAY_API2_PASSWORD = 'TEST_PASSWORD'
 		process.env.MONDIAL_RELAY_API2_CUSTOMER_ID = 'TEST123'
@@ -35,7 +34,7 @@ describe('mondial-relay-api2.server', () => {
 	describe('createShipment', () => {
 		test('throws error when API credentials are missing', async () => {
 			// Need to reload module after changing env vars
-			delete process.env.MONDIAL_RELAY_API2_BRAND_ID
+			delete process.env.MONDIAL_RELAY_API2_LOGIN
 			vi.resetModules()
 			const { createShipment: createShipmentReloaded } = await import('./mondial-relay-api2.server.ts')
 
@@ -59,23 +58,30 @@ describe('mondial-relay-api2.server', () => {
 					email: 'recipient@test.com',
 				},
 				pickupPointId: '12345',
+				pickupPointCountry: 'FR',
 				weight: 1000, // grams
 				reference: 'TEST-REF-001',
 			}
 
 			await expect(createShipmentReloaded(shipmentRequest)).rejects.toThrow(
-				'MONDIAL_RELAY_API2_BRAND_ID must be set',
+				'MONDIAL_RELAY_API2_LOGIN must be set',
 			)
 		})
 
-		test('generates correct REST API request for shipment creation', async () => {
+		test('generates correct XML request for shipment creation', async () => {
+			const mockXmlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+<ShipmentCreationResponse xmlns="http://www.example.org/Response">
+	<ShipmentsList>
+		<Shipment ShipmentNumber="123456789">
+			<Output>https://www.mondialrelay.fr/label/123456789</Output>
+		</Shipment>
+	</ShipmentsList>
+</ShipmentCreationResponse>`
+
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
-				json: async () => ({
-					Stat: 0,
-					ExpeditionNum: '123456789',
-					URL_Etiquette: 'https://www.mondialrelay.fr/label/123456789',
-				}),
+				headers: new Headers({ 'content-type': 'application/xml' }),
+				text: async () => mockXmlResponse,
 			})
 
 			const shipmentRequest: ShipmentRequest = {
@@ -98,6 +104,7 @@ describe('mondial-relay-api2.server', () => {
 					email: 'recipient@test.com',
 				},
 				pickupPointId: '12345',
+				pickupPointCountry: 'FR',
 				weight: 1000,
 				reference: 'TEST-REF-001',
 			}
@@ -109,44 +116,37 @@ describe('mondial-relay-api2.server', () => {
 			expect(call).toBeDefined()
 			if (!call) throw new Error('Expected call to be defined')
 			expect(call[0]).toContain('mondialrelay.fr')
+			expect(call[0]).toContain('/shipment')
 			expect(call[1]?.method).toBe('POST')
-			expect(call[1]?.headers['Content-Type']).toBe('application/json')
+			expect(call[1]?.headers['Content-Type']).toBe('text/xml; charset=utf-8')
+			expect(call[1]?.headers['Accept']).toBe('application/xml')
 
-			const requestBody = JSON.parse((call[1]?.body as string) || '{}') as {
-				BrandId: string
-				Login: string
-				Password: string
-				CustomerId: string
-				Expedition: {
-					Shipper: unknown
-					Recipient: unknown
-					PointRelais_Num: string
-					Poids: number
-					Ref: string
-				}
-			}
-			expect(requestBody).toHaveProperty('BrandId', 'TEST_BRAND_ID')
-			expect(requestBody).toHaveProperty('Login', 'TEST_LOGIN')
-			expect(requestBody).toHaveProperty('Password', 'TEST_PASSWORD')
-			expect(requestBody).toHaveProperty('CustomerId', 'TEST123')
-			expect(requestBody).toHaveProperty('Expedition')
-			expect(requestBody.Expedition).toHaveProperty('Shipper')
-			expect(requestBody.Expedition).toHaveProperty('Recipient')
-			expect(requestBody.Expedition).toHaveProperty('PointRelais_Num', '12345')
-			expect(requestBody.Expedition).toHaveProperty('Poids', 1000)
-			expect(requestBody.Expedition).toHaveProperty('Ref', 'TEST-REF-001')
+			const requestBody = call[1]?.body as string
+			expect(requestBody).toContain('<?xml version="1.0" encoding="UTF-8"?>')
+			expect(requestBody).toContain('<ShipmentCreationRequest')
+			expect(requestBody).toContain('<Login>TEST_LOGIN</Login>')
+			expect(requestBody).toContain('<Password>TEST_PASSWORD</Password>')
+			expect(requestBody).toContain('<CustomerId>TEST123</CustomerId>')
+			expect(requestBody).toContain('Location="FR-12345"')
+			expect(requestBody).toContain('<Weight Value="1000" Unit="gr"></Weight>')
+			expect(requestBody).toContain('<OrderNo>TEST-REF-001</OrderNo>')
+			expect(requestBody).toContain('Point Relais: 12345')
 		})
 
 		test('returns shipment number and label URL on success', async () => {
-			const mockResponse = {
-				Stat: 0,
-				ExpeditionNum: '123456789',
-				URL_Etiquette: 'https://www.mondialrelay.fr/label/123456789',
-			}
+			const mockXmlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+<ShipmentCreationResponse xmlns="http://www.example.org/Response">
+	<ShipmentsList>
+		<Shipment ShipmentNumber="123456789">
+			<Output>https://www.mondialrelay.fr/label/123456789</Output>
+		</Shipment>
+	</ShipmentsList>
+</ShipmentCreationResponse>`
 
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
-				json: async () => mockResponse,
+				headers: new Headers({ 'content-type': 'application/xml' }),
+				text: async () => mockXmlResponse,
 			})
 
 			const shipmentRequest: ShipmentRequest = {
@@ -169,6 +169,7 @@ describe('mondial-relay-api2.server', () => {
 					email: 'recipient@test.com',
 				},
 				pickupPointId: '12345',
+				pickupPointCountry: 'FR',
 				weight: 1000,
 				reference: 'TEST-REF-001',
 			}
@@ -181,12 +182,17 @@ describe('mondial-relay-api2.server', () => {
 		})
 
 		test('throws error when API returns error status', async () => {
+			const mockXmlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+<ShipmentCreationResponse xmlns="http://www.example.org/Response">
+	<StatusList>
+		<Status Code="10034" Level="Error" Message="Invalid pickup point" />
+	</StatusList>
+</ShipmentCreationResponse>`
+
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
-				json: async () => ({
-					Stat: 1,
-					Libelle: 'Invalid pickup point',
-				}),
+				headers: new Headers({ 'content-type': 'application/xml' }),
+				text: async () => mockXmlResponse,
 			})
 
 			const shipmentRequest: ShipmentRequest = {
@@ -209,11 +215,15 @@ describe('mondial-relay-api2.server', () => {
 					email: 'recipient@test.com',
 				},
 				pickupPointId: 'INVALID',
+				pickupPointCountry: 'FR',
 				weight: 1000,
 				reference: 'TEST-REF-001',
 			}
 
-			await expect(createShipment(shipmentRequest)).rejects.toThrow(/Invalid pickup point|Mondial Relay API2 error/)
+			await expect(createShipment(shipmentRequest)).rejects.toThrow(/Mondial Relay API2 error.*Invalid pickup point/)
+
+			// Verify console.error was called
+			expect(consoleError).toHaveBeenCalled()
 		})
 
 		test('throws error when API returns non-OK HTTP response', async () => {
@@ -221,6 +231,7 @@ describe('mondial-relay-api2.server', () => {
 				ok: false,
 				status: 500,
 				statusText: 'Internal Server Error',
+				text: async () => 'Internal Server Error',
 			})
 
 			const shipmentRequest: ShipmentRequest = {
@@ -243,6 +254,7 @@ describe('mondial-relay-api2.server', () => {
 					email: 'recipient@test.com',
 				},
 				pickupPointId: '12345',
+				pickupPointCountry: 'FR',
 				weight: 1000,
 				reference: 'TEST-REF-001',
 			}
@@ -276,6 +288,7 @@ describe('mondial-relay-api2.server', () => {
 					email: 'recipient@test.com',
 				},
 				pickupPointId: '12345',
+				pickupPointCountry: 'FR',
 				weight: 1000,
 				reference: 'TEST-REF-001',
 			}
@@ -349,4 +362,3 @@ describe('mondial-relay-api2.server', () => {
 		})
 	})
 })
-

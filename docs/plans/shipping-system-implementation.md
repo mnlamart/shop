@@ -154,10 +154,11 @@ MONDIAL_RELAY_API1_PRIVATE_KEY=...     # Clé Privée
 MONDIAL_RELAY_API1_BRAND_CODE=...      # Code Marque
 
 # Mondial Relay API2 (REST - Shipment Creation & Labels)
-MONDIAL_RELAY_API2_BRAND_ID=...        # Brand ID API
 MONDIAL_RELAY_API2_LOGIN=...           # Login API
 MONDIAL_RELAY_API2_PASSWORD=...        # API Password
 MONDIAL_RELAY_API2_CUSTOMER_ID=...     # CustomerId (2-8 characters)
+MONDIAL_RELAY_API2_URL=...             # API base URL (optional, defaults to https://connect-api.mondialrelay.com/api)
+MONDIAL_RELAY_API1_URL=...             # API1 base URL (optional, defaults to https://api.mondialrelay.com/WebService.asmx)
 ```
 
 ## Implementation Phases

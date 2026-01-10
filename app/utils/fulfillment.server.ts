@@ -55,9 +55,25 @@ export async function fulfillOrder(
 		!order.mondialRelayShipmentNumber &&
 		order.shippingCarrierName === 'Mondial Relay'
 
+	// Log fulfillment check for debugging
+	console.log('[Fulfillment] Checking order:', {
+		orderNumber: order.orderNumber,
+		status: order.status,
+		hasPickupPointId: !!order.mondialRelayPickupPointId,
+		hasShipmentNumber: !!order.mondialRelayShipmentNumber,
+		shippingCarrierName: order.shippingCarrierName,
+		needsMondialRelayShipment,
+	})
+
 	if (needsMondialRelayShipment) {
+		console.log('[Fulfillment] Creating Mondial Relay shipment for order:', order.orderNumber)
 		try {
 			const shipmentResult = await createMondialRelayShipment(order.id, storeAddress)
+			console.log('[Fulfillment] Shipment created successfully:', {
+				shipmentNumber: shipmentResult.shipmentNumber,
+				labelUrl: shipmentResult.labelUrl,
+			})
+			
 			// Shipment creation updates the order with shipment number and label URL
 
 			// Update order status to SHIPPED
@@ -65,6 +81,7 @@ export async function fulfillOrder(
 				where: { id: order.id },
 				data: { status: 'SHIPPED' },
 			})
+			console.log('[Fulfillment] Order status updated to SHIPPED')
 
 			// Send shipping confirmation email (non-blocking)
 			try {
@@ -92,6 +109,7 @@ export async function fulfillOrder(
 		} catch (error) {
 			// Log error but don't fail fulfillment
 			// Admin can manually create shipment later if needed
+			console.error('[Fulfillment] Error creating shipment (non-fatal):', error)
 			Sentry.captureException(error, {
 				tags: { context: 'order-fulfillment-shipment' },
 				extra: {

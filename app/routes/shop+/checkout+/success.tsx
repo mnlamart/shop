@@ -6,10 +6,12 @@ import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { getUserId } from '#app/utils/auth.server.ts'
+import { fulfillOrder } from '#app/utils/fulfillment.server.ts'
 import {
 	createOrderFromStripeSession,
 	getOrderByCheckoutSessionId,
 } from '#app/utils/order.server.ts'
+import { type StoreAddress } from '#app/utils/shipment.server.ts'
 import { stripe } from '#app/utils/stripe.server.ts'
 import { type Route } from './+types/success.ts'
 
@@ -97,6 +99,34 @@ export async function action({ request }: Route.ActionArgs) {
 
 		// Create order using shared function (includes cart deletion)
 		const order = await createOrderFromStripeSession(sessionId, session, request)
+
+		// Fulfill order (create shipments, etc.) - non-blocking
+		// Don't fail sync if fulfillment fails - it can be retried manually
+		try {
+			const storeAddress: StoreAddress = {
+				name: process.env.STORE_NAME || 'Store',
+				address1: process.env.STORE_ADDRESS1 || '',
+				address2: process.env.STORE_ADDRESS2,
+				city: process.env.STORE_CITY || '',
+				postalCode: process.env.STORE_POSTAL_CODE || '',
+				country: process.env.STORE_COUNTRY || 'FR',
+				phone: process.env.STORE_PHONE || '',
+				email: process.env.STORE_EMAIL,
+			}
+
+			await fulfillOrder(order.id, storeAddress)
+		} catch (fulfillmentError) {
+			// Log fulfillment errors but don't fail sync
+			// Order was created successfully, fulfillment can be retried
+			Sentry.captureException(fulfillmentError, {
+				tags: { context: 'checkout-success-sync-fulfillment' },
+				extra: {
+					orderId: order.id,
+					orderNumber: order.orderNumber,
+					sessionId,
+				},
+			})
+		}
 
 		// Return success with order number and email for redirect
 		return {

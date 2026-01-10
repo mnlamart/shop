@@ -5,15 +5,24 @@
  * - Searching pickup points (Point Relais®)
  * - Tracking shipments
  * 
- * Documentation: https://storage.mondialrelay.fr/Presentation%20of%20WebServices.pdf
+ * Official Documentation:
+ * - WebServices PDF: https://storage.mondialrelay.fr/Presentation%20of%20WebServices.pdf
+ * 
+ * API Endpoint: https://api.mondialrelay.com/WebService.asmx
+ * 
+ * Security Hash Format: MD5(Code Enseigne + Code Marque + Parameters + Clé Privée)
  */
 
 import { createHash } from 'crypto'
 import { invariant } from '@epic-web/invariant'
 import { XMLParser } from 'fast-xml-parser'
 
-// API endpoints
-const API1_BASE_URL = 'https://www.mondialrelay.fr/WebService/Web_Services.asmx'
+/**
+ * Gets the API1 base URL from environment variable or defaults to production
+ */
+function getApi1BaseUrl(): string {
+	return process.env.MONDIAL_RELAY_API1_URL || 'https://api.mondialrelay.com/WebService.asmx'
+}
 
 /**
  * Gets environment variables dynamically (for testing support)
@@ -45,6 +54,30 @@ function generateSecurityHash(params: string): string {
 	const { storeCode, brandCode, privateKey } = getApi1Credentials()
 	const hashString = `${storeCode}${brandCode}${params}${privateKey}`
 	return createHash('md5').update(hashString).digest('hex').toUpperCase()
+}
+
+/**
+ * PointRelais structure from SOAP API response
+ */
+interface PointRelaisResponse {
+	Num?: string | number
+	LgAdr1?: string
+	LgAdr2?: string
+	LgAdr3?: string
+	LgAdr4?: string
+	CP?: string
+	Ville?: string
+	Pays?: string
+	Latitude?: string | number
+	Longitude?: string | number
+	Horaires_Lun?: string
+	Horaires_Mar?: string
+	Horaires_Mer?: string
+	Horaires_Jeu?: string
+	Horaires_Ven?: string
+	Horaires_Sam?: string
+	Horaires_Dim?: string
+	[key: string]: unknown // Allow other fields
 }
 
 /**
@@ -89,6 +122,8 @@ export async function searchPickupPoints({
 	latitude,
 	longitude,
 	maxResults = 10,
+	weightGrams = 1000, // Default to 1kg if not specified
+	sizeCategory, // Optional: XS, S, M, L, XL, 3XL
 }: {
 	postalCode: string
 	country: string
@@ -96,11 +131,18 @@ export async function searchPickupPoints({
 	latitude?: number
 	longitude?: number
 	maxResults?: number
+	weightGrams?: number // Weight in grams (minimum 15g)
+	sizeCategory?: 'XS' | 'S' | 'M' | 'L' | 'XL' | '3XL' // Optional size category
 }): Promise<PickupPoint[]> {
 	validateApi1Credentials()
 
+	// Ensure minimum weight (15g minimum per Mondial Relay)
+	const poids = Math.max(weightGrams, 15)
+	
 	// Build SOAP request
 	const { storeCode } = getApi1Credentials()
+	// Parameters for security hash: CP + Pays + Ville only (this is the working method)
+	// Note: Taille, Poids, and Action are in the SOAP request but NOT included in the hash
 	const params = `${postalCode}${country}${city || ''}`
 	const securityHash = generateSecurityHash(params)
 
@@ -112,16 +154,16 @@ export async function searchPickupPoints({
       <Pays>${country}</Pays>
       <CP>${postalCode}</CP>
       <Ville>${city || ''}</Ville>
-      <Taille>${maxResults}</Taille>
-      <Poids>0</Poids>
-      <Action>0</Action>
+      ${sizeCategory ? `<Taille>${sizeCategory}</Taille>` : ''}
+      <Poids>${poids}</Poids>
+      <Action>24R</Action>
       <Security>${securityHash}</Security>
     </WSI2_RecherchePointRelais>
   </soap:Body>
 </soap:Envelope>`
 
 	try {
-		const response = await fetch(API1_BASE_URL, {
+		const response = await fetch(getApi1BaseUrl(), {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'text/xml; charset=utf-8',
@@ -135,7 +177,10 @@ export async function searchPickupPoints({
 		}
 
 		const xmlText = await response.text()
-		return parsePickupPointsResponse(xmlText, latitude, longitude)
+		const pickupPoints = parsePickupPointsResponse(xmlText, latitude, longitude)
+		
+		// Limit results if maxResults is specified
+		return maxResults ? pickupPoints.slice(0, maxResults) : pickupPoints
 	} catch (error) {
 		console.error('Mondial Relay API1 searchPickupPoints error:', error)
 		throw new Error(`Failed to search pickup points: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -193,23 +238,59 @@ function parsePickupPointsResponse(
 	const result =
 		response?.WSI2_RecherchePointRelaisResult ||
 		response?.['ws:WSI2_RecherchePointRelaisResult']
-	const pointsRelais = result?.PointsRelais || result?.pointsRelais
-
-	if (!pointsRelais) {
+	
+	// Check status code - non-zero means error
+	const status = result?.STAT
+	if (status && status !== '0' && status !== 0) {
+		console.warn(`Mondial Relay API returned error status: ${status}`)
 		return []
 	}
 
-	// Handle both single point and array of points
-	const pointRelaisArray = Array.isArray(pointsRelais.PointRelais)
-		? pointsRelais.PointRelais
-		: pointsRelais.PointRelais
-		? [pointsRelais.PointRelais]
-		: []
+	const pointsRelais = result?.PointsRelais || result?.pointsRelais
 
+	// If we have PointsRelais structure, use it
+	if (pointsRelais) {
+		// Handle both single point and array of points
+		const pointRelaisArray = Array.isArray(pointsRelais.PointRelais)
+			? pointsRelais.PointRelais
+			: pointsRelais.PointRelais
+			? [pointsRelais.PointRelais]
+			: []
+		
+		return parsePointRelaisArray(pointRelaisArray, latitude, longitude)
+	}
+
+	// Otherwise, try to parse PR01-PR10 structure (used when no results or alternative format)
+	const prFields = ['PR01', 'PR02', 'PR03', 'PR04', 'PR05', 'PR06', 'PR07', 'PR08', 'PR09', 'PR10']
+	const prPoints: PointRelaisResponse[] = []
+	
+	for (const prField of prFields) {
+		const pr = result?.[prField] as PointRelaisResponse | undefined
+		if (pr && pr.Num && String(pr.Num).trim() !== '') {
+			prPoints.push(pr)
+		}
+	}
+
+	if (prPoints.length > 0) {
+		return parsePointRelaisArray(prPoints, latitude, longitude)
+	}
+
+	// No results found
+	return []
+}
+
+/**
+ * Parse an array of PointRelais objects into PickupPoint objects
+ */
+function parsePointRelaisArray(
+	pointRelaisArray: PointRelaisResponse[],
+	latitude?: number,
+	longitude?: number,
+): PickupPoint[] {
 	const pickupPoints: PickupPoint[] = []
 
 	for (const point of pointRelaisArray) {
-		if (!point?.Num) continue // Skip invalid points
+		if (!point?.Num || String(point.Num).trim() === '') continue // Skip invalid points
 
 		// Build address from LgAdr1, LgAdr2, LgAdr3
 		const addressParts = [
@@ -295,7 +376,7 @@ export async function getTrackingInfo(shipmentNumber: string): Promise<{
 </soap:Envelope>`
 
 	try {
-		const response = await fetch(API1_BASE_URL, {
+		const response = await fetch(getApi1BaseUrl(), {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'text/xml; charset=utf-8',

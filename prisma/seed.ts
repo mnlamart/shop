@@ -42,7 +42,7 @@ async function createProduct(categoryId: string) {
 				{ weight: 70, value: 'ACTIVE' },
 				{ weight: 10, value: 'ARCHIVED' },
 			]),
-			weightGrams: faker.number.int({ min: 50, max: 5000 }), // Random weight between 50g and 5kg
+			weightGrams: faker.number.int({ min: 100, max: 300 }), // Random weight between 100g and 300g
 			categoryId,
 		},
 	})

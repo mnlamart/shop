@@ -85,7 +85,7 @@ describe('mondial-relay-api1.server', () => {
 			const call = mockFetch.mock.calls[0]
 			expect(call).toBeDefined()
 			if (!call) throw new Error('Expected call to be defined')
-			expect(call[0]).toBe('https://www.mondialrelay.fr/WebService/Web_Services.asmx')
+			expect(call[0]).toBe('https://api.mondialrelay.com/WebService.asmx')
 			expect(call[1]?.method).toBe('POST')
 			expect(call[1]?.headers['Content-Type']).toBe('text/xml; charset=utf-8')
 			expect(call[1]?.headers['SOAPAction']).toBe(
@@ -97,7 +97,8 @@ describe('mondial-relay-api1.server', () => {
 			expect(soapBody).toContain('<Pays>FR</Pays>')
 			expect(soapBody).toContain('<CP>75001</CP>')
 			expect(soapBody).toContain('<Ville>Paris</Ville>')
-			expect(soapBody).toContain('<Taille>5</Taille>')
+			expect(soapBody).toContain('<Poids>1000</Poids>') // Default weight
+			expect(soapBody).toContain('<Action>24R</Action>') // Standard Relay Point/Locker delivery
 			expect(soapBody).toContain('<Security>')
 		})
 
@@ -126,7 +127,10 @@ describe('mondial-relay-api1.server', () => {
 			if (!call) throw new Error('Expected call to be defined')
 			const soapBody = call[1]?.body
 			expect(soapBody).toContain('<Ville></Ville>')
-			expect(soapBody).toContain('<Taille>10</Taille>') // Default maxResults
+			expect(soapBody).toContain('<Poids>1000</Poids>') // Default weight
+			expect(soapBody).toContain('<Action>24R</Action>') // Standard Relay Point/Locker delivery
+			// Taille should not be present when sizeCategory is not provided
+			expect(soapBody).not.toContain('<Taille>')
 		})
 
 		test('generates security hash correctly', async () => {

@@ -6,14 +6,23 @@
  * Make sure the dev server is running first: npm run dev
  */
 
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3000'
+const SERVER_URL = process.env.SERVER_URL
+
+if (!SERVER_URL) {
+	console.error('Missing required environment variable: SERVER_URL')
+	console.error('Please set SERVER_URL in your .env file (e.g., http://localhost:3000)')
+	process.exit(1)
+}
+
+// TypeScript now knows SERVER_URL is defined after the check above
+const serverUrl: string = SERVER_URL
 
 async function testSitemap() {
 	console.log('🧪 Testing sitemap generation...\n')
 
 	try {
 		// Fetch sitemap
-		const response = await fetch(`${SERVER_URL}/sitemap.xml`)
+		const response = await fetch(`${serverUrl}/sitemap.xml`)
 		if (!response.ok) {
 			throw new Error(`HTTP ${response.status}: ${response.statusText}`)
 		}
@@ -32,7 +41,7 @@ async function testSitemap() {
 		// Extract all URLs from sitemap
 		const urlMatches = xml.matchAll(/<loc>(.*?)<\/loc>/g)
 		const urls = Array.from(urlMatches, m => m[1]).filter((url): url is string => url !== undefined)
-		const baseUrl = urls[0]?.split('/').slice(0, 3).join('/') || SERVER_URL
+		const baseUrl = urls[0]?.split('/').slice(0, 3).join('/') || serverUrl
 
 		// Count URLs
 		const productUrls = urls.filter(url => url.includes('/shop/products/') && !url.endsWith('/shop/products'))
@@ -71,7 +80,7 @@ async function testSitemap() {
 
 		// Test robots.txt too
 		console.log('\n🤖 Testing robots.txt...')
-		const robotsResponse = await fetch(`${SERVER_URL}/robots.txt`)
+		const robotsResponse = await fetch(`${serverUrl}/robots.txt`)
 		if (robotsResponse.ok) {
 			const robotsTxt = await robotsResponse.text()
 			if (robotsTxt.includes('Sitemap:')) {

@@ -7,6 +7,7 @@ const PickupPointsSearchSchema = z.object({
 	postalCode: z.string().min(1, { message: 'Postal code is required' }),
 	country: z.string().length(2, { message: 'Country code must be 2 letters' }),
 	city: z.string().optional(),
+	weightGrams: z.string().optional(), // Optional weight in grams for filtering pickup points
 })
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -14,12 +15,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 	const postalCode = url.searchParams.get('postalCode')
 	const country = url.searchParams.get('country')
 	const city = url.searchParams.get('city')
+	const weightGrams = url.searchParams.get('weightGrams')
 
 	// Validate parameters
 	const validation = PickupPointsSearchSchema.safeParse({
 		postalCode,
 		country,
 		city: city || undefined,
+		weightGrams: weightGrams || undefined,
 	})
 
 	if (!validation.success) {
@@ -35,7 +38,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 		)
 	}
 
-	const { postalCode: validPostalCode, country: validCountry, city: validCity } = validation.data
+	const { postalCode: validPostalCode, country: validCountry, city: validCity, weightGrams: validWeightGrams } = validation.data
 
 	try {
 		const pickupPoints = await searchPickupPoints({
@@ -43,6 +46,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 			country: validCountry.toUpperCase(),
 			city: validCity,
 			maxResults: 20, // Limit to 20 results
+			weightGrams: validWeightGrams ? parseInt(validWeightGrams, 10) : undefined,
 		})
 
 		return data({

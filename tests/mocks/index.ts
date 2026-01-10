@@ -32,6 +32,14 @@ server.listen({
 		if (request.url.includes('__rrdt')) {
 			return
 		}
+		// Allow Mondial Relay API requests to pass through (API1: SOAP, API2: REST)
+		// Allow all mondialrelay.com and mondialrelay.fr domains
+		if (
+			request.url.includes('mondialrelay.com') ||
+			request.url.includes('mondialrelay.fr')
+		) {
+			return
+		}
 		// In development mode, bypass Stripe API requests - we want to use real Stripe
 		// In test mode, Stripe requests are handled by mock handlers
 		if (
