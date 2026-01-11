@@ -1,4 +1,5 @@
-import { type Page } from '@playwright/test'
+import { randomUUID } from 'node:crypto'
+import { type Page, type TestInfo } from '@playwright/test'
 import { getPasswordHash } from '#app/utils/auth.server.ts'
 import { mergeCartOnUserLogin } from '#app/utils/cart.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
@@ -20,41 +21,67 @@ async function mergeCartInTest(page: Page, userId: string) {
 	await mergeCartOnUserLogin(mockRequest, userId)
 }
 
+const TEST_SKU_PREFIX = 'CB-E2E-'
+const TEST_CATEGORY_PREFIX = 'cb-e2e-category-'
+
+function getTestPrefix(testInfo: TestInfo) {
+	return testInfo.testId.replace(/\W+/g, '-').toLowerCase()
+}
+
+function createTestCategory(testPrefix: string) {
+	return prisma.category.create({
+		data: {
+			name: `Test Category ${testPrefix.slice(-8)}`,
+			slug: `${TEST_CATEGORY_PREFIX}${testPrefix}-${randomUUID()}`,
+		},
+	})
+}
+
+async function createTestProduct(categoryId: string, testPrefix: string) {
+	const productData = createProductData()
+	const uniqueId = randomUUID()
+	return prisma.product.create({
+		data: {
+			name: productData.name,
+			slug: `cb-e2e-product-${testPrefix}-${uniqueId}`,
+			description: productData.description,
+			sku: `${TEST_SKU_PREFIX}${testPrefix}-${uniqueId}`,
+			price: productData.price,
+			categoryId,
+			status: 'ACTIVE',
+		},
+	})
+}
+
 test.describe('Cart Badge', () => {
-	test.afterEach(async () => {
+	test.describe.configure({ mode: 'serial' })
+	test.afterEach(async ({}, testInfo) => {
+		const testPrefix = getTestPrefix(testInfo)
 		// Cleanup: Batch all operations in a transaction for better performance
 		// OrderItems must be deleted before Products (Restrict constraint)
 		await prisma.$transaction([
-			prisma.orderItem.deleteMany({}),
-			prisma.cartItem.deleteMany({}),
-			prisma.cart.deleteMany({}),
-			prisma.product.deleteMany({}),
-			prisma.category.deleteMany({}),
+			prisma.orderItem.deleteMany({
+				where: { product: { sku: { startsWith: `${TEST_SKU_PREFIX}${testPrefix}-` } } },
+			}),
+			prisma.cartItem.deleteMany({
+				where: { product: { sku: { startsWith: `${TEST_SKU_PREFIX}${testPrefix}-` } } },
+			}),
+			prisma.product.deleteMany({
+				where: { sku: { startsWith: `${TEST_SKU_PREFIX}${testPrefix}-` } },
+			}),
+			prisma.category.deleteMany({
+				where: { slug: { startsWith: `${TEST_CATEGORY_PREFIX}${testPrefix}-` } },
+			}),
 		])
 	})
 
-	test('cart badge should display item count', async ({ page }) => {
+	test('cart badge should display item count', async ({ page }, testInfo) => {
+		const testPrefix = getTestPrefix(testInfo)
 
 		// Create test product and category
-		const category = await prisma.category.create({
-			data: {
-				name: 'Test Category',
-				slug: `test-category-${Date.now()}`,
-			},
-		})
+		const category = await createTestCategory(testPrefix)
 
-		const productData = createProductData()
-		const product = await prisma.product.create({
-			data: {
-				name: productData.name,
-				slug: productData.slug,
-				description: productData.description,
-				sku: productData.sku,
-				price: productData.price,
-				categoryId: category.id,
-				status: 'ACTIVE',
-			},
-		})
+		const product = await createTestProduct(category.id, testPrefix)
 
 		// Navigate to product detail page
 		await page.goto(`/shop/products/${product.slug}`)
@@ -75,28 +102,13 @@ test.describe('Cart Badge', () => {
 		await expect(cartPageBadge.getByText('1')).toBeVisible()
 	})
 
-	test('cart badge should display correct count for multiple items', async ({ page }) => {
+	test('cart badge should display correct count for multiple items', async ({ page }, testInfo) => {
+		const testPrefix = getTestPrefix(testInfo)
 
 		// Create test product and category
-		const category = await prisma.category.create({
-			data: {
-				name: 'Test Category',
-				slug: `test-category-${Date.now()}`,
-			},
-		})
+		const category = await createTestCategory(testPrefix)
 
-		const productData = createProductData()
-		const product = await prisma.product.create({
-			data: {
-				name: productData.name,
-				slug: productData.slug,
-				description: productData.description,
-				sku: productData.sku,
-				price: productData.price,
-				categoryId: category.id,
-				status: 'ACTIVE',
-			},
-		})
+		const product = await createTestProduct(category.id, testPrefix)
 
 		// Navigate to product detail page and add to cart
 		await page.goto(`/shop/products/${product.slug}`)
@@ -113,28 +125,13 @@ test.describe('Cart Badge', () => {
 		await expect(cartBadge.getByText('3')).toBeVisible()
 	})
 
-	test('cart should merge guest cart with user cart on login', async ({ page }) => {
+	test('cart should merge guest cart with user cart on login', async ({ page }, testInfo) => {
+		const testPrefix = getTestPrefix(testInfo)
 		// Create test category
-		const category = await prisma.category.create({
-			data: {
-				name: 'Test Category',
-				slug: `test-category-${Date.now()}`,
-			},
-		})
+		const category = await createTestCategory(testPrefix)
 
 		// Create test product
-		const productData = createProductData()
-		const product = await prisma.product.create({
-			data: {
-				name: productData.name,
-				slug: productData.slug,
-				description: productData.description,
-				sku: productData.sku,
-				price: productData.price,
-				categoryId: category.id,
-				status: 'ACTIVE',
-			},
-		})
+		const product = await createTestProduct(category.id, testPrefix)
 
 		// As a guest, add product to cart
 		await page.goto(`/shop/products/${product.slug}`)
@@ -173,29 +170,14 @@ test.describe('Cart Badge', () => {
 		await expect(userCartBadge).toBeVisible({ timeout: 10000 })
 	})
 
-	test('guest cart should not contain user cart items after logout', async ({ page, login, logout }) => {
+	test('guest cart should not contain user cart items after logout', async ({ page, login, logout }, testInfo) => {
+		const testPrefix = getTestPrefix(testInfo)
 		await login()
 
 		// Create test category and product
-		const category = await prisma.category.create({
-			data: {
-				name: 'Test Category',
-				slug: `test-category-${Date.now()}`,
-			},
-		})
+		const category = await createTestCategory(testPrefix)
 
-		const productData = createProductData()
-		const product = await prisma.product.create({
-			data: {
-				name: productData.name,
-				slug: productData.slug,
-				description: productData.description,
-				sku: productData.sku,
-				price: productData.price,
-				categoryId: category.id,
-				status: 'ACTIVE',
-			},
-		})
+		const product = await createTestProduct(category.id, testPrefix)
 
 		// As logged-in user, add product to cart
 		await page.goto(`/shop/products/${product.slug}`)
@@ -222,40 +204,14 @@ test.describe('Cart Badge', () => {
 		await expect(page.getByRole('heading', { name: product.name })).toHaveCount(1)
 	})
 
-	test('cart should persist correctly through multiple login/logout cycles', async ({ page, login, logout }) => {
+	test('cart should persist correctly through multiple login/logout cycles', async ({ page, login, logout }, testInfo) => {
+		const testPrefix = getTestPrefix(testInfo)
 		// Create test products
-		const category = await prisma.category.create({
-			data: {
-				name: 'Test Category',
-				slug: `test-category-${Date.now()}`,
-			},
-		})
+		const category = await createTestCategory(testPrefix)
 
-		const product1Data = createProductData()
-		const product1 = await prisma.product.create({
-			data: {
-				name: product1Data.name,
-				slug: product1Data.slug,
-				description: product1Data.description,
-				sku: product1Data.sku,
-				price: product1Data.price,
-				categoryId: category.id,
-				status: 'ACTIVE',
-			},
-		})
+		const product1 = await createTestProduct(category.id, testPrefix)
 
-		const product2Data = createProductData()
-		const product2 = await prisma.product.create({
-			data: {
-				name: product2Data.name,
-				slug: product2Data.slug,
-				description: product2Data.description,
-				sku: product2Data.sku,
-				price: product2Data.price,
-				categoryId: category.id,
-				status: 'ACTIVE',
-			},
-		})
+		const product2 = await createTestProduct(category.id, testPrefix)
 
 		// 1. As guest, add product1 to cart
 		await page.goto(`/shop/products/${product1.slug}`)
@@ -303,8 +259,12 @@ test.describe('Cart Badge', () => {
 
 		// 5. Logout - cart should be cleared
 		await logout()
+		// Wait for logout to complete and page to update
+		await page.waitForLoadState('networkidle')
+		// Navigate to trigger badge update
+		await page.goto('/shop')
 		const guestCartBadge2 = page.getByRole('link', { name: /shopping cart with 0 items/i })
-		await expect(guestCartBadge2).toBeVisible()
+		await expect(guestCartBadge2).toBeVisible({ timeout: 10000 })
 
 		// 6. As guest, add product1 to cart (which is already in user cart with qty 2)
 		await page.goto(`/shop/products/${product1.slug}`)

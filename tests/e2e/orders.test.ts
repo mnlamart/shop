@@ -1,36 +1,47 @@
+import { randomUUID } from 'node:crypto'
+import { type TestInfo } from '@playwright/test'
 import { prisma } from '#app/utils/db.server.ts'
 import { generateOrderNumber } from '#app/utils/order-number.server.ts'
 import { expect, test } from '#tests/playwright-utils.ts'
 import { createProductData } from '#tests/product-utils.ts'
 
-test.describe('Order History', () => {
-	let testCategory: Awaited<ReturnType<typeof prisma.category.create>>
-	let testProduct: Awaited<ReturnType<typeof prisma.product.create>>
+const ORDERS_CATEGORY_PREFIX = 'orders-e2e-category-'
+const ORDERS_PRODUCT_PREFIX = 'orders-e2e-product-'
+const ORDERS_SKU_PREFIX = 'ORDERS-E2E-'
+const ORDERS_SESSION_PREFIX = 'orders-e2e-session-'
 
-	test.beforeEach(async () => {
-		// Create a test category
-		testCategory = await prisma.category.create({
-			data: {
-				name: 'Test Category',
-				slug: `test-category-${Date.now()}`,
-				description: 'Test category for products',
-			},
-		})
+function getTestPrefix(testInfo: TestInfo) {
+	return testInfo.testId.replace(/\W+/g, '-').toLowerCase()
+}
 
-		// Create a test product
-		const productData = createProductData()
-		testProduct = await prisma.product.create({
-			data: {
-				name: productData.name,
-				slug: productData.slug,
-				description: productData.description,
-				sku: productData.sku,
-				price: productData.price,
-				status: 'ACTIVE',
-				categoryId: testCategory.id,
-			},
-		})
+async function createTestCategory(testPrefix: string) {
+	return prisma.category.create({
+		data: {
+			name: `Test Category ${testPrefix.slice(-8)}`,
+			slug: `${ORDERS_CATEGORY_PREFIX}${testPrefix}-${randomUUID()}`,
+			description: 'Test category for products',
+		},
 	})
+}
+
+async function createTestProduct(categoryId: string, testPrefix: string) {
+	const productData = createProductData()
+	const uniqueId = randomUUID()
+	return prisma.product.create({
+		data: {
+			name: productData.name,
+			slug: `${ORDERS_PRODUCT_PREFIX}${testPrefix}-${uniqueId}`,
+			description: productData.description,
+			sku: `${ORDERS_SKU_PREFIX}${testPrefix}-${uniqueId}`,
+			price: productData.price,
+			status: 'ACTIVE',
+			categoryId,
+		},
+	})
+}
+
+test.describe('Order History', () => {
+	test.describe.configure({ mode: 'serial' })
 
 	test('should allow unauthenticated users to access order history for guest lookup', async ({
 		page,
@@ -56,31 +67,10 @@ test.describe('Order History', () => {
 	test('should display user orders in reverse chronological order', async ({
 		page,
 		login,
-	}) => {
-		// Ensure testProduct exists (created in beforeEach)
-		if (!testProduct?.id) {
-			throw new Error('testProduct was not created in beforeEach')
-		}
-		
-		// Verify product exists in database (might have been deleted in previous test cleanup)
-		const product = await prisma.product.findUnique({
-			where: { id: testProduct.id },
-		})
-		if (!product) {
-			// Recreate product if it was deleted
-			const productData = createProductData()
-			testProduct = await prisma.product.create({
-				data: {
-					name: productData.name,
-					slug: productData.slug,
-					description: productData.description,
-					sku: productData.sku,
-					price: productData.price,
-					status: 'ACTIVE',
-					categoryId: testCategory.id,
-				},
-			})
-		}
+	}, testInfo) => {
+		const testPrefix = getTestPrefix(testInfo)
+		const category = await createTestCategory(testPrefix)
+		const product = await createTestProduct(category.id, testPrefix)
 		
 		const user = await login()
 
@@ -99,10 +89,10 @@ test.describe('Order History', () => {
 				shippingPostal: '12345',
 				shippingCountry: 'US',
 				status: 'CONFIRMED',
-				stripeCheckoutSessionId: `cs_test_${Date.now()}_1`,
+				stripeCheckoutSessionId: `${ORDERS_SESSION_PREFIX}${testPrefix}-1`,
 				items: {
 					create: {
-						productId: testProduct.id,
+						productId: product.id,
 						price: 10000,
 						quantity: 1,
 					},
@@ -125,10 +115,10 @@ test.describe('Order History', () => {
 				shippingPostal: '12345',
 				shippingCountry: 'US',
 				status: 'SHIPPED',
-				stripeCheckoutSessionId: `cs_test_${Date.now()}_2`,
+				stripeCheckoutSessionId: `${ORDERS_SESSION_PREFIX}${testPrefix}-2`,
 				items: {
 					create: {
-						productId: testProduct.id,
+						productId: product.id,
 						price: 20000,
 						quantity: 1,
 					},
@@ -155,33 +145,10 @@ test.describe('Order History', () => {
 		page,
 		login,
 		navigate,
-	}) => {
-		
-		// Ensure testProduct exists (created in beforeEach)
-		if (!testProduct?.id) {
-			throw new Error('testProduct was not created in beforeEach')
-		}
-		
-		// Verify product exists in database (might have been deleted in previous test cleanup)
-		const product = await prisma.product.findUnique({
-			where: { id: testProduct.id },
-		})
-		if (!product) {
-			// Recreate product if it was deleted
-			const productData = createProductData()
-			const newProduct = await prisma.product.create({
-				data: {
-					name: productData.name,
-					slug: productData.slug,
-					description: productData.description,
-					sku: productData.sku,
-					price: productData.price,
-					status: 'ACTIVE',
-					categoryId: testCategory.id,
-				},
-			})
-			testProduct = newProduct
-		}
+	}, testInfo) => {
+		const testPrefix = getTestPrefix(testInfo)
+		const category = await createTestCategory(testPrefix)
+		const product = await createTestProduct(category.id, testPrefix)
 		
 		const user = await login()
 
@@ -199,10 +166,10 @@ test.describe('Order History', () => {
 				shippingPostal: '12345',
 				shippingCountry: 'US',
 				status: 'CONFIRMED',
-				stripeCheckoutSessionId: `cs_test_${Date.now()}`,
+				stripeCheckoutSessionId: `${ORDERS_SESSION_PREFIX}${testPrefix}-3`,
 				items: {
 					create: {
-						productId: testProduct.id,
+						productId: product.id,
 						price: 50000,
 						quantity: 1,
 					},
@@ -239,28 +206,10 @@ test.describe('Order History', () => {
 		await expect(page.getByRole('button', { name: /look up|find order/i })).toBeVisible()
 	})
 
-	test('should validate email matches order for guest lookup', async ({ page }) => {
-		// Ensure testProduct exists (created in beforeEach)
-		if (!testProduct?.id) {
-			throw new Error('testProduct was not created in beforeEach')
-		}
-		// Verify product exists in database (might have been deleted in previous test cleanup)
-		const product = await prisma.product.findUnique({ where: { id: testProduct.id } })
-		if (!product) {
-			// Recreate product if it was deleted
-			const productData = createProductData()
-			testProduct = await prisma.product.create({
-				data: {
-					name: productData.name,
-					slug: productData.slug,
-					description: productData.description,
-					sku: productData.sku,
-					price: productData.price,
-					status: 'ACTIVE',
-					categoryId: testCategory.id,
-				},
-			})
-		}
+	test('should validate email matches order for guest lookup', async ({ page }, testInfo) => {
+		const testPrefix = getTestPrefix(testInfo)
+		const category = await createTestCategory(testPrefix)
+		const product = await createTestProduct(category.id, testPrefix)
 
 		const orderNumber = await generateOrderNumber()
 		const guestEmail = 'guest@example.com'
@@ -279,10 +228,10 @@ test.describe('Order History', () => {
 				shippingPostal: '12345',
 				shippingCountry: 'US',
 				status: 'CONFIRMED',
-				stripeCheckoutSessionId: `cs_test_${Date.now()}`,
+				stripeCheckoutSessionId: `${ORDERS_SESSION_PREFIX}${testPrefix}-4`,
 				items: {
 					create: {
-						productId: testProduct.id,
+						productId: product.id,
 						price: 10000,
 						quantity: 1,
 					},
@@ -309,7 +258,10 @@ test.describe('Order History', () => {
 		await expect(page).toHaveURL(new RegExp(`/shop/orders/${orderNumber}`))
 	})
 
-	test('should link to order details from order history', async ({ page, login, navigate }) => {
+	test('should link to order details from order history', async ({ page, login, navigate }, testInfo) => {
+		const testPrefix = getTestPrefix(testInfo)
+		const category = await createTestCategory(testPrefix)
+		const product = await createTestProduct(category.id, testPrefix)
 		
 		const user = await login()
 
@@ -327,10 +279,10 @@ test.describe('Order History', () => {
 				shippingPostal: '12345',
 				shippingCountry: 'US',
 				status: 'CONFIRMED',
-				stripeCheckoutSessionId: `cs_test_${Date.now()}`,
+				stripeCheckoutSessionId: `${ORDERS_SESSION_PREFIX}${testPrefix}-5`,
 				items: {
 					create: {
-						productId: testProduct.id,
+						productId: product.id,
 						price: 10000,
 						quantity: 1,
 					},
@@ -350,47 +302,50 @@ test.describe('Order History', () => {
 		await expect(page).toHaveURL(new RegExp(`/account/orders/${orderNumber}`))
 	})
 
-	test.afterEach(async () => {
-		// Cleanup: Batch all operations in a transaction for better performance
-		// Delete Orders first (will cascade delete OrderItems)
-		const categoryId = testCategory?.id
-		
+	test.afterEach(async ({}, testInfo) => {
+		const testPrefix = getTestPrefix(testInfo)
+		// Scoped cleanup for data created by this suite
 		await prisma.$transaction([
-			prisma.order.deleteMany({
-				where: {
-					stripeCheckoutSessionId: {
-						startsWith: 'cs_test_',
-					},
-				},
-			}),
-			// Delete CartItems before Products
-			prisma.cartItem.deleteMany({
+			prisma.orderItem.deleteMany({
 				where: {
 					product: {
 						sku: {
-							startsWith: 'SKU-',
+							startsWith: `${ORDERS_SKU_PREFIX}${testPrefix}-`,
 						},
 					},
 				},
 			}),
-			// Now we can safely delete products
+			prisma.order.deleteMany({
+				where: {
+					stripeCheckoutSessionId: {
+						startsWith: `${ORDERS_SESSION_PREFIX}${testPrefix}-`,
+					},
+				},
+			}),
+			prisma.cartItem.deleteMany({
+				where: {
+					product: {
+						sku: {
+							startsWith: `${ORDERS_SKU_PREFIX}${testPrefix}-`,
+						},
+					},
+				},
+			}),
 			prisma.product.deleteMany({
 				where: {
 					sku: {
-						startsWith: 'SKU-',
+						startsWith: `${ORDERS_SKU_PREFIX}${testPrefix}-`,
+					},
+				},
+			}),
+			prisma.category.deleteMany({
+				where: {
+					slug: {
+						startsWith: `${ORDERS_CATEGORY_PREFIX}${testPrefix}-`,
 					},
 				},
 			}),
 		])
-		
-		// Delete category separately (after products are deleted)
-		if (categoryId) {
-			await prisma.category
-				.deleteMany({ where: { id: categoryId } })
-				.catch(() => {
-					// Ignore if category was already deleted or doesn't exist
-				})
-		}
 	})
 })
 

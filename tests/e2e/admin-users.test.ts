@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { faker } from '@faker-js/faker'
 import { prisma } from '#app/utils/db.server.ts'
 import { generateOrderNumber } from '#app/utils/order-number.server.ts'
@@ -8,6 +9,25 @@ import {
 	createTestUserWithRoles,
 	createTestRole,
 } from '#tests/user-utils.ts'
+
+// Run admin user tests serially to avoid data cleanup collisions across tests
+test.describe.configure({ mode: 'serial' })
+
+const ADMIN_USERS_PREFIX = 'admin-users-e2e'
+
+function getTestPrefix(testId: string) {
+	return `${ADMIN_USERS_PREFIX}-${testId.replace(/\W+/g, '-')}-${randomUUID()}`
+}
+
+async function createPrefixedUser(testId: string, overrides?: Parameters<typeof createTestUser>[0]) {
+	const prefix = getTestPrefix(testId)
+	return createTestUser({
+		username: `${prefix}-user`,
+		email: `${prefix}@example.com`,
+		name: overrides?.name ?? overrides?.username ?? overrides?.email ?? `${prefix}-name`,
+		...overrides,
+	})
+}
 
 test.describe('Admin User Management', () => {
 	test.beforeEach(async () => {
@@ -20,56 +40,40 @@ test.describe('Admin User Management', () => {
 	})
 
 	test.afterEach(async () => {
-		// Clean up: delete users created during tests
-		// Faker-generated usernames start with 2 alphanumeric chars + underscore
-		// We'll delete users that match the pattern by checking username length and format
-		const allUsers = await prisma.user.findMany({
-			where: {
-				username: {
-					contains: '_',
-				},
-			},
-			select: { id: true, username: true },
-		})
-		
-		const testUserIds = allUsers
-			.filter(u => /^[a-z0-9]{2}_/.test(u.username))
-			.map(u => u.id)
-		
-		// Batch all cleanup operations in a transaction for better performance
 		await prisma.$transaction([
-			...(testUserIds.length > 0
-				? [prisma.user.deleteMany({ where: { id: { in: testUserIds } } })]
-				: []),
-			prisma.role.deleteMany({
-				where: {
-					name: { notIn: ['admin', 'user'] },
-				},
-			}),
 			prisma.order.deleteMany({
 				where: {
-					orderNumber: { startsWith: 'ORD-' },
+					stripeCheckoutSessionId: { startsWith: ADMIN_USERS_PREFIX },
 				},
 			}),
 			prisma.cartItem.deleteMany({
 				where: {
 					product: {
-						category: {
-							name: { startsWith: 'Test' },
-						},
+						sku: { startsWith: ADMIN_USERS_PREFIX },
 					},
 				},
 			}),
 			prisma.product.deleteMany({
 				where: {
-					category: {
-						name: { startsWith: 'Test' },
-					},
+					sku: { startsWith: ADMIN_USERS_PREFIX },
 				},
 			}),
 			prisma.category.deleteMany({
 				where: {
-					name: { startsWith: 'Test' },
+					slug: { startsWith: ADMIN_USERS_PREFIX },
+				},
+			}),
+			prisma.user.deleteMany({
+				where: {
+					OR: [
+						{ email: { startsWith: ADMIN_USERS_PREFIX } },
+						{ username: { startsWith: ADMIN_USERS_PREFIX } },
+					],
+				},
+			}),
+			prisma.role.deleteMany({
+				where: {
+					name: { notIn: ['admin', 'user'] },
 				},
 			}),
 		])
@@ -105,10 +109,10 @@ test.describe('Admin User Management', () => {
 		await login({ asAdmin: true })
 
 		// Create test users with faker
-		const { user: testUser1 } = await createTestUser({
+		const { user: testUser1 } = await createPrefixedUser(test.info().testId, {
 			name: faker.person.fullName(),
 		})
-		const { user: testUser2 } = await createTestUser({
+		const { user: testUser2 } = await createPrefixedUser(test.info().testId, {
 			name: faker.person.fullName(),
 		})
 
@@ -117,19 +121,28 @@ test.describe('Admin User Management', () => {
 		// Wait for the table to be visible
 		await expect(page.getByRole('table')).toBeVisible({ timeout: 10000 })
 
-		// Check that users are displayed - wait for them to appear
-		// Use link queries instead of cell queries to avoid strict mode violations
-		// The user name appears in a link within the table
-		const user1Name = testUser1.name || testUser1.username
-		const user2Name = testUser2.name || testUser2.username
-		await expect(page.getByRole('link', { name: new RegExp(`^${user1Name}$`, 'i') })).toBeVisible({ timeout: 10000 })
-		await expect(page.getByRole('link', { name: new RegExp(`^${user2Name}$`, 'i') })).toBeVisible({ timeout: 10000 })
+		// Check that users are displayed by searching for each one
+		const searchInput = page.getByPlaceholder(/search users/i)
+
+		await searchInput.fill(testUser1.email)
+		await searchInput.blur()
+		await page.waitForLoadState('networkidle')
+		await expect(
+			page.getByText(new RegExp(`^${testUser1.email}$`, 'i')),
+		).toBeVisible({ timeout: 10000 })
+
+		await searchInput.fill(testUser2.email)
+		await searchInput.blur()
+		await page.waitForLoadState('networkidle')
+		await expect(
+			page.getByText(new RegExp(`^${testUser2.email}$`, 'i')),
+		).toBeVisible({ timeout: 10000 })
 	})
 
 	test('should display user email and username', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
 		await navigate('/admin/users')
 
@@ -163,8 +176,8 @@ test.describe('Admin User Management', () => {
 		const aliceName = `Alice ${faker.string.alphanumeric(8)}`
 		const bobName = `Bob ${faker.string.alphanumeric(8)}`
 
-		await createTestUser({ name: aliceName })
-		await createTestUser({ name: bobName })
+		await createPrefixedUser(test.info().testId, { name: aliceName })
+		await createPrefixedUser(test.info().testId, { name: bobName })
 
 		await navigate('/admin/users')
 		await page.waitForLoadState('networkidle')
@@ -191,7 +204,7 @@ test.describe('Admin User Management', () => {
 	test('should search users by email', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
 		await navigate('/admin/users')
 
@@ -211,7 +224,7 @@ test.describe('Admin User Management', () => {
 	test('should display user detail page with profile information', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
 		await navigate(('/admin/users/' + testUser.id) as any)
 
@@ -233,7 +246,7 @@ test.describe('Admin User Management', () => {
 	test('should display user statistics', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
 		await navigate(('/admin/users/' + testUser.id) as any)
 
@@ -250,12 +263,14 @@ test.describe('Admin User Management', () => {
 	test('should display user orders in detail page', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
+		const testPrefix = getTestPrefix(test.info().testId)
+
 		// Create test category and product with faker
-		const categoryName = faker.commerce.department()
+		const categoryName = `${testPrefix}-category`
 		const category = await prisma.category.create({
 			data: {
 				name: categoryName,
-				slug: faker.helpers.slugify(categoryName).toLowerCase() + '-' + faker.string.alphanumeric(4),
+				slug: `${testPrefix}-category`,
 				description: faker.lorem.sentence(),
 			},
 		})
@@ -264,16 +279,16 @@ test.describe('Admin User Management', () => {
 		const product = await prisma.product.create({
 			data: {
 				name: productData.name,
-				slug: productData.slug,
+				slug: `${testPrefix}-product`,
 				description: productData.description,
-				sku: productData.sku,
+				sku: `${ADMIN_USERS_PREFIX}-sku-${randomUUID()}`,
 				price: productData.price,
 				status: 'ACTIVE',
 				categoryId: category.id,
 			},
 		})
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
 		// Create an order for the user
 		const order = await prisma.order.create({
@@ -289,7 +304,7 @@ test.describe('Admin User Management', () => {
 				shippingPostal: faker.location.zipCode(),
 				shippingCountry: faker.location.countryCode(),
 				status: 'PENDING',
-				stripeCheckoutSessionId: `cs_test_${faker.string.alphanumeric(24)}`,
+				stripeCheckoutSessionId: `${ADMIN_USERS_PREFIX}-${faker.string.alphanumeric(24)}`,
 				items: {
 					create: {
 						productId: product.id,
@@ -327,62 +342,48 @@ test.describe('Admin User Edit', () => {
 	})
 
 	test.afterEach(async () => {
-		// Clean up test users - faker-generated usernames start with 2 alphanumeric chars + underscore
-		const allUsers = await prisma.user.findMany({
-			where: {
-				username: {
-					contains: '_',
-				},
-			},
-			select: { id: true, username: true },
-		})
-		
-		const testUserIds = allUsers
-			.filter(u => /^[a-z0-9]{2}_/.test(u.username))
-			.map(u => u.id)
-		
-		// Batch all cleanup operations in a transaction for better performance
 		await prisma.$transaction([
-			...(testUserIds.length > 0
-				? [prisma.user.deleteMany({ where: { id: { in: testUserIds } } })]
-				: []),
-			prisma.role.deleteMany({
-				where: {
-					name: { notIn: ['admin', 'user'] },
-				},
-			}),
-			// Clean up test orders, products, categories
 			prisma.order.deleteMany({
 				where: {
-					orderNumber: { startsWith: 'ORD-' },
+					stripeCheckoutSessionId: { startsWith: ADMIN_USERS_PREFIX },
 				},
 			}),
 			prisma.cartItem.deleteMany({
 				where: {
 					product: {
-						category: {
-							name: { notIn: ['Uncategorized'] },
-						},
+						sku: { startsWith: ADMIN_USERS_PREFIX },
 					},
 				},
 			}),
 			prisma.product.deleteMany({
 				where: {
-					category: {
-						name: { notIn: ['Uncategorized'] },
-					},
+					sku: { startsWith: ADMIN_USERS_PREFIX },
 				},
 			}),
+			prisma.cart.deleteMany({}),
 			prisma.category.deleteMany({
 				where: {
-					name: { notIn: ['Uncategorized'] },
+					slug: { startsWith: ADMIN_USERS_PREFIX },
+				},
+			}),
+			prisma.user.deleteMany({
+				where: {
+					OR: [
+						{ email: { startsWith: ADMIN_USERS_PREFIX } },
+						{ username: { startsWith: ADMIN_USERS_PREFIX } },
+					],
+				},
+			}),
+			prisma.role.deleteMany({
+				where: {
+					name: { notIn: ['admin', 'user'] },
 				},
 			}),
 		])
 	})
 
 	test('should redirect to login if not authenticated', async ({ page }) => {
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
 		await page.goto(`/admin/users/${testUser.id}/edit`)
 		await page.waitForURL(/\/login/)
@@ -391,7 +392,7 @@ test.describe('Admin User Edit', () => {
 
 	test('should redirect non-admin users', async ({ page, login, navigate }) => {
 		await login()
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
 		await navigate(`/admin/users/${testUser.id}/edit` as any)
 		await page.waitForLoadState('networkidle')
@@ -404,12 +405,13 @@ test.describe('Admin User Edit', () => {
 	test('should load edit page with user data pre-filled', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
 
 		await expect(page).toHaveURL(new RegExp(`/admin/users/${testUser.id}/edit`))
-		await expect(page.getByRole('heading', { name: /edit user/i })).toBeVisible()
+		await expect(page.getByRole('heading', { name: /edit user/i })).toBeVisible({ timeout: 10000 })
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
 
 		// Check that form fields are pre-filled
 		const nameInput = page.getByLabel(/^name$/i)
@@ -427,28 +429,56 @@ test.describe('Admin User Edit', () => {
 		await login({ asAdmin: true })
 
 		const originalName = faker.person.fullName()
-		const { user: testUser } = await createTestUser({ name: originalName })
+		const { user: testUser } = await createPrefixedUser(test.info().testId, { name: originalName })
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
+
+		// Wait for form to be ready - check for form element first
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
+		await expect(page.getByLabel(/^name$/i)).toBeVisible({ timeout: 10000 })
 
 		// Update name
 		const updatedName = faker.person.fullName()
 		await page.getByLabel(/^name$/i).fill(updatedName)
-		await page.getByRole('button', { name: /save changes/i }).click()
-
-		// Should redirect to user detail page
-		await page.waitForURL(new RegExp(`/admin/users/${testUser.id}`), { timeout: 10000 })
+		
+		// Submit form and wait for navigation
+		await Promise.all([
+			page.waitForURL(new RegExp(`/admin/users/${testUser.id}`), { timeout: 15000 }),
+			page.getByRole('button', { name: /save changes/i }).click(),
+		])
+		
+		// Wait for page to fully load
 		await page.waitForLoadState('networkidle')
-		await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10000 })
-		await expect(page.getByRole('heading', { name: new RegExp(updatedName, 'i') })).toBeVisible({ timeout: 10000 })
+		
+		// Wait for heading to be visible first
+		const heading = page.getByRole('heading', { level: 1 })
+		await expect(heading).toBeVisible({ timeout: 10000 })
+		
+		// Verify the update was successful by checking the database
+		const updatedUser = await prisma.user.findUnique({
+			where: { id: testUser.id },
+			select: { name: true },
+		})
+		expect(updatedUser?.name).toBe(updatedName)
+		
+		// Verify the updated name appears on the page
+		// The heading shows name || username, so if name exists, it should be in the heading
+		if (updatedUser?.name) {
+			await expect(heading).toContainText(updatedName, { timeout: 10000 })
+		} else {
+			// If name is null, check the detail section
+			await expect(page.locator('[data-testid="user-detail-name"]')).toHaveText(updatedName, { timeout: 5000 })
+		}
 	})
 
 	test('should update user email', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
+		await expect(page.getByLabel(/^email/i)).toBeVisible({ timeout: 10000 })
 
 		// Update email
 		const newEmail = faker.internet.email()
@@ -465,9 +495,11 @@ test.describe('Admin User Edit', () => {
 	test('should update user username', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
+		await expect(page.getByLabel(/^username/i)).toBeVisible({ timeout: 10000 })
 
 		// Update username - createTestUser ensures it's within 20 char limit
 		const { username: newUsername } = await createUser()
@@ -487,9 +519,10 @@ test.describe('Admin User Edit', () => {
 		// Create a test role
 		const testRole = await createTestRole()
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
 
 		// Check the role checkbox
 		await page.getByLabel(testRole.name).check()
@@ -531,7 +564,8 @@ test.describe('Admin User Edit', () => {
 
 		const { user: testUser } = await createTestUserWithRoles([role1.name])
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
 
 		// Check role2 and keep role1 checked
 		await page.getByLabel(role2.name).check()
@@ -548,12 +582,11 @@ test.describe('Admin User Edit', () => {
 	test('should show validation error for duplicate email', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: existingUser } = await createTestUser()
-		const { user: testUser } = await createTestUser()
+		const { user: existingUser } = await createPrefixedUser(test.info().testId)
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
-		await page.waitForLoadState('networkidle')
-		await page.waitForSelector('form', { timeout: 10000 })
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
 
 		// Try to use existing user's email
 		await page.getByLabel(/^email/i).fill(existingUser.email)
@@ -567,10 +600,11 @@ test.describe('Admin User Edit', () => {
 	test('should show validation error for duplicate username', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: existingUser } = await createTestUser()
-		const { user: testUser } = await createTestUser()
+		const { user: existingUser } = await createPrefixedUser(test.info().testId)
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
 
 		// Try to use existing user's username
 		await page.getByLabel(/^username/i).fill(existingUser.username)
@@ -585,9 +619,11 @@ test.describe('Admin User Edit', () => {
 	test('should show validation error for invalid email format', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
+		await expect(page.getByLabel(/^email/i)).toBeVisible({ timeout: 10000 })
 
 		// Enter invalid email
 		await page.getByLabel(/^email/i).fill('invalid-email')
@@ -601,9 +637,10 @@ test.describe('Admin User Edit', () => {
 	test('should show validation error for invalid username format', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
 
 		// Enter invalid username (with special characters)
 		await page.getByLabel(/^username/i).fill('invalid@username')
@@ -617,9 +654,11 @@ test.describe('Admin User Edit', () => {
 	test('should redirect to user detail page after successful update', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
+		await expect(page.getByLabel(/^name$/i)).toBeVisible({ timeout: 10000 })
 
 		// Update name
 		const updatedName = faker.person.fullName()
@@ -630,16 +669,17 @@ test.describe('Admin User Edit', () => {
 		await page.waitForURL(new RegExp(`/admin/users/${testUser.id}`), { timeout: 10000 })
 		await page.waitForLoadState('networkidle')
 		await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10000 })
-		await expect(page).toHaveURL(new RegExp(`/admin/users/${testUser.id}`))
 		await expect(page.getByRole('heading', { name: new RegExp(updatedName, 'i') })).toBeVisible({ timeout: 10000 })
 	})
 
 	test('should show toast notification on success', async ({ page, navigate, login }) => {
 		await login({ asAdmin: true })
 
-		const { user: testUser } = await createTestUser()
+		const { user: testUser } = await createPrefixedUser(test.info().testId)
 
-		await navigate(`/admin/users/${testUser.id}/edit` as any)
+		await page.goto(`/admin/users/${testUser.id}/edit`, { waitUntil: 'networkidle' })
+		await expect(page.locator('form')).toBeVisible({ timeout: 10000 })
+		await expect(page.getByLabel(/^name$/i)).toBeVisible({ timeout: 10000 })
 
 		// Update name
 		const updatedName = faker.person.fullName()

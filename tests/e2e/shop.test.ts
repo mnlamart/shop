@@ -1,18 +1,13 @@
+import { randomUUID } from 'node:crypto'
 import { prisma } from '#app/utils/db.server.ts'
 import { test, expect } from '../playwright-utils.ts'
 import { createProductData } from '../product-utils.ts'
 
+const SHOP_CATEGORY_PREFIX = 'shop-e2e-category-'
+const SHOP_PRODUCT_PREFIX = 'shop-e2e-product-'
+
 test.describe('Shop Home Page', () => {
-	test.beforeEach(async () => {
-		// Create a test category
-		await prisma.category.create({
-			data: {
-				name: 'Test Category',
-				slug: `test-category-${Date.now()}`,
-				description: 'Test category description',
-			},
-		})
-	})
+	test.describe.configure({ mode: 'serial' })
 
 	test('should display welcome message', async ({ page }) => {
 		await page.goto('/shop')
@@ -25,11 +20,17 @@ test.describe('Shop Home Page', () => {
 	})
 
 	test('should display category cards', async ({ page }) => {
+		const unique = randomUUID()
+		const categoryName = `Test Category ${unique.slice(0, 6)}`
+		const categorySlug = `${SHOP_CATEGORY_PREFIX}${unique}`
+		const productSlug = `${SHOP_PRODUCT_PREFIX}${unique}`
+		const productSku = `SHOP-E2E-${unique}`
+
 		// Create a category with a product so it's displayed
 		const category = await prisma.category.create({
 			data: {
-				name: 'Test Category',
-				slug: `test-category-${Date.now()}`,
+				name: categoryName,
+				slug: categorySlug,
 				description: 'Test category description',
 			},
 		})
@@ -39,9 +40,9 @@ test.describe('Shop Home Page', () => {
 		await prisma.product.create({
 			data: {
 				name: productData.name,
-				slug: productData.slug,
+				slug: productSlug,
 				description: productData.description,
-				sku: productData.sku,
+				sku: productSku,
 				price: productData.price,
 				status: 'ACTIVE',
 				categoryId: category.id,
@@ -52,14 +53,8 @@ test.describe('Shop Home Page', () => {
 		await page.waitForLoadState('networkidle')
 		// Use accessible query - category cards are links to category pages
 		// Find any category link (they contain category names)
-		const categoryLink = page.getByRole('link', { name: new RegExp(category.name, 'i') })
+		const categoryLink = page.getByRole('link', { name: new RegExp(categoryName, 'i') })
 		await expect(categoryLink).toBeVisible({ timeout: 10000 })
-		
-		// Cleanup
-		await prisma.$transaction([
-			prisma.product.deleteMany({ where: { categoryId: category.id } }),
-			prisma.category.deleteMany({ where: { id: category.id } }),
-		])
 	})
 
 	test.afterEach(async () => {
@@ -69,7 +64,7 @@ test.describe('Shop Home Page', () => {
 				where: {
 					category: {
 						slug: {
-							startsWith: 'test-category-',
+							startsWith: SHOP_CATEGORY_PREFIX,
 						},
 					},
 				},
@@ -77,7 +72,7 @@ test.describe('Shop Home Page', () => {
 			prisma.category.deleteMany({
 				where: {
 					slug: {
-						startsWith: 'test-category-',
+						startsWith: SHOP_CATEGORY_PREFIX,
 					},
 				},
 			}),
