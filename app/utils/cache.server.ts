@@ -145,7 +145,10 @@ export const cache: CachifiedCache = {
 		const { currentIsPrimary, primaryInstance: ignoredPrimaryInstance } = await getInstanceInfo()
 
 		if (currentIsPrimary) {
-			const value = JSON.stringify(entry.value, bufferReplacer)
+			// Handle undefined values - SQLite can't bind undefined, so convert to null
+			const value = entry.value === undefined 
+				? JSON.stringify(null) 
+				: JSON.stringify(entry.value, bufferReplacer)
 			setStatement.run(key, value, JSON.stringify(entry.metadata))
 		} else {
 			// fire-and-forget cache update

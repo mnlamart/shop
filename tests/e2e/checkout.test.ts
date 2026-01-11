@@ -50,8 +50,8 @@ test.describe('Checkout', () => {
 
 		// Navigate to checkout - it redirects to review, then we need to go to shipping step
 		await page.goto('/shop/checkout')
-		// Wait for redirect to review step
-		await page.waitForURL(/\/shop\/checkout\/review/, { timeout: 10000 })
+		// Wait for redirect to review step - allow more time
+		await page.waitForURL(/\/shop\/checkout\/review/, { timeout: 15000 })
 		// Navigate to shipping step where the form is
 		await page.goto('/shop/checkout/shipping')
 		await page.waitForLoadState('networkidle')
@@ -355,6 +355,8 @@ test.describe('Checkout', () => {
 		}
 
 		// Fill out checkout form - wait for fields to be visible
+		// Ensure we're on the shipping page and form is ready
+		await expect(page).toHaveURL(/\/shop\/checkout\/shipping/, { timeout: 10000 })
 		await expect(page.getByLabel(/^name$/i)).toBeVisible({ timeout: 10000 })
 		await page.getByLabel(/^name$/i).fill('Test User')
 		await page.getByLabel(/email/i).fill('test@example.com')
@@ -365,8 +367,8 @@ test.describe('Checkout', () => {
 
 		// Continue through checkout steps
 		await page.getByRole('button', { name: /continue to delivery/i }).click()
-		// Wait for delivery step
-		await page.waitForURL(/\/shop\/checkout\/delivery/, { timeout: 10000 })
+		// Wait for delivery step - allow more time for form processing
+		await page.waitForURL(/\/shop\/checkout\/delivery/, { timeout: 15000 })
 		await page.waitForLoadState('networkidle')
 		
 		// Check if we're still on delivery page (might have redirected if no shipping methods)

@@ -116,11 +116,12 @@ test.describe('Admin User Management', () => {
 		await page.waitForLoadState('networkidle')
 
 		// Check that users are displayed - wait for them to appear
-		// Use more specific queries to find users in the table
+		// Use link queries instead of cell queries to avoid strict mode violations
+		// The user name appears in a link within the table
 		const user1Name = testUser1.name || testUser1.username
 		const user2Name = testUser2.name || testUser2.username
-		await expect(page.getByRole('cell', { name: new RegExp(user1Name, 'i') })).toBeVisible({ timeout: 10000 })
-		await expect(page.getByRole('cell', { name: new RegExp(user2Name, 'i') })).toBeVisible({ timeout: 10000 })
+		await expect(page.getByRole('link', { name: new RegExp(`^${user1Name}$`, 'i') })).toBeVisible({ timeout: 10000 })
+		await expect(page.getByRole('link', { name: new RegExp(`^${user2Name}$`, 'i') })).toBeVisible({ timeout: 10000 })
 	})
 
 	test('should display user email and username', async ({ page, navigate, login }) => {
@@ -218,11 +219,12 @@ test.describe('Admin User Management', () => {
 		
 		// Check that user details are displayed - use accessible queries
 		// The user details are in a card with "Profile Details" heading
-		// Find the text directly since it's in a structured card
-		await expect(page.getByText(testUser.email)).toBeVisible({ timeout: 10000 })
-		await expect(page.getByText(testUser.username)).toBeVisible({ timeout: 10000 })
+		// Email appears in both header and profile details, so use first() to avoid strict mode violation
+		// Use test IDs for specific elements to avoid ambiguity
+		await expect(page.getByTestId('user-detail-email')).toHaveText(testUser.email, { timeout: 10000 })
+		await expect(page.getByTestId('user-detail-username')).toHaveText(testUser.username, { timeout: 10000 })
 		if (testUser.name) {
-			await expect(page.getByText(testUser.name)).toBeVisible({ timeout: 10000 })
+			await expect(page.getByTestId('user-detail-name')).toHaveText(testUser.name, { timeout: 10000 })
 		}
 	})
 

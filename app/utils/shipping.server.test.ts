@@ -255,6 +255,17 @@ describe('shipping.server', () => {
 
 	describe('getShippingMethodsForCountry', () => {
 		test('should return methods from all zones containing country', async () => {
+			// Verify methods exist in database
+			const standardMethod = await prisma.shippingMethod.findUnique({
+				where: { id: standardMethodId },
+			})
+			const freeMethod = await prisma.shippingMethod.findUnique({
+				where: { id: freeShippingMethodId },
+			})
+			
+			expect(standardMethod).toBeTruthy()
+			expect(freeMethod).toBeTruthy()
+			
 			const methods = await getShippingMethodsForCountry('FR')
 
 			expect(methods.length).toBeGreaterThan(0)
