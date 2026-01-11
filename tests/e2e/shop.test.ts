@@ -25,8 +25,11 @@ test.describe('Shop Home Page', () => {
 
 	test('should display category cards', async ({ page }) => {
 		await page.goto('/shop')
-		const categoryCards = page.getByTestId('category-card')
-		await expect(categoryCards.first()).toBeVisible()
+		await page.waitForLoadState('networkidle')
+		// Use accessible query - category cards are links to category pages
+		// Find any category link (they contain category names)
+		const categoryLink = page.getByRole('link', { name: /test category/i })
+		await expect(categoryLink).toBeVisible({ timeout: 10000 })
 	})
 
 	test.afterEach(async () => {

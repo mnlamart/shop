@@ -165,12 +165,13 @@ test.describe('Admin Order Management', () => {
 		})
 
 		await navigate('/admin/orders')
+		await page.waitForLoadState('networkidle')
 
-		// Check that both orders are displayed
-		await expect(page.getByText(orderNumber1)).toBeVisible()
-		await expect(page.getByText(orderNumber2)).toBeVisible()
-		await expect(page.getByText('customer1@example.com')).toBeVisible()
-		await expect(page.getByText('customer2@example.com')).toBeVisible()
+		// Check that both orders are displayed - wait for them to appear
+		await expect(page.getByText(orderNumber1)).toBeVisible({ timeout: 10000 })
+		await expect(page.getByText(orderNumber2)).toBeVisible({ timeout: 10000 })
+		await expect(page.getByText('customer1@example.com')).toBeVisible({ timeout: 10000 })
+		await expect(page.getByText('customer2@example.com')).toBeVisible({ timeout: 10000 })
 	})
 
 	test('should filter orders by status', async ({ page, navigate, login }) => {

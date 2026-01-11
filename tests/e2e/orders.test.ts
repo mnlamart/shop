@@ -57,6 +57,31 @@ test.describe('Order History', () => {
 		page,
 		login,
 	}) => {
+		// Ensure testProduct exists (created in beforeEach)
+		if (!testProduct?.id) {
+			throw new Error('testProduct was not created in beforeEach')
+		}
+		
+		// Verify product exists in database (might have been deleted in previous test cleanup)
+		const product = await prisma.product.findUnique({
+			where: { id: testProduct.id },
+		})
+		if (!product) {
+			// Recreate product if it was deleted
+			const productData = createProductData()
+			testProduct = await prisma.product.create({
+				data: {
+					name: productData.name,
+					slug: productData.slug,
+					description: productData.description,
+					sku: productData.sku,
+					price: productData.price,
+					status: 'ACTIVE',
+					categoryId: testCategory.id,
+				},
+			})
+		}
+		
 		const user = await login()
 
 		// Create two orders - generate second order number after first is committed

@@ -1,0 +1,611 @@
+---
+description: Comprehensive testing knowledge from all EpicWeb.dev workshops - Automatically applies to test files
+globs: **/*.test.ts,**/*.test.js,**/*.test.tsx,**/*.spec.ts,**/*.spec.js,**/*.spec.tsx,**/*.e2e.test.ts,**/*.browser.test.ts,**/*.browser.test.tsx,**/tests/**/*,**/__tests__/**/*
+alwaysApply: true
+---
+
+# Testing Knowledge Base - Comprehensive Rules
+
+This file contains comprehensive testing knowledge from all EpicWeb.dev workshops. It automatically applies when working on test files.
+
+**This file is self-contained** - All essential knowledge is embedded. No external references needed.
+
+**Workshops Included**: Testing Fundamentals, React Component Testing with Vitest, Full Stack Testing, Mocking Techniques in Vitest
+
+## Core Principles
+
+### The Golden Rule of Assertions
+**A test must fail if, and only if, the intention behind the system is not met.**
+
+When writing or reviewing tests, verify:
+- ✅ Test fails when intention is broken
+- ✅ Test passes when intention is met
+- ❌ Test fails when intention is met (bad test)
+- ❌ Test passes when intention is broken (bad test)
+
+### Intention vs Implementation
+**Always test intentions, not implementation details.**
+
+- The implementation may change but the intention stays the same
+- Tests should validate what the code does, not how it does it
+- This makes tests more resilient to refactoring
+
+### Testing Philosophy
+**The more your tests resemble the way your software is used, the more confidence they can give you.**
+
+- Test from user's perspective
+- Use accessible queries (getByRole, getByLabelText)
+- Interact like users would (click, type, etc.)
+
+### Test Boundaries
+**Mocking is a technique to establish test boundaries - draw the line where dependencies end.**
+
+- Never mock anything directly related to the intention you want to test
+- Always mock third-party HTTP requests
+- Choose the least intrusive mocking technique possible
+- The more you alter the system under test, the more you are testing a different system
+
+### Test Levels
+**Choose the right test level for the job:**
+
+- **E2E (Playwright)**: Full user flows, critical paths
+- **Integration (Vitest)**: Multiple units working together
+- **Component (RTL/Browser Mode)**: React components in isolation
+- **Unit (Vitest)**: Pure functions, utilities
+
+## Test Structure
+
+Every test should follow the **Setup-Actions-Assertions** pattern:
+
+```typescript
+test('test description', () => {
+  // Setup (optional)
+  const input = 'John'
+  
+  // Actions
+  const result = greet(input)
+  
+  // Assertions
+  expect(result).toBe('Hello, John!')
+})
+```
+
+## Best Practices
+
+### DO
+
+1. **Use declarative assertions** - Always use `expect()` instead of imperative `if` statements
+2. **Test intentions** - Focus on what the code does, not how
+3. **Wait for state, not time** - Use `waitFor()` pattern, never `sleep()`
+4. **Use meaningful test names** - Describe the intention being tested
+5. **Keep tests isolated** - Each test should be independent
+6. **Clean up side effects** - Always restore in `afterAll` what you set up in `beforeAll`
+7. **Make tests async when needed** - Use `async` test callbacks for async code
+8. **Always await promises** - Never forget to await async operations
+9. **Use `.rejects.toThrow()`** - For testing promise rejections
+10. **Mock side effects** - Use appropriate techniques to mock Date, HTTP, etc.
+11. **Separate test files** - Keep tests in `.test.ts` or `.spec.ts` files, separate from source
+12. **Create test data in tests** - Don't rely on seed data
+13. **Use fixtures for setup/teardown** - Ensures cleanup even on failure
+14. **Mock third-party HTTP requests** - Always use MSW
+15. **Use accessible queries** - `getByRole()` with accessible names (most specific)
+16. **Use Vitest Browser Mode** - Real browser runtime, no polyfills (for component tests)
+17. **Test from user's perspective** - What users see and interact with
+18. **Use custom wrappers** - For router-dependent components (MemoryRouter)
+19. **Use setup functions** - Instead of nested describe blocks
+20. **Use custom assertions** - For common patterns
+
+### DON'T
+
+1. **Never use `sleep()`** - It makes tests flaky and slow
+2. **Don't test implementation details** - Test behavior, not code structure
+3. **Don't write non-deterministic tests** - Tests should pass consistently
+4. **Don't forget to clean up** - Side effects must be restored
+5. **Don't write imperative assertions** - Use declarative `expect()`
+6. **Don't test in source files** - Keep tests separate
+7. **Don't assume promises resolve immediately** - Always await
+8. **Don't mock the code you're testing** - Only mock dependencies
+9. **Never rely on seed data** - Makes tests brittle
+10. **Don't use JSDOM** - Missing APIs, compatibility issues (use Browser Mode)
+11. **Don't use `getByTestId()`** - Not accessible, doesn't resemble user experience
+12. **Don't use class-based selectors** - Implementation details
+13. **Don't test actual navigation** - Test `href` attributes, test navigation in E2E
+14. **Don't nest describe blocks deeply** - Use setup functions
+15. **Don't test third-party code** - Focus on your code
+16. **Don't over-mock** - The more you mock, the less you're testing
+
+## Code Patterns
+
+### Declarative Assertions
+
+```typescript
+// ✅ Good
+expect(result).toBe(expected)
+expect(result).toEqual(expected)
+expect(result).toBeTruthy()
+
+// ❌ Bad
+if (result !== expected) {
+  throw new Error(`Expected ${expected} but got ${result}`)
+}
+```
+
+### Async Tests
+
+```typescript
+// ✅ Good
+test('async operation', async () => {
+  const result = await asyncFunction()
+  expect(result).toBe(expected)
+})
+
+// ❌ Bad
+test('async operation', () => {
+  const result = asyncFunction() // Missing await!
+  expect(result).toBe(expected)
+})
+```
+
+### Promise Rejection Testing
+
+```typescript
+// ✅ Good
+test('handles errors', async () => {
+  await expect(asyncFunction(invalidInput)).rejects.toThrow(
+    new Error('Expected error message')
+  )
+})
+```
+
+### Waiting for State Changes
+
+```typescript
+// ✅ Good - Waits for state
+await waitFor(() => {
+  expect(state.isReady).toBe(true)
+})
+
+// ❌ Bad - Waits for time
+await sleep(500)
+expect(state.isReady).toBe(true)
+```
+
+### Side Effect Mocking (Date)
+
+```typescript
+// ✅ Good - Proper setup and cleanup
+const OriginalDate = globalThis.Date
+
+beforeAll(() => {
+  globalThis.Date = new Proxy(globalThis.Date, {
+    construct: () => new OriginalDate('2024-01-01'),
+  })
+})
+
+afterAll(() => {
+  globalThis.Date = OriginalDate
+})
+```
+
+### Using Vitest Fake Timers
+
+```typescript
+// ✅ Good - Freeze time
+vi.useFakeTimers()
+vi.setSystemTime(new Date('2024-01-01'))
+// Test code
+vi.useRealTimers()
+
+// ✅ Good - Advance timers
+vi.useFakeTimers()
+debounce(fn, 250)()
+vi.advanceTimersByTime(250)
+expect(fn).toHaveBeenCalled()
+vi.useRealTimers()
+```
+
+## Mocking Techniques
+
+### Function Mocking
+
+```typescript
+// Track function calls
+const mockFn = vi.fn()
+emitter.on('event', mockFn)
+emitter.emit('event')
+expect(mockFn).toHaveBeenCalledOnce()
+
+// Control return value
+vi.spyOn(controller, 'isItemInStock').mockReturnValue(true)
+
+// Conditional behavior
+vi.spyOn(controller, 'isItemInStock').mockImplementation((item) => {
+  return item.id === 4
+})
+```
+
+### Global Mocking
+
+```typescript
+// Mock console
+vi.spyOn(console, 'log').mockImplementation(() => {})
+// Test code
+expect(console.log).toHaveBeenCalledWith('message')
+vi.restoreAllMocks()
+
+// Mock global value
+vi.stubGlobal('location', { href: 'http://example.com' })
+// Test code
+vi.unstubAllGlobals()
+
+// Mock environment variable
+vi.stubEnv('API_URL', 'http://test-api.com')
+// Test code
+vi.unstubAllEnvs()
+```
+
+### Network Mocking (MSW)
+
+```typescript
+// Always mock third-party HTTP requests
+import { http, HttpResponse } from 'msw'
+import { setupServer } from 'msw/node'
+
+const server = setupServer(
+  http.get('https://api.example.com/data', () => {
+    return HttpResponse.json({ data: 'test' })
+  })
+)
+
+beforeAll(() => server.listen())
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
+
+// Or with Playwright/Vitest Browser Mode
+import { test } from './test-extend'
+
+test('test', async ({ worker }) => {
+  worker.use(
+    http.post('url', () => HttpResponse.json({ data: 'value' }))
+  )
+  // ... test code
+})
+```
+
+### Module Mocking (Last Resort)
+
+```typescript
+// Only use when necessary - prefer dependency injection
+const mockFn = vi.hoisted(() => vi.fn())
+vi.mock('./module', () => ({
+  exportedFunction: mockFn,
+}))
+```
+
+## Playwright E2E Testing
+
+### Basic Playwright Test
+
+```typescript
+test('user flow', async ({ page }) => {
+  await page.goto('/path')
+  await page.getByRole('button', { name: /text/i }).click()
+  await expect(page.getByText('expected')).toBeVisible()
+})
+```
+
+### Playwright Fixtures
+
+```typescript
+const test = base.extend({
+  insertNewUser: async ({}, use) => {
+    const user = await createUser()
+    await use(() => user)
+    await deleteUser(user.id)
+  },
+})
+```
+
+### Authenticated Tests
+
+```typescript
+const user = await createUser()
+const session = await createSession(user)
+const cookie = await getCookie(session)
+await page.context().addCookies([{ name, value, domain, path, ... }])
+```
+
+## React Component Testing
+
+### Browser Mode Setup
+
+```typescript
+// ✅ Good - Browser Mode
+import { render } from 'vitest-browser-react'
+import { page } from '@vitest/browser/context'
+
+test('reads file', async () => {
+  const file = new File(['content'], 'file.txt')
+  render(<FilePreview file={file} />)
+  // Works: Real browser supports file.text()
+})
+
+// ❌ Bad - JSDOM
+import { render } from '@testing-library/react'
+test('reads file', () => {
+  const file = new File(['content'], 'file.txt')
+  render(<FilePreview file={file} />)
+  // Fails: file.text() is not a function in JSDOM
+})
+```
+
+### Query Specificity Hierarchy
+
+Always prefer more specific queries:
+
+1. 🏆 `getByRole()` - Most specific, preferred
+2. `getByLabelText()` - For form inputs
+3. `getByPlaceholder()` - For inputs with placeholders
+4. `getByText()` - For text content
+5. `getByAltText()` - For images
+6. `getByTitle()` - For elements with title attributes
+7. ❌ `getByTestId()` - Avoid (not accessible)
+
+### Component Test Structure
+
+```typescript
+import { render } from 'vitest-browser-react'
+import { page } from '@vitest/browser/context'
+
+test('test name', async () => {
+  // Setup
+  render(<Component />)
+  
+  // Actions
+  const element = page.getByRole('button', { name: 'Submit' })
+  await element.click()
+  
+  // Assertions
+  await expect.element(page.getByText('Success')).toBeVisible()
+})
+```
+
+### Element Queries
+
+```typescript
+// ✅ Good - By role (preferred)
+page.getByRole('button', { name: 'Submit' })
+page.getByRole('link', { name: 'Home' })
+
+// ✅ Good - By label
+page.getByLabelText('Email address')
+
+// ✅ Good - By text
+page.getByText('Hello, world!')
+
+// ✅ Good - Chaining
+page.getByRole('navigation').getByRole('link', { name: 'Home' })
+
+// ❌ Bad - Test ID
+page.getByTestId('submit-button')
+```
+
+### Element Assertions
+
+```typescript
+// ✅ Good - With retry mechanism
+await expect.element(page.getByText('Hello')).toBeVisible()
+await expect.element(page.getByRole('alert')).toHaveTextContent('Error')
+await expect.element(page.getByRole('link')).toHaveAttribute('href', '/cart')
+await expect.element(page.getByText('Removed')).not.toBeInTheDocument()
+
+// ❌ Bad - No retry mechanism
+expect(page.getByText('Hello')).toBeVisible()
+```
+
+### Custom Wrappers
+
+```typescript
+// ✅ Good - Router wrapper
+import { MemoryRouter } from 'react-router'
+
+const wrapper = ({ children }) => <MemoryRouter>{children}</MemoryRouter>
+
+test('test', async () => {
+  render(<Component />, { wrapper })
+})
+```
+
+### Testing Links
+
+```typescript
+// ✅ Good - Test href attribute
+test('has correct link', async () => {
+  render(<Component />, { wrapper })
+  const link = page.getByRole('link', { name: 'Back to cart' })
+  await expect.element(link).toHaveAttribute('href', '/cart')
+})
+
+// ❌ Bad - Test actual navigation
+test('navigates to cart', async () => {
+  render(<Component />)
+  await page.getByRole('link', { name: 'Back to cart' }).click()
+  // Tests what happens on cart page - not component's responsibility
+})
+```
+
+### Remix Route Testing
+
+```typescript
+// ✅ Good - Remix Stub
+import { createRemixStub } from '@remix-run/testing'
+
+const App = createRemixStub([
+  {
+    path: '/route',
+    Component: MyRoute,
+    loader: () => json({ data: 'value' }),
+  },
+])
+
+test('route works', async () => {
+  render(<App />)
+  // ... test code
+})
+```
+
+## Quick Decision Trees
+
+### When Writing a Test
+
+1. **What level?** → E2E/Integration/Component/Unit
+2. **What am I testing?** → The intention/behavior, not the implementation
+3. **Is it async?** → Make test callback `async` and `await` all promises
+4. **Are there side effects?** → Mock them in `beforeAll` and restore in `afterAll`
+5. **Do I need to wait for something?** → Use `waitFor()` or `expect.element()`, never `sleep()`
+6. **Is the test isolated?** → Should not depend on other tests
+7. **Needs auth?** → Create user/session/cookie
+8. **Makes HTTP requests?** → Mock with MSW
+9. **Uses database?** → Use test DB, clean up
+
+### When to Mock?
+
+1. **Is it a third-party HTTP request?** → Always mock with MSW
+2. **Is it a side effect irrelevant to the test?** → Mock it
+3. **Is it non-deterministic (date, time, random)?** → Mock it
+4. **Is it the code you're testing?** → Never mock
+5. **Is it directly related to the intention?** → Don't mock
+
+### Which Mocking Technique?
+
+1. **Function call tracking?** → `vi.fn()` or `vi.spyOn()`
+2. **Date/time?** → `vi.useFakeTimers()`
+3. **Global method?** → `vi.spyOn(global, 'method')`
+4. **Global value?** → `vi.stubGlobal()`
+5. **Environment variable?** → `vi.stubEnv()`
+6. **HTTP request?** → MSW
+7. **Module with side effects?** → `vi.mock()` (last resort)
+
+### Component Testing Queries
+
+1. **Which query to use?** → Use `getByRole()` with accessible name (most specific)
+2. **Is it a form input?** → Use `getByLabelText()`
+3. **Does it make HTTP requests?** → Always mock with MSW
+4. **Does it need a router?** → Create custom wrapper with `MemoryRouter`
+5. **Are you testing navigation?** → Test `href` attribute, not actual navigation
+6. **Do you need to wait?** → Use `expect.element()` (has retry)
+7. **Is element removed?** → Use `.not.toBeInTheDocument()`
+
+## Common Mistakes to Avoid
+
+### Flaky Tests
+**Problem**: Tests that pass sometimes and fail other times
+**Solution**: Mock side effects properly (Date, random values, etc.)
+
+### Testing Implementation Details
+**Problem**: Tests break when implementation changes, even though behavior is correct
+**Solution**: Test what the code does, not how it does it
+
+### Using `sleep()`
+**Problem**: Tests wait for arbitrary time, making them slow and flaky
+**Solution**: Use `waitFor()` or `expect.element()` to wait for state changes
+
+### Forgetting to Await
+**Problem**: Assertions run before async operations complete
+**Solution**: Make test `async` and always `await` promises
+
+### Not Cleaning Up Side Effects
+**Problem**: Side effects leak between tests
+**Solution**: Always restore in `afterAll` what you set up in `beforeAll`
+
+### Relying on Seed Data
+**Problem**: Tests break when seed data changes
+**Solution**: Create test data in tests using fixtures
+
+### Using JSDOM
+**Problem**: Missing browser APIs, compatibility issues
+**Solution**: Use Vitest Browser Mode for component tests
+
+### Using Non-Accessible Queries
+**Problem**: Tests break when implementation changes, doesn't test from user's perspective
+**Solution**: Use `getByRole()` with accessible names
+
+### Not Mocking Network Requests
+**Problem**: Tests fail due to server issues, flaky tests
+**Solution**: Always mock HTTP requests with MSW
+
+### Mocking the Code You're Testing
+**Problem**: Testing the mock, not the real code
+**Solution**: Only mock dependencies, never the code under test
+
+### Over-Mocking
+**Problem**: Testing mostly mocks, not real code
+**Solution**: Mock at the lowest level, only what's necessary
+
+## Project-Specific Notes
+
+This project uses:
+- **Vitest** for unit tests (`.test.ts`, `.test.tsx` files)
+- **Playwright** for E2E tests (`tests/e2e/` directory)
+- **Remix/React Router** for routing and server-side rendering
+- **Prisma** for database access
+
+### Remix/React Router Testing Patterns
+
+When testing Remix routes:
+- Use `createRemixStub` for isolated route testing (Vitest)
+- Use Playwright for full E2E route testing
+- Test both loader and action functions separately
+- Mock database calls when testing route logic
+
+### Playwright E2E Testing
+
+This project has custom Playwright utilities in `#tests/playwright-utils.ts`:
+- Use `navigate()` helper for navigation
+- Use custom `test` and `expect` from playwright-utils
+- Clean up test data in `test.afterEach` or `test.afterAll`
+- Use `prisma` directly for test data setup
+
+### Database Testing
+
+- Use Prisma for test data setup/cleanup
+- Create test data in `test.beforeEach` or `test.beforeAll`
+- Clean up in `test.afterEach` or `test.afterAll`
+- Use unique identifiers (timestamps, UUIDs) to avoid conflicts
+
+## References
+
+**This rules file is self-contained and works standalone.** All essential knowledge is included above.
+
+If you have access to the Knowledge Base directory, you can reference detailed documentation using @-files in Cursor Chat:
+
+### Using @-files in Cursor Chat
+
+If the Knowledge Base is accessible (e.g., in a parent directory or workspace):
+
+```
+@../Knowledge Base/testing-fundamentals/TESTING_FUNDAMENTALS_EXAMPLES.md
+@../Knowledge Base/mocking-techniques/MOCKING_TECHNIQUES_QUICK_REFERENCE.md
+@../Knowledge Base/full-stack-testing/FULL_STACK_TESTING_RESUME.md
+@../Knowledge Base/react-component-testing-with-vitest/REACT_COMPONENT_TESTING_WITH_VITEST_EXAMPLES.md
+```
+
+Or with absolute path:
+
+```
+@/Users/marvinlamart/dev/kentc/Knowledge Base/testing-fundamentals/TESTING_FUNDAMENTALS_RESUME.md
+```
+
+### Available Knowledge Sources
+
+- `testing-fundamentals/` - Foundation testing knowledge
+- `react-component-testing-with-vitest/` - Component testing (Browser Mode)
+- `full-stack-testing/` - Complete testing strategy (E2E, Integration, Component, Unit)
+- `mocking-techniques/` - All mocking techniques
+
+Each directory contains:
+- `{WORKSHOP}_RESUME.md` - Complete knowledge base
+- `{WORKSHOP}_EXAMPLES.md` - Working code examples
+- `{WORKSHOP}_QUICK_REFERENCE.md` - Quick lookup
+
+**Note**: These references are optional. This rules file contains all essential knowledge needed for writing tests.

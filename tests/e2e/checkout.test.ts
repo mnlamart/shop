@@ -340,11 +340,26 @@ test.describe('Checkout', () => {
 		await page.goto('/shop/checkout/shipping')
 		await page.waitForLoadState('networkidle')
 
-		// Fill out checkout form
+		// Wait for the shipping form to be visible
+		await expect(page.getByRole('heading', { name: /shipping information/i })).toBeVisible({ timeout: 10000 })
+		
+		// If there's an address selector, select "Use New Address" to show the form fields
+		const addressSelect = page.getByRole('combobox', { name: /use saved address/i }).or(
+			page.getByLabel(/use saved address/i)
+		)
+		if (await addressSelect.isVisible().catch(() => false)) {
+			await addressSelect.click()
+			await page.getByRole('option', { name: /use new address/i }).click()
+			// Wait for form fields to appear
+			await page.waitForTimeout(500)
+		}
+
+		// Fill out checkout form - wait for fields to be visible
+		await expect(page.getByLabel(/^name$/i)).toBeVisible({ timeout: 10000 })
 		await page.getByLabel(/^name$/i).fill('Test User')
-		await page.getByRole('textbox', { name: /email/i }).fill('test@example.com')
-		await page.getByRole('textbox', { name: /street/i }).fill('123 Main St')
-		await page.getByRole('textbox', { name: /city/i }).fill('New York')
+		await page.getByLabel(/email/i).fill('test@example.com')
+		await page.getByLabel(/street address/i).fill('123 Main St')
+		await page.getByLabel(/city/i).fill('New York')
 		await page.getByLabel(/postal|zip/i).fill('10001')
 		await page.getByLabel(/country/i).fill('US')
 

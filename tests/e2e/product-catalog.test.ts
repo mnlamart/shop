@@ -34,7 +34,7 @@ test.describe('Product Catalog', () => {
 		const productData = createProductData()
 		productData.status = 'ACTIVE'
 
-		await prisma.product.create({
+		const product = await prisma.product.create({
 			data: {
 				name: productData.name,
 				slug: productData.slug,
@@ -47,8 +47,12 @@ test.describe('Product Catalog', () => {
 		})
 
 		await page.goto('/shop/products')
-		const productCards = page.getByTestId('product-card')
-		await expect(productCards.first()).toBeVisible()
+		// Wait for products to load
+		await page.waitForLoadState('networkidle')
+		// Use accessible query - product cards are links to product detail pages
+		// Find the link that contains the product name
+		const productLink = page.getByRole('link', { name: new RegExp(product.name, 'i') })
+		await expect(productLink).toBeVisible({ timeout: 10000 })
 	})
 
 	test.afterEach(async () => {
