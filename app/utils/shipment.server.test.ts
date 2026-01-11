@@ -92,7 +92,9 @@ describe('shipment.server', () => {
 				email: order.email,
 			},
 			pickupPointId: order.mondialRelayPickupPointId!,
+			pickupPointCountry: order.shippingCountry, // Now required for Location attribute
 			weight: expect.any(Number), // Weight calculation
+			value: order.total, // Shipment value in cents
 			reference: order.orderNumber,
 		})
 

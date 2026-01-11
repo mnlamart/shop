@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import * as Sentry from '@sentry/react-router'
 import { getUserId } from './auth.server.ts'
 import { getCartSessionId, getCartSessionIdFromRequest } from './cart-session.server.ts'
@@ -56,11 +57,8 @@ export async function getOrCreateCart({
 		// Handle race condition: if cart was created by another request between findFirst and create
 		// (e.g., after webhook deleted cart, another request created it)
 		if (
-			error &&
-			typeof error === 'object' &&
-			'code' in error &&
+			error instanceof Prisma.PrismaClientKnownRequestError &&
 			error.code === 'P2002' &&
-			'meta' in error &&
 			error.meta &&
 			typeof error.meta === 'object' &&
 			'modelName' in error.meta &&

@@ -1,45 +1,8 @@
-import { getPasswordHash } from '#app/utils/auth.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { generateOrderNumber } from '#app/utils/order-number.server.ts'
 import { expect, test } from '#tests/playwright-utils.ts'
 import { createProductData } from '#tests/product-utils.ts'
 
-async function createAdminUser() {
-	const username = `admin${Date.now()}`
-	const email = `admin${Date.now()}@example.com`
-	const password = username
-	const hashedPassword = await getPasswordHash(password)
-
-	const user = await prisma.user.create({
-		data: {
-			username,
-			name: 'Admin User',
-			email,
-			roles: { connect: { name: 'admin' } },
-			password: { create: { hash: hashedPassword } },
-		},
-		select: { id: true, email: true, username: true, name: true },
-	})
-
-	return { user, password }
-}
-
-async function loginAsAdmin(page: any, username: string, password: string) {
-	await page.goto('/login')
-	await page.getByRole('textbox', { name: /username/i }).fill(username)
-	await page.getByLabel(/^password$/i).fill(password)
-	await page.getByRole('button', { name: /log in/i }).click()
-	// Wait for redirect after login
-	await page.waitForURL(/\/(?:|\?redirectTo=)|\/settings\/profile/)
-	// Verify user is logged in by checking for user menu
-	await page.waitForSelector('[data-testid="user-menu"]', { timeout: 5000 }).catch(() => {
-		// Fallback: wait for any indication that login succeeded
-		return page.waitForFunction(() => {
-			return document.querySelector('a[href*="/logout"]') !== null ||
-				document.querySelector('[aria-label*="User menu"]') !== null
-		}, { timeout: 5000 })
-	})
-}
 
 test.describe('Admin Order Management', () => {
 	let testCategory: Awaited<ReturnType<typeof prisma.category.create>>
@@ -71,30 +34,48 @@ test.describe('Admin Order Management', () => {
 	})
 
 	test.afterEach(async () => {
-		// Clean up test data
-		// Delete Orders first (will cascade delete OrderItems)
-		await prisma.order.deleteMany({
-			where: {
-				orderNumber: { startsWith: 'ORD-' },
-			},
-		})
-		// Delete CartItems before Products
-		await prisma.cartItem.deleteMany({
-			where: {
-				product: {
-					categoryId: testCategory.id,
+		// Clean up test data - batch all operations in a transaction for better performance
+		const categoryId = testCategory?.id
+		
+		// Delete products and related data first
+		await prisma.$transaction([
+			// Delete Orders first (will cascade delete OrderItems)
+			prisma.order.deleteMany({
+				where: {
+					orderNumber: { startsWith: 'ORD-' },
 				},
-			},
-		})
-		await prisma.product.deleteMany({
-			where: { categoryId: testCategory.id },
-		})
-		await prisma.category.deleteMany({
-			where: { id: testCategory.id },
-		})
-		await prisma.user.deleteMany({
-			where: { username: { startsWith: 'admin' } },
-		})
+			}),
+			// Delete CartItems before Products
+			...(categoryId
+				? [
+						prisma.cartItem.deleteMany({
+							where: {
+								product: {
+									categoryId: categoryId,
+								},
+							},
+						}),
+						prisma.product.deleteMany({
+							where: { categoryId: categoryId },
+						}),
+					]
+				: [
+						prisma.cartItem.deleteMany({}),
+						prisma.product.deleteMany({}),
+					]),
+			prisma.user.deleteMany({
+				where: { username: { startsWith: 'admin' } },
+			}),
+		])
+		
+		// Delete category separately (after products are deleted)
+		if (categoryId) {
+			await prisma.category
+				.deleteMany({ where: { id: categoryId } })
+				.catch(() => {
+					// Ignore if category was already deleted or doesn't exist
+				})
+		}
 	})
 
 	test('should redirect non-admin users from admin orders page', async ({
@@ -114,9 +95,8 @@ test.describe('Admin Order Management', () => {
 		await expect(page.getByRole('heading', { name: /unauthorized/i })).toBeVisible({ timeout: 5000 })
 	})
 
-	test('should display admin order list page', async ({ page, navigate }) => {
-		const { user, password } = await createAdminUser()
-		await loginAsAdmin(page, user.username, password)
+	test('should display admin order list page', async ({ page, navigate, login }) => {
+		await login({ asAdmin: true })
 
 		await navigate('/admin/orders')
 
@@ -124,10 +104,15 @@ test.describe('Admin Order Management', () => {
 		await expect(page.getByRole('heading', { name: /orders/i })).toBeVisible()
 	})
 
-	test('should display all orders in the list', async ({ page, navigate }) => {
+	test('should display all orders in the list', async ({ page, navigate, login }) => {
+		
+		// Ensure testProduct exists (created in beforeEach)
+		if (!testProduct?.id) {
+			throw new Error('testProduct was not created in beforeEach')
+		}
+		
 		// Create admin user
-		const { user, password } = await createAdminUser()
-		await loginAsAdmin(page, user.username, password)
+		await login({ asAdmin: true })
 
 		// Create test orders - generate second order number after first is committed
 		const orderNumber1 = await generateOrderNumber()
@@ -188,9 +173,14 @@ test.describe('Admin Order Management', () => {
 		await expect(page.getByText('customer2@example.com')).toBeVisible()
 	})
 
-	test('should filter orders by status', async ({ page, navigate }) => {
-		const { user, password } = await createAdminUser()
-		await loginAsAdmin(page, user.username, password)
+	test('should filter orders by status', async ({ page, navigate, login }) => {
+		
+		// Ensure testProduct exists (created in beforeEach)
+		if (!testProduct?.id) {
+			throw new Error('testProduct was not created in beforeEach')
+		}
+		
+		await login({ asAdmin: true })
 
 		// Create orders with different statuses
 		const orderNumber1 = await generateOrderNumber()
@@ -244,8 +234,8 @@ test.describe('Admin Order Management', () => {
 		await navigate('/admin/orders')
 
 		// Filter by CONFIRMED status
-		// Try to find the status filter dropdown
-		const statusFilter = page.getByRole('combobox').first()
+		// The Select component uses aria-label="Filter by status"
+		const statusFilter = page.getByRole('combobox', { name: /filter by status/i })
 		await statusFilter.click()
 		await page.getByRole('option', { name: /confirmed/i }).click()
 
@@ -254,9 +244,14 @@ test.describe('Admin Order Management', () => {
 		await expect(page.getByText(orderNumber2)).not.toBeVisible()
 	})
 
-	test('should search orders by order number', async ({ page, navigate }) => {
-		const { user, password } = await createAdminUser()
-		await loginAsAdmin(page, user.username, password)
+	test('should search orders by order number', async ({ page, navigate, login }) => {
+		
+		// Ensure testProduct exists (created in beforeEach)
+		if (!testProduct?.id) {
+			throw new Error('testProduct was not created in beforeEach')
+		}
+		
+		await login({ asAdmin: true })
 
 		const orderNumber1 = await generateOrderNumber()
 		await prisma.order.create({
@@ -308,22 +303,36 @@ test.describe('Admin Order Management', () => {
 		})
 
 		await navigate('/admin/orders')
+		await page.waitForLoadState('networkidle')
+
+		// Verify both orders are visible initially
+		await expect(page.getByText(orderNumber1)).toBeVisible()
+		await expect(page.getByText(orderNumber2)).toBeVisible()
 
 		// Search by order number
-		const searchInput = page
-			.getByRole('textbox', { name: /search/i })
-			.or(page.getByPlaceholder(/search/i))
-			.first()
+		const searchInput = page.getByPlaceholder(/search orders/i)
 		await searchInput.fill(orderNumber1)
+		await searchInput.blur() // Trigger change event
+
+		// Wait for React to update the filtered list
+		await page.waitForTimeout(300)
 
 		// Should show only matching order
+		await expect(page.getByText(orderNumber1)).toBeVisible({ timeout: 5000 })
+		// Second order should not be visible - wait for it to disappear
+		await expect(page.getByText(orderNumber2)).not.toBeVisible({ timeout: 5000 })
 		await expect(page.getByText(orderNumber1)).toBeVisible()
 		await expect(page.getByText(orderNumber2)).not.toBeVisible()
 	})
 
-	test('should search orders by email', async ({ page, navigate }) => {
-		const { user, password } = await createAdminUser()
-		await loginAsAdmin(page, user.username, password)
+	test('should search orders by email', async ({ page, navigate, login }) => {
+		
+		// Ensure testProduct exists (created in beforeEach)
+		if (!testProduct?.id) {
+			throw new Error('testProduct was not created in beforeEach')
+		}
+		
+		await login({ asAdmin: true })
 
 		const orderNumber1 = await generateOrderNumber()
 
@@ -364,9 +373,8 @@ test.describe('Admin Order Management', () => {
 		await expect(page.getByText('unique-email@example.com')).toBeVisible()
 	})
 
-	test('should display empty state when no orders exist', async ({ page, navigate }) => {
-		const { user, password } = await createAdminUser()
-		await loginAsAdmin(page, user.username, password)
+	test('should display empty state when no orders exist', async ({ page, navigate, login }) => {
+		await login({ asAdmin: true })
 
 		await navigate('/admin/orders')
 
@@ -375,9 +383,14 @@ test.describe('Admin Order Management', () => {
 		await expect(page.getByText('No orders found.')).toBeVisible()
 	})
 
-	test('should link to order detail page from order list', async ({ page, navigate }) => {
-		const { user, password } = await createAdminUser()
-		await loginAsAdmin(page, user.username, password)
+	test('should link to order detail page from order list', async ({ page, navigate, login }) => {
+		
+		// Ensure testProduct exists (created in beforeEach)
+		if (!testProduct?.id) {
+			throw new Error('testProduct was not created in beforeEach')
+		}
+		
+		await login({ asAdmin: true })
 
 		const orderNumber = await generateOrderNumber()
 
@@ -406,12 +419,21 @@ test.describe('Admin Order Management', () => {
 
 		await navigate('/admin/orders')
 
-		// Click on order number or order row
+		// Wait for the order to appear in the list
+		await page.waitForSelector(`a[aria-label*="${orderNumber}"]`, { timeout: 10000 })
+		
+		// Click on order number link - there are 2 links (text and icon), use first one
+		// Use both getByRole and getByText as fallback for reliability
 		const orderLink = page
 			.getByRole('link', { name: orderNumber })
 			.or(page.getByText(orderNumber))
 			.first()
-		await orderLink.click()
+		
+		// Wait for navigation while clicking
+		await Promise.all([
+			page.waitForURL(new RegExp(`/admin/orders/${orderNumber}`), { timeout: 10000 }),
+			orderLink.click()
+		])
 
 		// Should navigate to order detail page
 		await expect(page).toHaveURL(new RegExp(`/admin/orders/${orderNumber}`))

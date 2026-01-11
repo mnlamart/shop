@@ -310,8 +310,8 @@ function parsePointRelaisArray(
 		if (point.Horaires_Sam) openingHours.saturday = point.Horaires_Sam
 		if (point.Horaires_Dim) openingHours.sunday = point.Horaires_Dim
 
-		const pointLat = parseFloat(point.Latitude)
-		const pointLon = parseFloat(point.Longitude)
+		const pointLat = parseFloat(String(point.Latitude ?? '0'))
+		const pointLon = parseFloat(String(point.Longitude ?? '0'))
 
 		const pickupPoint: PickupPoint = {
 			id: String(point.Num),

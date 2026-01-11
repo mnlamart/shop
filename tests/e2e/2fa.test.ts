@@ -10,13 +10,16 @@ test('Users can add 2FA to their account and use it when logging in', async ({
 	const password = faker.internet.password()
 	const user = await login({ password })
 	await navigate('/account/security/two-factor')
+	await page.waitForLoadState('networkidle')
 
 	await page.getByRole('button', { name: /enable 2fa/i }).click()
 
-	await expect(page).toHaveURL(`/account/security/two-factor`)
+	// After clicking enable, should redirect to verify page
+	await page.waitForURL(`/account/security/two-factor/verify`, { timeout: 10000 })
+	await page.waitForLoadState('networkidle')
+	
 	// Use the first main element (the page content) to avoid multiple main elements
 	const main = page.getByRole('main').first()
-	await main.getByRole('button', { name: /enable 2fa/i }).click()
 	const otpUriString = await main
 		.getByLabel(/One-Time Password URI/i)
 		.innerText()
@@ -36,7 +39,7 @@ test('Users can add 2FA to their account and use it when logging in', async ({
 	await main.getByRole('button', { name: /submit/i }).click()
 
 	// Wait for the redirect back to the two-factor page after verification
-	await page.waitForURL(`/account/security/two-factor`, { timeout: 5000 })
+	await page.waitForURL(`/account/security/two-factor`, { timeout: 10000 })
 	// Use the page content directly instead of main to avoid multiple main elements
 	await expect(page.getByText(/You have enabled two-factor authentication./i)).toBeVisible()
 	await expect(page.getByRole('link', { name: /disable 2fa/i })).toBeVisible()

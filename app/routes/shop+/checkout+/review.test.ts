@@ -83,6 +83,11 @@ describe('Checkout Review Step', () => {
 			context: {},
 		})
 
+		expect(result).not.toBeInstanceOf(Response)
+		if (result instanceof Response) {
+			throw new Error('Expected data object, got Response')
+		}
+
 		expect(result).toHaveProperty('cart')
 		expect(result).toHaveProperty('currency')
 		expect(result).toHaveProperty('subtotal')
@@ -162,6 +167,10 @@ describe('Checkout Review Step', () => {
 			context: {},
 		})
 
+		if (result instanceof Response) {
+			throw new Error('Expected data object, got Response')
+		}
+
 		expect(result).toHaveProperty('cart')
 		expect(result.cart.items).toHaveLength(1)
 		expect(result.subtotal).toBe(1500) // $15.00
@@ -219,6 +228,10 @@ describe('Checkout Review Step', () => {
 			params: {},
 			context: {},
 		})
+
+		if (result instanceof Response) {
+			throw new Error('Expected data object, got Response')
+		}
 
 		expect(result.subtotal).toBe(4500) // 3 * $15.00 = $45.00 (uses variant price, not product price)
 		expect(result.cart.items[0]?.variant?.price).toBe(1500)

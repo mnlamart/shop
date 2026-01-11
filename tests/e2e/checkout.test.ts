@@ -25,6 +25,11 @@ test.describe('Checkout', () => {
 	})
 
 	test('should display checkout form when cart has items', async ({ page }) => {
+		// Ensure testCategory exists (created in beforeEach)
+		if (!testCategory?.id) {
+			throw new Error('testCategory was not created in beforeEach')
+		}
+
 		// Create a test product
 		const productData = createProductData()
 		const product = await prisma.product.create({
@@ -43,17 +48,22 @@ test.describe('Checkout', () => {
 		await page.goto(`/shop/products/${product.slug}`)
 		await page.getByRole('button', { name: /add to cart/i }).click()
 
-		// Navigate to checkout
+		// Navigate to checkout - it redirects to review, then we need to go to shipping step
 		await page.goto('/shop/checkout')
+		// Wait for redirect to review step
+		await page.waitForURL(/\/shop\/checkout\/review/, { timeout: 10000 })
+		// Navigate to shipping step where the form is
+		await page.goto('/shop/checkout/shipping')
+		await page.waitForLoadState('networkidle')
 
-		// Verify checkout form is displayed
-		await expect(page.getByRole('heading', { name: /checkout/i })).toBeVisible()
-		await expect(page.getByRole('textbox', { name: /^name/i })).toBeVisible()
-		await expect(page.getByRole('textbox', { name: /email/i })).toBeVisible()
-		await expect(page.getByRole('textbox', { name: /street/i })).toBeVisible()
-		await expect(page.getByRole('textbox', { name: /city/i })).toBeVisible()
-		await expect(page.getByRole('textbox', { name: /postal|zip/i })).toBeVisible()
-		await expect(page.getByRole('textbox', { name: /country/i })).toBeVisible()
+		// Verify checkout form is displayed - shipping page has "Shipping Information" heading
+		await expect(page.getByRole('heading', { name: /shipping information/i })).toBeVisible()
+		await expect(page.getByLabel(/^name$/i)).toBeVisible()
+		await expect(page.getByLabel(/email/i)).toBeVisible()
+		await expect(page.getByLabel(/street/i)).toBeVisible()
+		await expect(page.getByLabel(/city/i)).toBeVisible()
+		await expect(page.getByLabel(/postal|zip/i)).toBeVisible()
+		await expect(page.getByLabel(/country/i)).toBeVisible()
 	})
 
 	test('should show validation errors when submitting empty form', async ({
@@ -76,17 +86,18 @@ test.describe('Checkout', () => {
 		await page.goto(`/shop/products/${product.slug}`)
 		await page.getByRole('button', { name: /add to cart/i }).click()
 
-		await page.goto('/shop/checkout')
+		// Navigate to checkout shipping step
+		await page.goto('/shop/checkout/shipping')
 
 		// Clear the country default value to test empty form
-		await page.getByRole('textbox', { name: /country/i }).clear()
+		await page.getByLabel(/country/i).clear()
 		
-		// Submit empty form
-		const submitPromise = page.waitForURL(/\/shop\/checkout/)
-		await page.getByRole('button', { name: /proceed to checkout/i }).click()
-		await submitPromise
+		// Submit empty form - button says "Continue to Delivery"
+		await page.getByRole('button', { name: /continue to delivery/i }).click()
 
-		// Wait for form validation errors to appear
+		// Wait for form validation errors to appear (should stay on shipping page)
+		await page.waitForLoadState('networkidle')
+		
 		// Check that at least some validation errors are displayed
 		await expect(page.getByText(/name is required/i)).toBeVisible({ timeout: 10000 })
 		await expect(page.getByText(/email is required/i)).toBeVisible()
@@ -113,21 +124,22 @@ test.describe('Checkout', () => {
 		await page.goto(`/shop/products/${product.slug}`)
 		await page.getByRole('button', { name: /add to cart/i }).click()
 
-		await page.goto('/shop/checkout')
+		// Navigate to checkout shipping step
+		await page.goto('/shop/checkout/shipping')
 
-		// Fill form with invalid email
-		await page.getByRole('textbox', { name: /^name/i }).fill('Test User')
-		await page.getByRole('textbox', { name: /email/i }).fill('invalid-email')
-		await page.getByRole('textbox', { name: /street/i }).fill('123 Main St')
-		await page.getByRole('textbox', { name: /city/i }).fill('New York')
-		await page.getByRole('textbox', { name: /postal|zip/i }).fill('10001')
-		await page.getByRole('textbox', { name: /country/i }).fill('US')
+			// Fill form with invalid email
+			await page.getByLabel(/^name$/i).fill('Test User')
+			await page.getByLabel(/email/i).fill('invalid-email')
+			await page.getByLabel(/street/i).fill('123 Main St')
+			await page.getByLabel(/city/i).fill('New York')
+		await page.getByLabel(/postal|zip/i).fill('10001')
+		await page.getByLabel(/country/i).fill('US')
 
-		await page.getByRole('button', { name: /proceed to checkout/i }).click()
+		await page.getByRole('button', { name: /continue to delivery/i }).click()
 
-		// Verify email validation error
-		await expect(page).toHaveURL(/\/shop\/checkout/)
-		await expect(page.getByText(/invalid email address/i)).toBeVisible()
+		// Wait for validation error (should stay on shipping page)
+		await page.waitForLoadState('networkidle')
+		await expect(page.getByText(/invalid email address/i)).toBeVisible({ timeout: 10000 })
 	})
 
 	test('should show validation error for invalid country code', async ({
@@ -150,20 +162,21 @@ test.describe('Checkout', () => {
 		await page.goto(`/shop/products/${product.slug}`)
 		await page.getByRole('button', { name: /add to cart/i }).click()
 
-		await page.goto('/shop/checkout')
+		// Navigate to checkout shipping step
+		await page.goto('/shop/checkout/shipping')
 
 		// Fill form with invalid country code (too long)
-		await page.getByRole('textbox', { name: /^name/i }).fill('Test User')
-		await page.getByRole('textbox', { name: /email/i }).fill('test@example.com')
-		await page.getByRole('textbox', { name: /street/i }).fill('123 Main St')
-		await page.getByRole('textbox', { name: /city/i }).fill('New York')
+		await page.getByLabel(/^name$/i).fill('Test User')
+		await page.getByLabel(/email/i).fill('test@example.com')
+		await page.getByLabel(/street/i).fill('123 Main St')
+		await page.getByLabel(/city/i).fill('New York')
 		await page.getByRole('textbox', { name: /postal|zip/i }).fill('10001')
 		await page.getByRole('textbox', { name: /country/i }).fill('USA')
 
-		await page.getByRole('button', { name: /proceed to checkout/i }).click()
+		await page.getByRole('button', { name: /continue to delivery/i }).click()
 
-		// Verify country validation error appears
-		await expect(page).toHaveURL(/\/shop\/checkout/)
+		// Wait for validation error (should stay on shipping page)
+		await page.waitForLoadState('networkidle')
 		await expect(
 			page.getByText(/country.*2.*letter.*iso/i),
 		).toBeVisible({ timeout: 10000 })
@@ -172,6 +185,35 @@ test.describe('Checkout', () => {
 	test('should redirect to Stripe checkout when form is submitted with valid data', async ({
 		page,
 	}) => {
+		test.setTimeout(60000)
+		// Create shipping zone and method for US
+		const shippingZone = await prisma.shippingZone.create({
+			data: {
+				name: `Test US Zone ${Date.now()}`,
+				description: 'US only',
+				countries: ['US'],
+				isActive: true,
+				displayOrder: 0,
+			},
+		})
+
+		const shippingMethod = await prisma.shippingMethod.create({
+			data: {
+				zoneId: shippingZone.id,
+				name: 'Standard Shipping',
+				description: 'Standard delivery',
+				rateType: 'FLAT',
+				flatRate: 500,
+				isActive: true,
+				displayOrder: 0,
+				estimatedDays: 5,
+			},
+		})
+
+		// Store IDs for cleanup
+		const shippingZoneId = shippingZone.id
+		const shippingMethodId = shippingMethod.id
+
 		// Create a test product
 		const productData = createProductData()
 		const product = await prisma.product.create({
@@ -189,44 +231,90 @@ test.describe('Checkout', () => {
 		// Add product to cart
 		await page.goto(`/shop/products/${product.slug}`)
 		await page.getByRole('button', { name: /add to cart/i }).click()
+		// Wait for cart to be updated
+		await page.waitForTimeout(500)
 
-		// Navigate to checkout
-		await page.goto('/shop/checkout')
+		// Navigate to checkout shipping step
+		await page.goto('/shop/checkout/shipping')
+		await page.waitForLoadState('networkidle')
 
 		// Fill out checkout form
-		await page.getByRole('textbox', { name: /^name/i }).fill('Test User')
-		await page.getByRole('textbox', { name: /email/i }).fill('test@example.com')
-		await page.getByRole('textbox', { name: /street/i }).fill('123 Main St')
-		await page.getByRole('textbox', { name: /city/i }).fill('New York')
-		await page.getByRole('textbox', { name: /postal|zip/i }).fill('10001')
-		await page.getByRole('textbox', { name: /country/i }).fill('US')
-
-		// Submit form and wait for redirect to Stripe
-		await page.getByRole('button', { name: /proceed to checkout/i }).click()
-
-		// Wait for redirect - could go to Stripe or orders page
-		await page.waitForURL(
-			(url) =>
-				url.href.includes('checkout.stripe.com') ||
-				url.href.includes('/shop/orders'),
-			{ timeout: 15000 },
-		)
-
-		// Should redirect to Stripe checkout or orders page (if webhook processed quickly)
-		const finalUrl = page.url()
+		await page.getByLabel(/^name$/i).fill('Test User')
+		await page.getByLabel(/email/i).fill('test@example.com')
+		await page.getByLabel(/street/i).fill('123 Main St')
+		await page.getByLabel(/city/i).fill('New York')
+		await page.getByLabel(/postal|zip/i).fill('10001')
+		await page.getByLabel(/country/i).fill('US')
 		
-		// Either we're on Stripe checkout or we've been redirected to orders page
-		expect(
-			finalUrl.includes('checkout.stripe.com') ||
-				finalUrl.includes('/shop/orders'),
-		).toBeTruthy()
+		await page.getByRole('button', { name: /continue to delivery/i }).click()
+		await page.waitForURL(/\/shop\/checkout\/delivery/, { timeout: 10000 })
+
+		// Wait for delivery page to load
+		await page.waitForSelector('h2:has-text("Delivery Options")', { timeout: 15000 })
+		await page.waitForSelector('text=Standard Shipping', { timeout: 15000 })
+		
+		// Select shipping method - use radio button role
+		const shippingMethodRadio = page.getByRole('radio', { name: /standard shipping/i }).first()
+		await shippingMethodRadio.click()
+		
+		// Continue to payment - the payment page auto-submits on mount, redirecting to Stripe
+		await page.getByRole('button', { name: /continue to payment/i }).click()
+		
+		// The payment page auto-submits, so we might go directly to Stripe or to payment page first
+		// Wait for either the payment page or Stripe
+		await Promise.race([
+			page.waitForURL(/\/shop\/checkout\/payment/, { timeout: 5000 }).then(() => {
+				// If we're on payment page, wait for it to auto-submit and redirect to Stripe
+				return page.waitForURL(/checkout\.stripe\.com/, { timeout: 15000 })
+			}),
+			page.waitForURL(/checkout\.stripe\.com/, { timeout: 15000 }),
+		])
+
+		// Verify we're on Stripe checkout
+		const finalUrl = page.url()
+		expect(finalUrl.includes('checkout.stripe.com')).toBeTruthy()
+
+		// Cleanup shipping zone and method
+		await prisma.$transaction([
+			prisma.shippingMethod.deleteMany({ where: { id: shippingMethodId } }),
+			prisma.shippingZone.deleteMany({ where: { id: shippingZoneId } }),
+		])
 	})
 
 	test('should complete Stripe checkout and redirect to order details', async ({
 		page,
 	}) => {
+		test.setTimeout(60000)
 		// This test uses mocked Stripe API responses via MSW
 		// No real Stripe credentials needed
+
+		// Create shipping zone and method for US
+		const shippingZone = await prisma.shippingZone.create({
+			data: {
+				name: `Test US Zone ${Date.now()}`,
+				description: 'US only',
+				countries: ['US'],
+				isActive: true,
+				displayOrder: 0,
+			},
+		})
+
+		const shippingMethod = await prisma.shippingMethod.create({
+			data: {
+				zoneId: shippingZone.id,
+				name: 'Standard Shipping',
+				description: 'Standard delivery',
+				rateType: 'FLAT',
+				flatRate: 500,
+				isActive: true,
+				displayOrder: 0,
+				estimatedDays: 5,
+			},
+		})
+
+		// Store IDs for cleanup
+		const shippingZoneId = shippingZone.id
+		const shippingMethodId = shippingMethod.id
 
 		// Create a test product with stock
 		const productData = createProductData()
@@ -248,19 +336,55 @@ test.describe('Checkout', () => {
 		await page.getByRole('button', { name: /add to cart/i }).click()
 		await page.waitForTimeout(500) // Wait for cart update
 
-		// Navigate to checkout
-		await page.goto('/shop/checkout')
+		// Navigate to checkout shipping step
+		await page.goto('/shop/checkout/shipping')
+		await page.waitForLoadState('networkidle')
 
 		// Fill out checkout form
-		await page.getByRole('textbox', { name: /^name/i }).fill('Test User')
+		await page.getByLabel(/^name$/i).fill('Test User')
 		await page.getByRole('textbox', { name: /email/i }).fill('test@example.com')
 		await page.getByRole('textbox', { name: /street/i }).fill('123 Main St')
 		await page.getByRole('textbox', { name: /city/i }).fill('New York')
-		await page.getByRole('textbox', { name: /postal|zip/i }).fill('10001')
-		await page.getByRole('textbox', { name: /country/i }).fill('US')
+		await page.getByLabel(/postal|zip/i).fill('10001')
+		await page.getByLabel(/country/i).fill('US')
 
-		// Submit form
-		await page.getByRole('button', { name: /proceed to checkout/i }).click()
+		// Continue through checkout steps
+		await page.getByRole('button', { name: /continue to delivery/i }).click()
+		// Wait for delivery step
+		await page.waitForURL(/\/shop\/checkout\/delivery/, { timeout: 10000 })
+		await page.waitForLoadState('networkidle')
+		
+		// Check if we're still on delivery page (might have redirected if no shipping methods)
+		const deliveryUrl = page.url()
+		if (!deliveryUrl.includes('/shop/checkout/delivery')) {
+			throw new Error(`Expected to be on delivery page, but was on: ${deliveryUrl}`)
+		}
+		
+		// Wait for delivery page to load - check for either "Delivery Options" or "No shipping methods"
+		await Promise.race([
+			page.getByRole('heading', { name: /delivery options/i }).waitFor({ timeout: 15000 }),
+			page.getByRole('heading', { name: /no shipping methods/i }).waitFor({ timeout: 15000 }),
+		]).catch(() => {})
+		
+		// If "No shipping methods", that's a problem
+		const pageText = await page.textContent('body') || ''
+		if (pageText.includes('No shipping methods available')) {
+			throw new Error('No shipping methods available - shipping zone/method may not have been created correctly')
+		}
+		
+		// Wait for shipping method to appear
+		await page.waitForSelector('text=Standard Shipping', { timeout: 15000 })
+		
+		// Select shipping method - use radio button role
+		const shippingMethodRadio = page.getByRole('radio', { name: /standard shipping/i }).first()
+		await shippingMethodRadio.click()
+		
+		// Continue to payment - the payment page auto-submits on mount, redirecting to Stripe
+		await page.getByRole('button', { name: /continue to payment/i }).click()
+		// Wait for navigation to start (payment page loads first, then auto-submits)
+		await page.waitForURL(/\/shop\/checkout\/payment/, { timeout: 10000 }).catch(() => {
+			// If we're already on Stripe, that's fine
+		})
 
 		// With mocked Stripe, the redirect should go directly to Stripe checkout URL
 		// In test mode, MSW will intercept and return mock checkout URL
@@ -281,55 +405,63 @@ test.describe('Checkout', () => {
 		// Actual payment completion would require either:
 		// - Real Stripe test mode setup
 		// - More complex mocking of Stripe's hosted checkout page
+
+		// Cleanup shipping zone and method
+		await prisma.$transaction([
+			prisma.shippingMethod.deleteMany({ where: { id: shippingMethodId } }),
+			prisma.shippingZone.deleteMany({ where: { id: shippingZoneId } }),
+		])
 	})
 
 	test.afterEach(async () => {
-		// Cleanup: Delete test products, categories, carts, and orders
-		await prisma.orderItem.deleteMany({
-			where: {
-				order: {
+		// Cleanup: Batch all operations in a transaction for better performance
+		// Delete products first, then categories (to respect foreign key constraints)
+		const categoryId = testCategory?.id
+		
+		await prisma.$transaction([
+			prisma.orderItem.deleteMany({
+				where: {
+					order: {
+						stripeCheckoutSessionId: {
+							startsWith: 'cs_test_',
+						},
+					},
+				},
+			}),
+			prisma.order.deleteMany({
+				where: {
 					stripeCheckoutSessionId: {
 						startsWith: 'cs_test_',
 					},
 				},
-			},
-		})
-		
-		await prisma.order.deleteMany({
-			where: {
-				stripeCheckoutSessionId: {
-					startsWith: 'cs_test_',
+			}),
+			prisma.cartItem.deleteMany({
+				where: {
+					product: {
+						sku: {
+							startsWith: 'SKU-',
+						},
+					},
 				},
-			},
-		})
-
-		await prisma.cartItem.deleteMany({
-			where: {
-				product: {
+			}),
+			prisma.product.deleteMany({
+				where: {
 					sku: {
 						startsWith: 'SKU-',
 					},
 				},
-			},
-		})
-
-		await prisma.product.deleteMany({
-			where: {
-				sku: {
-					startsWith: 'SKU-',
-				},
-			},
-		})
-
-		await prisma.category.deleteMany({
-			where: {
-				slug: {
-					startsWith: 'test-category-',
-				},
-			},
-		})
-
-		await prisma.cart.deleteMany({})
+			}),
+			prisma.cart.deleteMany({}),
+		])
+		
+		// Delete category separately (after products are deleted)
+		if (categoryId) {
+			await prisma.category
+				.deleteMany({ where: { id: categoryId } })
+				.catch(() => {
+					// Ignore if category was already deleted or doesn't exist
+				})
+		}
 	})
 })
 

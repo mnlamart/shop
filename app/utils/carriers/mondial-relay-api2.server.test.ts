@@ -115,8 +115,8 @@ describe('mondial-relay-api2.server', () => {
 			const call = mockFetch.mock.calls[0]
 			expect(call).toBeDefined()
 			if (!call) throw new Error('Expected call to be defined')
-			expect(call[0]).toContain('mondialrelay.fr')
-			expect(call[0]).toContain('/shipment')
+		expect(call[0]).toContain('mondialrelay.com')
+		expect(call[0]).toContain('/shipment')
 			expect(call[1]?.method).toBe('POST')
 			expect(call[1]?.headers['Content-Type']).toBe('text/xml; charset=utf-8')
 			expect(call[1]?.headers['Accept']).toBe('application/xml')
@@ -321,8 +321,8 @@ describe('mondial-relay-api2.server', () => {
 			const call = mockFetch.mock.calls[0]
 			expect(call).toBeDefined()
 			if (!call) throw new Error('Expected call to be defined')
-			expect(call[0]).toContain('mondialrelay.fr')
-			expect(call[0]).toContain('123456789')
+		expect(call[0]).toContain('mondialrelay.com')
+		expect(call[0]).toContain('123456789')
 			expect(call[1]?.method).toBe('GET')
 		})
 

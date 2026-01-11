@@ -1,3 +1,4 @@
+import { copyFileSync } from 'node:fs'
 import path from 'node:path'
 import fsExtra from 'fs-extra'
 import { afterAll, beforeEach } from 'vitest'
@@ -8,7 +9,7 @@ const databasePath = path.join(process.cwd(), databaseFile)
 process.env.DATABASE_URL = `file:${databasePath}`
 
 beforeEach(async () => {
-	await fsExtra.copyFile(BASE_DATABASE_PATH, databasePath)
+	copyFileSync(BASE_DATABASE_PATH, databasePath)
 })
 
 afterAll(async () => {

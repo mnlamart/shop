@@ -10,15 +10,22 @@ const CODE_REGEX = /Here's your verification code: (?<code>[\d\w]+)/
 test('Users can update their basic info', async ({ page, navigate, login }) => {
 	await login()
 	await navigate('/account')
+	await page.waitForLoadState('networkidle')
+	
+	// Wait for the profile form to be visible
+	await page.waitForSelector('form', { timeout: 10000 })
+	await page.waitForSelector('input[type="text"]', { timeout: 10000 })
 
 	const newUserData = createUser()
 
-	await page.getByRole('textbox', { name: /^name/i }).fill(newUserData.name)
-	await page
-		.getByRole('textbox', { name: /^username/i })
-		.fill(newUserData.username)
+	// Use semantic selectors now that labels are properly associated with inputs
+	await page.getByLabel(/username/i).fill(newUserData.username)
+	await page.getByLabel(/display name/i).fill(newUserData.name)
 
-	await page.getByRole('button', { name: /^save/i }).click()
+	// Submit the form and wait for it to complete
+	await page.getByRole('button', { name: /save changes/i }).click()
+	// Wait for the form submission to complete (either success or error)
+	await page.waitForLoadState('networkidle')
 })
 
 test('Users can update their password', async ({ page, navigate, login }) => {
@@ -65,10 +72,12 @@ test('Users can update their profile photo', async ({
 	await page.getByRole('link', { name: /change profile photo/i }).click()
 
 	await expect(page).toHaveURL(`/account/profile/photo`)
+	await page.waitForLoadState('networkidle')
 
-	await page
-		.getByRole('button', { name: /change/i })
-		.setInputFiles('./tests/fixtures/images/user/kody.png')
+	// Use getByLabel with the aria-label - Playwright's getByLabel works with aria-label attributes
+	// This is the recommended approach per Playwright docs for file inputs with aria-label
+	const fileInput = page.getByLabel('Profile photo file input')
+	await fileInput.setInputFiles('./tests/fixtures/images/user/kody.png')
 
 	await page.getByRole('button', { name: /save/i }).click()
 

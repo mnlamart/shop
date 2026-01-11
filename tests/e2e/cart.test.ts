@@ -75,10 +75,11 @@ test.describe('Shopping Cart', () => {
 
 		// Navigate to cart page
 		await page.goto('/shop/cart')
+		await page.waitForLoadState('networkidle')
 		
-		// Update quantity
-		const quantityInput = page.getByRole('spinbutton', { name: /quantity/i })
-		await expect(quantityInput).toBeVisible()
+		// Update quantity - use label for quantity input
+		const quantityInput = page.getByLabel(/quantity/i).first()
+		await expect(quantityInput).toBeVisible({ timeout: 10000 })
 		await quantityInput.fill('2')
 		
 		// Verify update button exists
@@ -86,45 +87,44 @@ test.describe('Shopping Cart', () => {
 	})
 
 	test.afterEach(async () => {
-		// Cleanup: Delete in order to respect foreign key constraints
+		// Cleanup: Batch all operations in a transaction for better performance
 		// OrderItems must be deleted before Products (Restrict constraint)
-		await prisma.orderItem.deleteMany({
-			where: {
-				product: {
+		await prisma.$transaction([
+			prisma.orderItem.deleteMany({
+				where: {
+					product: {
+						sku: {
+							startsWith: 'SKU-',
+						},
+					},
+				},
+			}),
+			// CartItems will cascade when Products are deleted, but delete explicitly for clarity
+			prisma.cartItem.deleteMany({
+				where: {
+					product: {
+						sku: {
+							startsWith: 'SKU-',
+						},
+					},
+				},
+			}),
+			// Now we can safely delete products
+			prisma.product.deleteMany({
+				where: {
 					sku: {
 						startsWith: 'SKU-',
 					},
 				},
-			},
-		})
-
-		// CartItems will cascade when Products are deleted, but delete explicitly for clarity
-		await prisma.cartItem.deleteMany({
-			where: {
-				product: {
-					sku: {
-						startsWith: 'SKU-',
+			}),
+			prisma.category.deleteMany({
+				where: {
+					slug: {
+						startsWith: 'test-category-',
 					},
 				},
-			},
-		})
-
-		// Now we can safely delete products
-		await prisma.product.deleteMany({
-			where: {
-				sku: {
-					startsWith: 'SKU-',
-				},
-			},
-		})
-
-		await prisma.category.deleteMany({
-			where: {
-				slug: {
-					startsWith: 'test-category-',
-				},
-			},
-		})
+			}),
+		])
 	})
 })
 

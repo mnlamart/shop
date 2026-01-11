@@ -28,6 +28,7 @@ type GetOrInsertUserOptions = {
 	password?: string
 	email?: UserModel['email']
 	roles?: { connect: { name: string } }
+	asAdmin?: boolean
 }
 
 type User = {
@@ -43,6 +44,7 @@ async function getOrInsertUser({
 	password,
 	email,
 	roles,
+	asAdmin,
 }: GetOrInsertUserOptions = {}): Promise<User> {
 	const select = { id: true, email: true, username: true, name: true }
 	if (id) {
@@ -55,13 +57,17 @@ async function getOrInsertUser({
 		username ??= userData.username
 		password ??= userData.username
 		email ??= userData.email
+		// If asAdmin is true, use admin role; otherwise use provided roles or default to 'user'
+		const finalRoles = asAdmin 
+			? { connect: { name: 'admin' } }
+			: roles || { connect: { name: 'user' } }
 		return await prisma.user.create({
 			select,
 			data: {
 				...userData,
 				email,
 				username,
-				roles: roles || { connect: { name: 'user' } },
+				roles: finalRoles,
 				password: { create: { hash: await getPasswordHash(password) } },
 			},
 		})

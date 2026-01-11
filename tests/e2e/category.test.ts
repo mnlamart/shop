@@ -4,15 +4,15 @@ import { createProductData } from '../product-utils.ts'
 
 test.describe('Category Page', () => {
 	test.afterEach(async () => {
-		// Cleanup: Delete in order to respect foreign key constraints
+		// Cleanup: Batch all operations in a transaction for better performance
 		// OrderItems must be deleted before Products (Restrict constraint)
-		await prisma.orderItem.deleteMany({})
-		// CartItems will cascade when Products are deleted, but delete explicitly for clarity
-		await prisma.cartItem.deleteMany({})
-		await prisma.cart.deleteMany({})
-		// Now we can safely delete products
-		await prisma.product.deleteMany({})
-		await prisma.category.deleteMany({})
+		await prisma.$transaction([
+			prisma.orderItem.deleteMany({}),
+			prisma.cartItem.deleteMany({}),
+			prisma.cart.deleteMany({}),
+			prisma.product.deleteMany({}),
+			prisma.category.deleteMany({}),
+		])
 	})
 
 	test('should display products filtered by category', async ({ page }) => {

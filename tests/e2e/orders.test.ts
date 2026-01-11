@@ -111,11 +111,13 @@ test.describe('Order History', () => {
 			},
 		})
 
-		await page.goto('/shop/orders')
+		// Navigate to account orders (authenticated users are redirected from /shop/orders anyway)
+		await page.goto('/account/orders')
+		await page.waitForLoadState('networkidle')
 
 		// Verify orders are displayed (newest first)
-		await expect(page.getByText(orderNumber2)).toBeVisible()
-		await expect(page.getByText(orderNumber1)).toBeVisible()
+		await expect(page.getByText(orderNumber2)).toBeVisible({ timeout: 10000 })
+		await expect(page.getByText(orderNumber1)).toBeVisible({ timeout: 10000 })
 
 		// Verify order details are shown
 		await expect(page.getByText(/\$200\.00|\$200/)).toBeVisible()
@@ -127,7 +129,35 @@ test.describe('Order History', () => {
 	test('should display order number, date, status, and total for each order', async ({
 		page,
 		login,
+		navigate,
 	}) => {
+		
+		// Ensure testProduct exists (created in beforeEach)
+		if (!testProduct?.id) {
+			throw new Error('testProduct was not created in beforeEach')
+		}
+		
+		// Verify product exists in database (might have been deleted in previous test cleanup)
+		const product = await prisma.product.findUnique({
+			where: { id: testProduct.id },
+		})
+		if (!product) {
+			// Recreate product if it was deleted
+			const productData = createProductData()
+			const newProduct = await prisma.product.create({
+				data: {
+					name: productData.name,
+					slug: productData.slug,
+					description: productData.description,
+					sku: productData.sku,
+					price: productData.price,
+					status: 'ACTIVE',
+					categoryId: testCategory.id,
+				},
+			})
+			testProduct = newProduct
+		}
+		
 		const user = await login()
 
 		const orderNumber = await generateOrderNumber()
@@ -155,7 +185,8 @@ test.describe('Order History', () => {
 			},
 		})
 
-		await page.goto('/shop/orders')
+		// Navigate to account orders (authenticated users are redirected from /shop/orders anyway)
+		await navigate('/account/orders')
 
 		// Verify all required fields are displayed
 		await expect(page.getByText(orderNumber)).toBeVisible()
@@ -231,7 +262,8 @@ test.describe('Order History', () => {
 		await expect(page).toHaveURL(new RegExp(`/shop/orders/${orderNumber}`))
 	})
 
-	test('should link to order details from order history', async ({ page, login }) => {
+	test('should link to order details from order history', async ({ page, login, navigate }) => {
+		
 		const user = await login()
 
 		const orderNumber = await generateOrderNumber()
@@ -259,55 +291,59 @@ test.describe('Order History', () => {
 			},
 		})
 
-		await page.goto('/shop/orders')
+		// Navigate to account orders (authenticated users are redirected from /shop/orders anyway)
+		await navigate('/account/orders')
 
-		// Click on order number link
+		// Wait for order list to load and find the order link
 		const orderLink = page.getByRole('link', { name: orderNumber })
 		await expect(orderLink).toBeVisible()
 		await orderLink.click()
 
 		// Should navigate to order detail page
-		await expect(page).toHaveURL(new RegExp(`/shop/orders/${orderNumber}`))
+		await expect(page).toHaveURL(new RegExp(`/account/orders/${orderNumber}`))
 	})
 
 	test.afterEach(async () => {
-		// Cleanup: Delete in order to respect foreign key constraints
+		// Cleanup: Batch all operations in a transaction for better performance
 		// Delete Orders first (will cascade delete OrderItems)
-		await prisma.order.deleteMany({
-			where: {
-				stripeCheckoutSessionId: {
-					startsWith: 'cs_test_',
+		const categoryId = testCategory?.id
+		
+		await prisma.$transaction([
+			prisma.order.deleteMany({
+				where: {
+					stripeCheckoutSessionId: {
+						startsWith: 'cs_test_',
+					},
 				},
-			},
-		})
-
-		// Delete CartItems before Products
-		await prisma.cartItem.deleteMany({
-			where: {
-				product: {
+			}),
+			// Delete CartItems before Products
+			prisma.cartItem.deleteMany({
+				where: {
+					product: {
+						sku: {
+							startsWith: 'SKU-',
+						},
+					},
+				},
+			}),
+			// Now we can safely delete products
+			prisma.product.deleteMany({
+				where: {
 					sku: {
 						startsWith: 'SKU-',
 					},
 				},
-			},
-		})
-
-		// Now we can safely delete products
-		await prisma.product.deleteMany({
-			where: {
-				sku: {
-					startsWith: 'SKU-',
-				},
-			},
-		})
-
-		await prisma.category.deleteMany({
-			where: {
-				slug: {
-					startsWith: 'test-category-',
-				},
-			},
-		})
+			}),
+		])
+		
+		// Delete category separately (after products are deleted)
+		if (categoryId) {
+			await prisma.category
+				.deleteMany({ where: { id: categoryId } })
+				.catch(() => {
+					// Ignore if category was already deleted or doesn't exist
+				})
+		}
 	})
 })
 

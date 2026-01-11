@@ -1,4 +1,4 @@
-import { getFormProps, getInputProps, useForm } from '@conform-to/react'
+import { getFormProps, getInputProps, useForm, type SubmissionResult } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import { Img } from 'openimg/react'
@@ -126,6 +126,18 @@ async function profileUpdateAction({ userId, formData }: ProfileActionArgs) {
 
 	const { username, name } = submission.value
 
+	// Verify user exists before updating (handles race conditions in tests)
+	const existingUser = await prisma.user.findUnique({
+		where: { id: userId },
+		select: { id: true },
+	})
+	if (!existingUser) {
+		return data(
+			{ result: { status: 'error' as const, error: [{ message: 'User not found' }] } },
+			{ status: 404 },
+		)
+	}
+
 	await prisma.user.update({
 		select: { username: true },
 		where: { id: userId },
@@ -228,7 +240,9 @@ function UpdateProfile({
 	const [form, fields] = useForm({
 		id: 'edit-profile',
 		constraint: getZodConstraint(ProfileFormSchema),
-		lastResult: actionData && 'result' in actionData ? actionData.result : fetcher.data?.result,
+		lastResult: actionData && 'result' in actionData 
+			? (actionData.result as SubmissionResult<string[]> | undefined)
+			: (fetcher.data?.result as SubmissionResult<string[]> | undefined),
 		onValidate({ formData }) {
 			return parseWithZod(formData, { schema: ProfileFormSchema })
 		},
@@ -244,22 +258,24 @@ function UpdateProfile({
 			<div className="space-y-6">
 				<div className="grid md:grid-cols-2 gap-6">
 					<div className="space-y-2">
-						<label className="block text-sm" style={{ color: '#717182' }}>Username</label>
+						<label htmlFor={fields.username.id} className="block text-sm" style={{ color: '#717182' }}>Username</label>
 						<input
 							{...getInputProps(fields.username, { type: 'text' })}
 							className="w-full px-3 py-1 rounded-lg border-0"
 							style={{ backgroundColor: '#F3F3F5', color: '#0A0A0A' }}
+							aria-label="Username"
 						/>
 						{fields.username.errors && (
 							<p className="text-sm text-red-600 mt-1">{fields.username.errors[0]}</p>
 						)}
 					</div>
 					<div className="space-y-2">
-						<label className="block text-sm" style={{ color: '#717182' }}>Display Name</label>
+						<label htmlFor={fields.name.id} className="block text-sm" style={{ color: '#717182' }}>Display Name</label>
 						<input
 							{...getInputProps(fields.name, { type: 'text' })}
 							className="w-full px-3 py-1 rounded-lg border-0"
 							style={{ backgroundColor: '#F3F3F5', color: '#0A0A0A' }}
+							aria-label="Display Name"
 						/>
 						{fields.name.errors && (
 							<p className="text-sm text-red-600 mt-1">{fields.name.errors[0]}</p>
@@ -268,12 +284,14 @@ function UpdateProfile({
 				</div>
 
 				<div className="space-y-2">
-					<label className="block text-sm" style={{ color: '#717182' }}>Bio</label>
+					<label htmlFor="bio" className="block text-sm" style={{ color: '#717182' }}>Bio</label>
 					<textarea
+						id="bio"
 						placeholder="Tell us a bit about yourself..."
 						className="w-full px-3 py-2 rounded-lg border-0 resize-none"
 						style={{ backgroundColor: '#F3F3F5', color: '#717182' }}
 						rows={4}
+						aria-label="Bio"
 					/>
 				</div>
 

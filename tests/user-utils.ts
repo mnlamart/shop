@@ -98,27 +98,3 @@ export async function createTestRole(overrides?: { name?: string; description?: 
 		},
 	})
 }
-
-/**
- * Login helper for admin users
- */
-export async function loginAsAdmin(page: any, username: string, password: string) {
-	await page.goto('/login')
-	await page.getByRole('textbox', { name: /username/i }).fill(username)
-	await page.getByLabel(/^password$/i).fill(password)
-	await page.getByRole('button', { name: /log in/i }).click()
-	// Wait for redirect after login
-	await page.waitForURL(/\/(?:|\?redirectTo=)|\/settings\/profile/)
-	// Verify user is logged in by checking for user menu using role locator
-	await page.getByRole('button', { name: /user menu|account menu/i }).waitFor({ timeout: 5000 }).catch(() => {
-		// Fallback: wait for logout link or user menu aria-label
-		return page.getByRole('link', { name: /logout|sign out/i }).waitFor({ timeout: 5000 }).catch(() => {
-			// Last resort: wait for any logout link
-			return page.waitForFunction(() => {
-				return document.querySelector('a[href*="/logout"]') !== null ||
-					document.querySelector('[aria-label*="User menu"]') !== null
-			}, { timeout: 5000 })
-		})
-	})
-}
-

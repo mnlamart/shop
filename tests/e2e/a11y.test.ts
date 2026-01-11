@@ -6,20 +6,14 @@ import { createProductData } from '#tests/product-utils.ts'
 
 /**
  * Helper function to login as admin and navigate to a page
+ * Now uses the login fixture for faster execution
  */
 async function loginAndNavigateToAdminPage(
 	page: any,
-	insertNewUser: any,
+	login: any,
 	path: string,
 ) {
-	const adminUser = await insertNewUser({
-		roles: { connect: { name: 'admin' } },
-	})
-	await page.goto('/login')
-	await page.getByRole('textbox', { name: /username/i }).fill(adminUser.username)
-	await page.getByLabel(/^password$/i).fill(adminUser.username)
-	await page.getByRole('button', { name: /log in/i }).click()
-	await page.waitForLoadState('networkidle')
+	await login({ asAdmin: true })
 	await page.goto(path)
 	await page.waitForLoadState('networkidle')
 	await page.waitForSelector('main', { timeout: 5000 })
@@ -144,124 +138,128 @@ test.describe('Accessibility', () => {
 			})
 		})
 
-		test('admin dashboard should be accessible', async ({ page, insertNewUser }) => {
-			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin')
+		test('admin dashboard should be accessible', async ({ page, login }) => {
+			await loginAndNavigateToAdminPage(page, login, '/admin')
 			await expectPageToBeAccessible(page)
 		})
 
-		test('orders list page should be accessible', async ({ page, insertNewUser }) => {
-			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin/orders')
+		test('orders list page should be accessible', async ({ page, login }) => {
+			await loginAndNavigateToAdminPage(page, login, '/admin/orders')
 			await expectPageToBeAccessible(page)
 		})
 
-		test('order detail page should be accessible', async ({ page, insertNewUser }) => {
+		test('order detail page should be accessible', async ({ page, login }) => {
+			// Verify testOrder exists
+			if (!testOrder?.orderNumber) {
+				throw new Error('testOrder was not created in beforeAll')
+			}
 			await loginAndNavigateToAdminPage(
 				page,
-				insertNewUser,
+				login,
 				`/admin/orders/${testOrder.orderNumber}`,
 			)
 			await expectPageToBeAccessible(page)
 		})
 
-		test('products list page should be accessible', async ({ page, insertNewUser }) => {
-			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin/products')
+		test('products list page should be accessible', async ({ page, login }) => {
+			await loginAndNavigateToAdminPage(page, login, '/admin/products')
 			await expectPageToBeAccessible(page, {
 				disableRules: ['button-name'], // Radix SelectTrigger buttons have aria-labels but axe-core doesn't always recognize them
 			})
 		})
 
-		test('product detail page should be accessible', async ({ page, insertNewUser }) => {
+		test('product detail page should be accessible', async ({ page, login }) => {
 			await loginAndNavigateToAdminPage(
 				page,
-				insertNewUser,
+				login,
 				`/admin/products/${testProduct.slug}`,
 			)
 			await expectPageToBeAccessible(page)
 		})
 
-		test('product create page should be accessible', async ({ page, insertNewUser }) => {
-			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin/products/new')
+		test('product create page should be accessible', async ({ page, login }) => {
+			await loginAndNavigateToAdminPage(page, login, '/admin/products/new')
 			await expectPageToBeAccessible(page)
 		})
 
-		test('product edit page should be accessible', async ({ page, insertNewUser }) => {
+		test('product edit page should be accessible', async ({ page, login }) => {
 			await loginAndNavigateToAdminPage(
 				page,
-				insertNewUser,
+				login,
 				`/admin/products/${testProduct.slug}/edit`,
 			)
 			await expectPageToBeAccessible(page)
 		})
 
-		test('categories list page should be accessible', async ({ page, insertNewUser }) => {
-			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin/categories')
+		test('categories list page should be accessible', async ({ page, login }) => {
+			await loginAndNavigateToAdminPage(page, login, '/admin/categories')
 			await expectPageToBeAccessible(page)
 		})
 
-		test('category detail page should be accessible', async ({ page, insertNewUser }) => {
+		test('category detail page should be accessible', async ({ page, login }) => {
 			await loginAndNavigateToAdminPage(
 				page,
-				insertNewUser,
+				login,
 				`/admin/categories/${testCategory.slug}`,
 			)
 			await expectPageToBeAccessible(page)
 		})
 
-		test('category create page should be accessible', async ({ page, insertNewUser }) => {
-			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin/categories/new')
+		test('category create page should be accessible', async ({ page, login }) => {
+			await loginAndNavigateToAdminPage(page, login, '/admin/categories/new')
 			await expectPageToBeAccessible(page)
 		})
 
-		test('category edit page should be accessible', async ({ page, insertNewUser }) => {
+		test('category edit page should be accessible', async ({ page, login }) => {
 			await loginAndNavigateToAdminPage(
 				page,
-				insertNewUser,
+				login,
 				`/admin/categories/${testCategory.slug}/edit`,
 			)
 			await expectPageToBeAccessible(page)
 		})
 
-		test('attributes list page should be accessible', async ({ page, insertNewUser }) => {
-			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin/attributes')
+		test('attributes list page should be accessible', async ({ page, login }) => {
+			await loginAndNavigateToAdminPage(page, login, '/admin/attributes')
 			await expectPageToBeAccessible(page)
 		})
 
-		test('attribute detail page should be accessible', async ({ page, insertNewUser }) => {
+		test('attribute detail page should be accessible', async ({ page, login }) => {
 			await loginAndNavigateToAdminPage(
 				page,
-				insertNewUser,
+				login,
 				`/admin/attributes/${testAttribute.id}`,
 			)
 			await expectPageToBeAccessible(page)
 		})
 
-		test('attribute create page should be accessible', async ({ page, insertNewUser }) => {
-			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin/attributes/new')
+		test('attribute create page should be accessible', async ({ page, login }) => {
+			await loginAndNavigateToAdminPage(page, login, '/admin/attributes/new')
 			await expectPageToBeAccessible(page)
 		})
 
-		test('attribute edit page should be accessible', async ({ page, insertNewUser }) => {
+		test('attribute edit page should be accessible', async ({ page, login }) => {
 			await loginAndNavigateToAdminPage(
 				page,
-				insertNewUser,
+				login,
 				`/admin/attributes/${testAttribute.id}/edit`,
 			)
 			await expectPageToBeAccessible(page)
 		})
 
-		test('cache page should be accessible', async ({ page, insertNewUser }) => {
-			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin/cache')
+		test('cache page should be accessible', async ({ page, login }) => {
+			await loginAndNavigateToAdminPage(page, login, '/admin/cache')
 			await expectPageToBeAccessible(page)
 		})
 
-		test('users list page should be accessible', async ({ page, insertNewUser }) => {
-			await loginAndNavigateToAdminPage(page, insertNewUser, '/admin/users')
+		test('users list page should be accessible', async ({ page, login }) => {
+			await loginAndNavigateToAdminPage(page, login, '/admin/users')
 			await expectPageToBeAccessible(page, {
 				disableRules: ['button-name'], // Radix SelectTrigger buttons have aria-labels but axe-core doesn't always recognize them
 			})
 		})
 
-		test('user detail page should be accessible', async ({ page, insertNewUser }) => {
+		test('user detail page should be accessible', async ({ page, login }) => {
 			// Create a test user for detail page
 			const testUser = await prisma.user.create({
 				data: {
@@ -272,7 +270,7 @@ test.describe('Accessibility', () => {
 			})
 
 			try {
-				await loginAndNavigateToAdminPage(page, insertNewUser, `/admin/users/${testUser.id}`)
+				await loginAndNavigateToAdminPage(page, login, `/admin/users/${testUser.id}`)
 				await expectPageToBeAccessible(page)
 			} finally {
 				// Cleanup
@@ -282,7 +280,7 @@ test.describe('Accessibility', () => {
 			}
 		})
 
-		test('user edit page should be accessible', async ({ page, insertNewUser }) => {
+		test('user edit page should be accessible', async ({ page, login }) => {
 			// Create a test user for edit page
 			const testUser = await prisma.user.create({
 				data: {
@@ -293,7 +291,7 @@ test.describe('Accessibility', () => {
 			})
 
 			try {
-				await loginAndNavigateToAdminPage(page, insertNewUser, `/admin/users/${testUser.id}/edit`)
+				await loginAndNavigateToAdminPage(page, login, `/admin/users/${testUser.id}/edit`)
 				await expectPageToBeAccessible(page)
 			} finally {
 				// Cleanup
@@ -447,26 +445,19 @@ test.describe('Accessibility', () => {
 			await expectPageToBeAccessible(page)
 		})
 
-		test('orders list page should be accessible', async ({ page, insertNewUser }) => {
-			// Create a user and login manually to avoid cleanup conflicts
-			const user = await insertNewUser({
-				username: `shopuser-${Date.now()}`,
-			})
-			await page.goto('/login')
-			await page.getByRole('textbox', { name: /username/i }).fill(user.username)
-			await page.getByLabel(/^password$/i).fill(user.username)
-			await page.getByRole('button', { name: /log in/i }).click()
-			await page.waitForLoadState('networkidle')
+		test('orders list page should be accessible', async ({ page, login }) => {
+			// Login using fixture for faster execution
+			await login()
 			
 			// Navigate to orders (even if empty, page should still be accessible)
-			await page.goto('/shop/orders')
+			await page.goto('/account/orders')
 			await page.waitForLoadState('networkidle')
 			await page.waitForSelector('main', { timeout: 5000 })
 			await expectPageToBeAccessible(page)
 		})
 
 		test('order detail page should be accessible', async ({ page }) => {
-			// Create a user and order for this test without using insertNewUser fixture
+			// Create a user and order for this test without using login fixture
 			// to avoid cleanup conflicts
 			const username = `shopuser-${Date.now()}`
 			const user = await prisma.user.create({

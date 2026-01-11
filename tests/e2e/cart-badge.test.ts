@@ -22,15 +22,15 @@ async function mergeCartInTest(page: Page, userId: string) {
 
 test.describe('Cart Badge', () => {
 	test.afterEach(async () => {
-		// Cleanup: Delete in order to respect foreign key constraints
+		// Cleanup: Batch all operations in a transaction for better performance
 		// OrderItems must be deleted before Products (Restrict constraint)
-		await prisma.orderItem.deleteMany({})
-		// CartItems will cascade when Products are deleted, but delete explicitly for clarity
-		await prisma.cartItem.deleteMany({})
-		await prisma.cart.deleteMany({})
-		// Now we can safely delete products
-		await prisma.product.deleteMany({})
-		await prisma.category.deleteMany({})
+		await prisma.$transaction([
+			prisma.orderItem.deleteMany({}),
+			prisma.cartItem.deleteMany({}),
+			prisma.cart.deleteMany({}),
+			prisma.product.deleteMany({}),
+			prisma.category.deleteMany({}),
+		])
 	})
 
 	test('cart badge should display item count', async ({ page }) => {
@@ -292,10 +292,14 @@ test.describe('Cart Badge', () => {
 		await expect(page.getByRole('heading', { name: product2.name })).toBeVisible()
 
 		// 4. Update product1 quantity to 2 in user cart
-		await page.getByRole('spinbutton', { name: /quantity/i }).first().fill('2')
+		const quantityInput = page.getByLabel(/quantity/i).first()
+		await quantityInput.fill('2')
 		await page.getByRole('button', { name: /update/i }).first().click()
+		// Wait for cart to update and badge to refresh
+		await page.waitForTimeout(500)
+		await page.goto('/') // Navigate away and back to trigger badge update
 		const userCartBadge2 = page.getByRole('link', { name: /shopping cart with 3 items/i })
-		await expect(userCartBadge2).toBeVisible()
+		await expect(userCartBadge2).toBeVisible({ timeout: 10000 })
 
 		// 5. Logout - cart should be cleared
 		await logout()

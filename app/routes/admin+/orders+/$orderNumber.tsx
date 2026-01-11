@@ -551,7 +551,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 												<span className="text-sm text-[var(--text-medium)]">Shipping</span>
 												<span className="text-sm font-normal text-[var(--text-dark)]">
 													{order.shippingCost === 0 ? (
-														<span className="text-green-600">Free</span>
+														<span className="text-green-700">Free</span>
 													) : (
 														formatPrice(order.shippingCost, currency)
 													)}
@@ -623,7 +623,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 																</p>
 															)}
 															{shipmentResult?.success && (
-																<p className="text-sm text-green-600">
+																<p className="text-sm text-green-700">
 																	{shipmentResult.message}
 																</p>
 															)}
@@ -675,7 +675,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 														<p
 															className={`text-sm mt-2 ${
 																syncTrackingResult.success && syncTrackingResult.updated
-																	? 'text-green-600'
+																	? 'text-green-700'
 																	: 'text-muted-foreground'
 															}`}
 														>

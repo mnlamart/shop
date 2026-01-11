@@ -120,7 +120,7 @@ export default function AccountLayout() {
 					{/* Sidebar Navigation */}
 					<aside className="lg:w-64 flex-shrink-0">
 						<Card className="p-2" style={{ borderRadius: '14px' }}>
-							<nav className="space-y-1">
+							<nav aria-label="Account navigation" className="space-y-1">
 								<SidebarButton
 									icon={<Icon name="user" className="w-5 h-5" />}
 									label="Profile"
@@ -156,9 +156,9 @@ export default function AccountLayout() {
 					</aside>
 
 					{/* Main Content */}
-					<main className="flex-1 min-w-0">
+					<div className="flex-1 min-w-0">
 						<Outlet />
-					</main>
+					</div>
 				</div>
 			</div>
 		</div>

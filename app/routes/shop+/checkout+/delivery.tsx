@@ -2,7 +2,7 @@ import { getFormProps, getInputProps, useForm, useInputControl } from '@conform-
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
 import { useEffect, useState } from 'react'
-import { Form, redirect, redirectDocument, useActionData, useLoaderData } from 'react-router'
+import { Form, redirect, redirectDocument, useLoaderData } from 'react-router'
 import { z } from 'zod'
 import { ErrorList } from '#app/components/forms.tsx'
 import { MondialRelayPickupSelector } from '#app/components/shipping/mondial-relay-pickup-selector.tsx'
@@ -173,7 +173,6 @@ export const meta: Route.MetaFunction = () => [{ title: 'Delivery | Checkout' }]
 
 export default function CheckoutDelivery() {
 	const loaderData = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
 	const isPending = useIsPending()
 
 	// Initialize hooks before early return
@@ -186,7 +185,7 @@ export default function CheckoutDelivery() {
 	const [form, fields] = useForm({
 		id: 'delivery-form',
 		constraint: getZodConstraint(DeliveryFormSchema),
-		lastResult: actionData && typeof actionData === 'object' && 'result' in actionData ? (actionData as { result?: unknown }).result : undefined,
+		lastResult: undefined, // Action only redirects, doesn't return form errors
 		onValidate({ formData }) {
 			return parseWithZod(formData, { schema: DeliveryFormSchema })
 		},

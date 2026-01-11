@@ -118,12 +118,16 @@ describe('Checkout Shipping Step', () => {
 				context: {},
 			})
 
-			expect(result).toHaveProperty('cart')
-			expect(result).toHaveProperty('currency')
-			expect(result).toHaveProperty('subtotal')
-			expect(result).toHaveProperty('savedAddresses')
-			expect(result).toHaveProperty('shippingMethods')
-			expect(result.cart.items).toHaveLength(1)
+		if (result instanceof Response) {
+			throw new Error('Expected data object, got Response')
+		}
+
+		expect(result).toHaveProperty('cart')
+		expect(result).toHaveProperty('currency')
+		expect(result).toHaveProperty('subtotal')
+		expect(result).toHaveProperty('savedAddresses')
+		expect(result).toHaveProperty('shippingMethods')
+		expect(result.cart.items).toHaveLength(1)
 		})
 
 		test('redirects to cart when cart is empty', async () => {
@@ -212,15 +216,19 @@ describe('Checkout Shipping Step', () => {
 				},
 			})
 
-			const result = await loader({
-				request,
-				params: {},
-				context: {},
-			})
+		const result = await loader({
+			request,
+			params: {},
+			context: {},
+		})
 
-			expect(result.savedAddresses).toHaveLength(1)
-			expect(result.savedAddresses[0]?.name).toBe('John Doe')
-			expect(result.defaultShippingAddress?.name).toBe('John Doe')
+		if (result instanceof Response) {
+			throw new Error('Expected data object, got Response')
+		}
+
+		expect(result.savedAddresses).toHaveLength(1)
+		expect(result.savedAddresses[0]?.name).toBe('John Doe')
+		expect(result.defaultShippingAddress?.name).toBe('John Doe')
 		})
 	})
 
@@ -282,7 +290,7 @@ describe('Checkout Shipping Step', () => {
 			}
 		})
 
-		test('redirects to payment step with shipping data', async () => {
+		test('redirects to delivery step with shipping data', async () => {
 			// Create product and cart
 			const product = await prisma.product.create({
 				data: {
@@ -343,16 +351,13 @@ describe('Checkout Shipping Step', () => {
 			if (result instanceof Response) {
 				expect(result.status).toBe(302)
 				const location = result.headers.get('location')
-				expect(location).toContain('/shop/checkout/payment')
+				expect(location).toContain('/shop/checkout/delivery')
 				expect(location).toContain('name=John%20Doe')
 				expect(location).toContain('email=john%40example.com')
-				expect(location).toContain(`shippingMethodId=${testMethod.id}`)
-				expect(location).toContain('shippingCost=500')
-				expect(mockGetShippingCost).toHaveBeenCalledWith(
-					testMethod.id,
-					expect.any(Number),
-					expect.any(Number),
-				)
+				expect(location).toContain('street=123%20Main%20St')
+				expect(location).toContain('city=New%20York')
+				expect(location).toContain('postal=10001')
+				expect(location).toContain('country=US')
 			}
 		})
 
@@ -470,8 +475,16 @@ describe('Checkout Shipping Step', () => {
 			const cookieHeader = await authSessionStorage.commitSession(authSession)
 
 			// Submit form with addressId
+			// Note: The schema requires name/street/city/postal/country for validation,
+			// but when addressId is provided, the action loads the saved address and
+			// overrides these form values with the saved address data.
 			const formData = new FormData()
 			formData.append('email', 'test@example.com')
+			formData.append('name', 'Temp Name') // Required for validation, but replaced by saved address
+			formData.append('street', 'Temp Street') // Required for validation, but replaced by saved address
+			formData.append('city', 'Temp City') // Required for validation, but replaced by saved address
+			formData.append('postal', '00000') // Required for validation, but replaced by saved address
+			formData.append('country', 'US') // Required for validation, but replaced by saved address
 			formData.append('shippingMethodId', testMethod.id)
 			formData.append('addressId', savedAddress.id)
 
@@ -489,10 +502,12 @@ describe('Checkout Shipping Step', () => {
 				context: {},
 			})
 
+			// redirect() returns a Response
 			expect(result).toBeInstanceOf(Response)
 			if (result instanceof Response) {
 				expect(result.status).toBe(302)
 				const location = result.headers.get('location')
+				expect(location).toContain('/shop/checkout/delivery')
 				expect(location).toContain('name=Saved%20User')
 				expect(location).toContain('street=789%20Pine%20St')
 				expect(location).toContain('city=Chicago')

@@ -30,13 +30,15 @@ test.describe('Shop Home Page', () => {
 	})
 
 	test.afterEach(async () => {
-		// Cleanup: Delete test categories
-		await prisma.category.deleteMany({
-			where: {
-				slug: {
-					startsWith: 'test-category-',
+		// Cleanup: Use transaction for consistency (even with single operation)
+		await prisma.$transaction([
+			prisma.category.deleteMany({
+				where: {
+					slug: {
+						startsWith: 'test-category-',
+					},
 				},
-			},
-		})
+			}),
+		])
 	})
 })

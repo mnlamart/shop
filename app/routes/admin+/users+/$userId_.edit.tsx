@@ -238,6 +238,7 @@ export default function EditUser({ loaderData, actionData }: Route.ComponentProp
 									</Label>
 									<Input
 										{...getInputProps(fields.name, { type: 'text' })}
+										aria-label="Name"
 										placeholder="Enter user name (optional)"
 										className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
 									/>
@@ -252,6 +253,7 @@ export default function EditUser({ loaderData, actionData }: Route.ComponentProp
 										{...getInputProps(fields.email, { type: 'email' })}
 										placeholder="Enter email address"
 										className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+										aria-label="Email"
 									/>
 									<ErrorList errors={fields.email.errors} />
 								</div>
@@ -265,6 +267,7 @@ export default function EditUser({ loaderData, actionData }: Route.ComponentProp
 									{...getInputProps(fields.username, { type: 'text' })}
 									placeholder="Enter username"
 									className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+									aria-label="Username"
 								/>
 								<ErrorList errors={fields.username.errors} />
 							</div>
