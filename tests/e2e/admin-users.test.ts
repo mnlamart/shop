@@ -114,6 +114,8 @@ test.describe('Admin User Management', () => {
 
 		await navigate('/admin/users')
 		await page.waitForLoadState('networkidle')
+		// Wait for the table to be visible
+		await expect(page.getByRole('table')).toBeVisible({ timeout: 10000 })
 
 		// Check that users are displayed - wait for them to appear
 		// Use link queries instead of cell queries to avoid strict mode violations

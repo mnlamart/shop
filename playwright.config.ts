@@ -14,6 +14,7 @@ export default defineConfig({
 	retries: process.env.CI ? 2 : 0,
 	workers: process.env.CI ? 4 : 2,
 	reporter: process.env.CI ? 'html' : [['html', { open: 'never' }]],
+	globalSetup: './tests/setup/playwright-global-setup.ts',
 	use: {
 		baseURL: `http://localhost:${PORT}/`,
 		trace: 'on-first-retry',

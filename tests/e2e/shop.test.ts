@@ -63,8 +63,17 @@ test.describe('Shop Home Page', () => {
 	})
 
 	test.afterEach(async () => {
-		// Cleanup: Use transaction for consistency (even with single operation)
+		// Cleanup: Delete products first to avoid foreign key constraints, then categories
 		await prisma.$transaction([
+			prisma.product.deleteMany({
+				where: {
+					category: {
+						slug: {
+							startsWith: 'test-category-',
+						},
+					},
+				},
+			}),
 			prisma.category.deleteMany({
 				where: {
 					slug: {
