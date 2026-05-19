@@ -1,15 +1,5 @@
-/**
- * Order status utility functions
- */
-
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'
 
-/**
- * Gets the badge variant for an order status
- * 
- * @param status - Order status
- * @returns Badge variant name
- */
 export function getOrderStatusBadgeVariant(status: string): 'warning' | 'default' | 'secondary' | 'success' | 'destructive' {
 	switch (status) {
 		case 'PENDING':
@@ -27,12 +17,6 @@ export function getOrderStatusBadgeVariant(status: string): 'warning' | 'default
 	}
 }
 
-/**
- * Gets the human-readable label for an order status
- * 
- * @param status - Order status
- * @returns Human-readable status label
- */
 export function getOrderStatusLabel(status: string): string {
 	switch (status) {
 		case 'PENDING':
@@ -49,4 +33,5 @@ export function getOrderStatusLabel(status: string): string {
 			return status
 	}
 }
+
 

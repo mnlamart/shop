@@ -1,32 +1,19 @@
 /**
- * Mondial Relay API1 Client (SOAP)
- * 
- * API1 is used for:
- * - Searching pickup points (Point Relais®)
- * - Tracking shipments
- * 
- * Official Documentation:
- * - WebServices PDF: https://storage.mondialrelay.fr/Presentation%20of%20WebServices.pdf
- * 
- * API Endpoint: https://api.mondialrelay.com/WebService.asmx
- * 
- * Security Hash Format: MD5(Code Enseigne + Code Marque + Parameters + Clé Privée)
+ * Mondial Relay API1 Client (SOAP) — pickup point search and tracking.
+ *
+ * Docs: https://storage.mondialrelay.fr/Presentation%20of%20WebServices.pdf
+ * Endpoint: https://api.mondialrelay.com/WebService.asmx
+ * Security hash: MD5(storeCode + brandCode + params + privateKey)
  */
 
 import { createHash } from 'crypto'
 import { invariant } from '@epic-web/invariant'
 import { XMLParser } from 'fast-xml-parser'
 
-/**
- * Gets the API1 base URL from environment variable or defaults to production
- */
 function getApi1BaseUrl(): string {
 	return process.env.MONDIAL_RELAY_API1_URL || 'https://api.mondialrelay.com/WebService.asmx'
 }
 
-/**
- * Gets environment variables dynamically (for testing support)
- */
 function getApi1Credentials() {
 	return {
 		storeCode: process.env.MONDIAL_RELAY_API1_STORE_CODE,
@@ -35,9 +22,6 @@ function getApi1Credentials() {
 	}
 }
 
-/**
- * Validates that all required API1 credentials are set
- */
 function validateApi1Credentials() {
 	const { storeCode, privateKey, brandCode } = getApi1Credentials()
 	invariant(storeCode, 'MONDIAL_RELAY_API1_STORE_CODE must be set')
@@ -46,8 +30,9 @@ function validateApi1Credentials() {
 }
 
 /**
- * Generates the security hash for API1 requests
- * Format: MD5(Code Enseigne + Code Marque + Parameters + Clé Privée)
+ * Generates the security hash required on every API1 request.
+ * Format: MD5(storeCode + brandCode + params + privateKey).
+ * The `params` string must be assembled by the caller — see callsites for the exact ordering Mondial Relay expects per endpoint (it differs from the SOAP body).
  */
 function generateSecurityHash(params: string): string {
 	validateApi1Credentials()
@@ -56,9 +41,6 @@ function generateSecurityHash(params: string): string {
 	return createHash('md5').update(hashString).digest('hex').toUpperCase()
 }
 
-/**
- * PointRelais structure from SOAP API response
- */
 interface PointRelaisResponse {
 	Num?: string | number
 	LgAdr1?: string
@@ -77,7 +59,7 @@ interface PointRelaisResponse {
 	Horaires_Ven?: string
 	Horaires_Sam?: string
 	Horaires_Dim?: string
-	[key: string]: unknown // Allow other fields
+	[key: string]: unknown
 }
 
 /**

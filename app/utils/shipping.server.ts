@@ -1,8 +1,5 @@
 import { prisma } from './db.server.ts'
 
-/**
- * Get shipping zones that contain the given country
- */
 export async function getShippingZonesForCountry(country: string) {
 	const zones = await prisma.shippingZone.findMany({
 		where: {
@@ -13,8 +10,7 @@ export async function getShippingZonesForCountry(country: string) {
 		},
 	})
 
-	// Filter zones that contain this country
-	// countries is stored as JSON array
+	// countries is a JSON column of ISO country codes — filter in code since SQLite has no array ops.
 	return zones.filter((zone) => {
 		const countries = zone.countries as string[]
 		return Array.isArray(countries) && countries.includes(country.toUpperCase())
@@ -22,8 +18,7 @@ export async function getShippingZonesForCountry(country: string) {
 }
 
 /**
- * Get available carriers for a given country
- * Checks both country-level and zone-level availability
+ * Available carriers for a country, checking both country-level and zone-level availability.
  */
 export async function getAvailableCarriersForCountry(country: string) {
 	const zones = await getShippingZonesForCountry(country)
@@ -38,9 +33,7 @@ export async function getAvailableCarriersForCountry(country: string) {
 		},
 	})
 
-	// Filter carriers available for this country
 	return carriers.filter((carrier) => {
-		// Check country-level availability
 		const availableCountries = carrier.availableCountries as string[]
 		if (
 			Array.isArray(availableCountries) &&
@@ -49,7 +42,6 @@ export async function getAvailableCarriersForCountry(country: string) {
 			return true
 		}
 
-		// Check zone-level availability
 		const availableZoneIds = carrier.availableZoneIds as string[]
 		if (
 			Array.isArray(availableZoneIds) &&
@@ -62,9 +54,6 @@ export async function getAvailableCarriersForCountry(country: string) {
 	})
 }
 
-/**
- * Get shipping methods available for a given zone
- */
 export async function getShippingMethodsForZone(zoneId: string) {
 	return prisma.shippingMethod.findMany({
 		where: {
@@ -89,8 +78,7 @@ export async function getShippingMethodsForZone(zoneId: string) {
 }
 
 /**
- * Get all available shipping methods for a country
- * Returns methods from all zones that contain this country
+ * Shipping methods from every zone that contains this country.
  */
 export async function getShippingMethodsForCountry(country: string) {
 	const zones = await getShippingZonesForCountry(country)
@@ -102,7 +90,8 @@ export async function getShippingMethodsForCountry(country: string) {
 }
 
 /**
- * Calculate shipping cost for a method based on order subtotal and/or weight
+ * Cost based on rate type. WEIGHT_BASED falls back to flatRate when weight is unknown
+ * or no rate band matches. FREE checks freeShippingThreshold against subtotal.
  */
 export function calculateShippingRate(
 	method: {
@@ -133,20 +122,17 @@ export function calculateShippingRate(
 		}
 
 		case 'FREE': {
-			// If threshold is set and order meets it, shipping is free
 			if (
 				method.freeShippingThreshold &&
 				subtotal >= method.freeShippingThreshold
 			) {
 				return 0
 			}
-			// Otherwise use flat rate if available
 			return method.flatRate ?? 0
 		}
 
 		case 'WEIGHT_BASED': {
 			if (!method.weightRates || totalWeightGrams === undefined) {
-				// Fallback to flat rate if weight rates not configured or weight not provided
 				return method.flatRate ?? 0
 			}
 			const weightRates = method.weightRates as Array<{
@@ -154,7 +140,6 @@ export function calculateShippingRate(
 				maxWeightGrams: number | null
 				rateCents: number
 			}>
-			// Find matching weight range
 			const matchingRate = weightRates.find((rate) => {
 				const inMinRange = totalWeightGrams >= rate.minWeightGrams
 				const inMaxRange =
@@ -169,9 +154,6 @@ export function calculateShippingRate(
 	}
 }
 
-/**
- * Get shipping cost for a specific method ID
- */
 export async function getShippingCost(
 	methodId: string,
 	subtotal: number,
@@ -188,9 +170,6 @@ export async function getShippingCost(
 	return calculateShippingRate(method, subtotal, totalWeightGrams)
 }
 
-/**
- * Get a shipping method by ID with full details
- */
 export async function getShippingMethod(methodId: string) {
 	return prisma.shippingMethod.findUnique({
 		where: { id: methodId },
@@ -200,4 +179,5 @@ export async function getShippingMethod(methodId: string) {
 		},
 	})
 }
+
 

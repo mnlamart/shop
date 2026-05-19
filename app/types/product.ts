@@ -1,10 +1,6 @@
 import { type Prisma } from '@prisma/client'
 import { variantsWithAttributesInclude } from '#app/utils/prisma-includes.ts'
 
-/**
- * Product list item type for the admin products index page
- * Includes all necessary fields for displaying products in a table
- */
 export type ProductListItem = Prisma.ProductGetPayload<{
 	include: {
 		category: {
@@ -24,10 +20,6 @@ export type ProductListItem = Prisma.ProductGetPayload<{
 	}
 }>
 
-/**
- * Product detail type for viewing a single product
- * Includes all relations with full data for product details page
- */
 export type ProductDetail = Prisma.ProductGetPayload<{
 	include: {
 		category: {
@@ -43,10 +35,6 @@ export type ProductDetail = Prisma.ProductGetPayload<{
 	}
 }>
 
-/**
- * Attribute detail type for viewing a single attribute
- * Includes values and usage statistics
- */
 export type AttributeDetail = Prisma.AttributeGetPayload<{
 	include: {
 		values: {
@@ -62,10 +50,6 @@ export type AttributeDetail = Prisma.AttributeGetPayload<{
 	}
 }>
 
-/**
- * Product for attribute page
- * Simplified product type for displaying products that use an attribute
- */
 export type ProductForAttribute = {
 	id: string
 	name: string

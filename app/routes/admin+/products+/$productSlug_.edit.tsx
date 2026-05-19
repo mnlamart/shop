@@ -27,18 +27,9 @@ import { type Route } from './+types/$productSlug_.edit.ts'
 
 export { action } from './__edit.server.tsx'
 
-/**
- * Loads product data for editing
- * 
- * @param params - Route parameters containing the product slug
- * @param request - HTTP request object
- * @returns Product data with all relations (images, variants, tags), categories, and attributes
- * @throws {invariantResponse} If product is not found (404)
- */
 export async function loader({ params, request }: Route.LoaderArgs) {
 	await requireUserWithRole(request, 'admin')
 
-	// Get existing product with all relations
 	const product = await prisma.product.findUnique({
 		where: { slug: params.productSlug },
 		include: {
@@ -54,7 +45,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 	invariantResponse(product, 'Product not found', { status: 404 })
 
-	// Get categories and attributes for the form
 	const [categories, attributes] = await Promise.all([
 		prisma.category.findMany({
 			select: { id: true, name: true, parentId: true },
@@ -92,24 +82,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	}
 }
 
-/**
- * Generates metadata for the edit product page
- * 
- * @param args - Route meta arguments containing loader data
- * @returns Array of meta tags for the page
- */
 export const meta: Route.MetaFunction = ({ loaderData }) => [
 	{ title: `Edit ${loaderData?.product.name} | Admin | Epic Shop` },
 	{ name: 'description', content: `Edit product: ${loaderData?.product.name}` },
 ]
 
-/**
- * EditProduct component for editing product information
- * 
- * @param loaderData - Product data loaded from the loader function
- * @param actionData - Result data from form submissions
- * @returns React component with product edit form
- */
 export default function EditProduct({ loaderData, actionData }: Route.ComponentProps) {
 	const { product, categories, attributes } = loaderData
 	const isPending = useIsPending()

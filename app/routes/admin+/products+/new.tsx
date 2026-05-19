@@ -22,16 +22,9 @@ import { type Route } from './+types/new.ts'
 
 export { action } from './__new.server.tsx'
 
-/**
- * Loads categories and attributes for the new product form
- * 
- * @param request - HTTP request object
- * @returns Categories and attributes data for form dropdowns
- */
 export async function loader({ request }: Route.LoaderArgs) {
 	await requireUserWithRole(request, 'admin')
 
-	// Get categories and attributes for the form
 	const [categories, attributes] = await Promise.all([
 		prisma.category.findMany({
 			select: { id: true, name: true, parentId: true },
@@ -60,11 +53,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 	}
 }
 
-/**
- * Generates metadata for the new product page
- * 
- * @returns Array of meta tags for the page
- */
 export const meta: Route.MetaFunction = () => [
 	{ title: 'New Product | Admin | Epic Shop' },
 	{ name: 'description', content: 'Create a new product' },
@@ -72,13 +60,6 @@ export const meta: Route.MetaFunction = () => [
 
 const productWithoutIdSchema = productSchema.omit({ id: true })
 
-/**
- * NewProduct component for creating a new product
- * 
- * @param loaderData - Categories and attributes data loaded from the loader function
- * @param actionData - Result data from form submissions
- * @returns React component with product creation form
- */
 export default function NewProduct({ loaderData, actionData }: Route.ComponentProps) {
 	const isPending = useIsPending()
 
