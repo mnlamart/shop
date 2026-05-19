@@ -1,5 +1,5 @@
 node_modules
-.DS_store
+.DS_Store
 
 /build
 /server-build
@@ -8,6 +8,7 @@ node_modules
 
 /prisma/data.db
 /prisma/data.db-journal
+/prisma/data.db.backup
 /tests/prisma
 
 /test-results/
