@@ -19,7 +19,7 @@ Key architectural decisions, trade-offs, and lessons learned during development.
 ### [Accessibility Testing](accessibility-testing.md)
 Complete guide to accessibility testing with axe-core, covering E2E tests (Playwright), component tests (Vitest), configuration options, and best practices for maintaining WCAG compliance.
 
-### [Order Management System](order-management-system.plan.md)
+### [Order Management System](archive/order-management-system.plan.md)
 Comprehensive documentation of the order management system, including Stripe integration, webhook handling, idempotency, atomic operations, and order lifecycle management.
 
 ### [Checkout Success Page](checkout-success-page.md)
@@ -30,14 +30,15 @@ All schemas use Zod v4 syntax with the `error` parameter for consistent, user-fr
 
 ## Planning Documentation
 
-### [Admin Product Management Plan](plans/001-admin-product-management.md)
-Original implementation plan with status updates and completion notes. Shows the evolution from initial requirements to final implementation.
+Historical implementation plans and completed work are archived under [`archive/`](archive/). They preserve context for past decisions but are no longer active references:
 
-### [Shopping Cart System Plan](plans/002-shopping-cart-system.md)
-Implementation plan for the shopping cart system, including guest and authenticated user flows, cart merging, and checkout integration.
-
-### [Checkout Test Refactoring Plan](checkout-test-refactoring-plan.md)
-Documentation of the checkout test refactoring process. ✅ **Completed** - All checkout tests are now active and passing.
+- `archive/001-admin-product-management.md` — original admin product CRUD plan (completed)
+- `archive/002-shopping-cart-system.md` — shopping cart implementation plan (completed)
+- `archive/shipping-system-implementation.md` — shipping system rollout plan (completed)
+- `archive/checkout-test-refactoring-plan.md` — checkout test refactor (completed)
+- `archive/e2e-flaky-tests-fix-reference.md` — Playwright flakiness debugging notes
+- `archive/order-management-polish.md` — order management optimization pass (completed)
+- `archive/order-management-system.plan.md` — order system implementation plan
 
 ## Quick Reference
 
