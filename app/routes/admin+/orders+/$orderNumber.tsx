@@ -1,31 +1,11 @@
 import { parseWithZod } from '@conform-to/zod/v4'
 import { invariantResponse } from '@epic-web/invariant'
-import { useEffect, useState } from 'react'
-import { data, Link, useFetcher } from 'react-router'
+import { data, Link } from 'react-router'
 import { z } from 'zod'
 import { OrderStatusBadge } from '#app/components/order-status-badge.tsx'
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-	AlertDialogTrigger,
-} from '#app/components/ui/alert-dialog.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
-import { Input } from '#app/components/ui/input.tsx'
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '#app/components/ui/select.tsx'
 import { getOrderStatusLabel } from '#app/utils/order-status.ts'
 import { getOrderByOrderNumber } from '#app/utils/order-queries.server.ts'
 import { updateOrderStatus, cancelOrder } from '#app/utils/order.server.ts'
@@ -33,6 +13,8 @@ import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
+import { OrderManagementCard } from './__order-management-card.tsx'
+import { ShipmentManagementSection } from './__shipment-management-section.tsx'
 import { type Route } from './+types/$orderNumber.ts'
 
 const StatusUpdateSchema = z.object({
@@ -148,53 +130,6 @@ export const meta: Route.MetaFunction = ({ loaderData }) => {
 
 export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 	const { order, currency } = loaderData
-	const statusFetcher = useFetcher()
-	const cancelFetcher = useFetcher()
-	const createShipmentFetcher = useFetcher<{
-		success?: boolean
-		error?: string
-		message?: string
-		shipmentNumber?: string
-	}>()
-	const syncTrackingFetcher = useFetcher<{
-		success?: boolean
-		message?: string
-		newStatus?: string
-		updated?: boolean
-	}>()
-	const [status, setStatus] = useState(order.status)
-	const [trackingNumber, setTrackingNumber] = useState(order.trackingNumber || '')
-
-	// Sync status state when order data changes
-	useEffect(() => {
-		setStatus(order.status)
-		setTrackingNumber(order.trackingNumber || '')
-	}, [order.status, order.trackingNumber])
-
-	const isUpdating = statusFetcher.state !== 'idle'
-	const isCancelling = cancelFetcher.state !== 'idle'
-	const isCreatingShipment = createShipmentFetcher.state !== 'idle'
-	const isSyncingTracking = syncTrackingFetcher.state !== 'idle'
-	const shipmentResult = createShipmentFetcher.data
-	const syncTrackingResult = syncTrackingFetcher.data
-	const showTrackingNumber = status === 'SHIPPED' || status === 'DELIVERED'
-	const canCancel = order.status !== 'CANCELLED'
-	
-	// Show success/error messages for shipment creation
-	useEffect(() => {
-		if (shipmentResult?.success && shipmentResult.shipmentNumber) {
-			// Reload page to show updated order with shipment number
-			window.location.reload()
-		}
-	}, [shipmentResult])
-
-	// Reload page when tracking sync updates status
-	useEffect(() => {
-		if (syncTrackingResult?.success && syncTrackingResult.updated && syncTrackingResult.newStatus) {
-			// Reload page to show updated order status
-			window.location.reload()
-		}
-	}, [syncTrackingResult])
 
 	return (
 		<div className="space-y-6 animate-slide-top">
@@ -307,154 +242,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 					</Card>
 
 					{/* Order Management */}
-					<Card className="rounded-[14px]">
-						<CardHeader className="pb-6 px-6 pt-6">
-							<CardTitle className="text-base font-normal text-foreground">
-								Order Management
-							</CardTitle>
-						</CardHeader>
-						<CardContent className="px-6 pb-6">
-							<div className="space-y-6">
-								{/* Update Status Section */}
-								<div className="space-y-4">
-									<h4 className="text-sm font-normal text-foreground">Update Status</h4>
-									<div className="space-y-4">
-										<statusFetcher.Form method="POST" className="space-y-4">
-											<input type="hidden" name="status" value={status} />
-											<div className="space-y-2">
-												<label
-													htmlFor="status-select"
-													className="text-sm font-medium flex items-center gap-2 text-foreground"
-												>
-													Order Status
-												</label>
-												<Select
-													value={status}
-													disabled={isUpdating}
-													onValueChange={(value) => setStatus(value as typeof status)}
-												>
-													<SelectTrigger
-														id="status-select"
-														className="w-full h-10 rounded-lg border bg-input px-3"
-														aria-label="Order status"
-													>
-														<SelectValue placeholder="Select status" />
-													</SelectTrigger>
-													<SelectContent>
-														<SelectItem value="PENDING">Pending</SelectItem>
-														<SelectItem value="CONFIRMED">Confirmed</SelectItem>
-														<SelectItem value="SHIPPED">Shipped</SelectItem>
-														<SelectItem value="DELIVERED">Delivered</SelectItem>
-														<SelectItem value="CANCELLED">Cancelled</SelectItem>
-													</SelectContent>
-												</Select>
-											</div>
-											{showTrackingNumber && (
-												<div className="space-y-2">
-													<label
-														htmlFor="tracking-number"
-														className="text-sm font-medium flex items-center gap-2 text-foreground"
-													>
-														Tracking Number
-													</label>
-													<Input
-														id="tracking-number"
-														name="trackingNumber"
-														type="text"
-														value={trackingNumber}
-														onChange={(e) => setTrackingNumber(e.target.value)}
-														disabled={isUpdating}
-														placeholder="Enter tracking number"
-														className="h-10 rounded-lg bg-input"
-													/>
-												</div>
-											)}
-											<Button
-												type="submit"
-												disabled={isUpdating}
-												aria-busy={isUpdating}
-												className="w-full h-9 rounded-lg font-medium transition-all duration-200 bg-[var(--action-button)] text-[var(--action-button-foreground)] hover:bg-[var(--action-button)]/90"
-											>
-												{isUpdating ? (
-													<>
-														<Icon name="update" className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-														<span>Updating...</span>
-													</>
-												) : (
-													<span>Update Status</span>
-												)}
-											</Button>
-										</statusFetcher.Form>
-									</div>
-								</div>
-
-								{/* Divider */}
-								<div className="border-t border-border" />
-
-								{/* Cancel Order Section */}
-								{canCancel && (
-									<div className="space-y-4">
-										<div className="flex items-start gap-3">
-											<Icon
-												name="cross-1"
-												className="h-5 w-5 flex-shrink-0 mt-0.5 text-[var(--destructive-accent)]"
-												aria-hidden="true"
-											/>
-											<div className="space-y-1">
-												<h4 className="text-sm font-normal text-foreground">Cancel Order</h4>
-												<p className="text-sm text-muted-foreground">
-													This action cannot be undone. The order will be permanently
-													cancelled.
-												</p>
-											</div>
-										</div>
-										<AlertDialog>
-											<AlertDialogTrigger asChild>
-												<Button
-													variant="destructive"
-													disabled={isCancelling}
-													aria-busy={isCancelling}
-													className="w-full h-9 rounded-lg font-medium transition-all duration-200"
-												>
-													{isCancelling ? (
-														<>
-															<Icon name="update" className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-															<span>Cancelling...</span>
-														</>
-													) : (
-														<span>Cancel Order</span>
-													)}
-												</Button>
-											</AlertDialogTrigger>
-											<AlertDialogContent>
-												<AlertDialogHeader>
-													<AlertDialogTitle>Cancel Order?</AlertDialogTitle>
-													<AlertDialogDescription>
-														Are you sure you want to cancel order {order.orderNumber}? This
-														will create a refund for the customer and send them a cancellation
-														email. This action cannot be undone.
-													</AlertDialogDescription>
-												</AlertDialogHeader>
-												<AlertDialogFooter>
-													<AlertDialogCancel>Keep Order</AlertDialogCancel>
-													<cancelFetcher.Form method="POST">
-														<input type="hidden" name="intent" value="cancel" />
-														<AlertDialogAction
-															type="submit"
-															disabled={isCancelling}
-															className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-														>
-															Yes, Cancel Order
-														</AlertDialogAction>
-													</cancelFetcher.Form>
-												</AlertDialogFooter>
-											</AlertDialogContent>
-										</AlertDialog>
-									</div>
-								)}
-							</div>
-						</CardContent>
-					</Card>
+					<OrderManagementCard order={order} />
 
 					{/* Shipping Address */}
 					<Card className="rounded-[14px]">
@@ -584,154 +372,7 @@ export default function AdminOrderDetail({ loaderData }: Route.ComponentProps) {
 										)}
 
 										{/* Shipment Management */}
-										{order.mondialRelayPickupPointId &&
-											order.shippingCarrierName === 'Mondial Relay' && (
-												<div className="mt-4 pt-4 border-t border-border">
-													<h3 className="text-sm font-medium mb-3">Shipment Management</h3>
-													{!order.mondialRelayShipmentNumber ? (
-														<div className="space-y-3">
-															<createShipmentFetcher.Form
-																method="POST"
-																action={`/admin/orders/${order.orderNumber}/create-shipment`}
-															>
-																<Button
-																	type="submit"
-																	variant="default"
-																	size="sm"
-																	className="h-9"
-																	disabled={isCreatingShipment}
-																	aria-busy={isCreatingShipment}
-																>
-																	{isCreatingShipment ? (
-																		<>
-																			<Icon
-																				name="update"
-																				className="h-4 w-4 mr-2 animate-spin"
-																			/>
-																			Creating...
-																		</>
-																	) : (
-																		<>
-																			<Icon name="plus" className="h-4 w-4 mr-2" />
-																			Create Shipment
-																		</>
-																	)}
-																</Button>
-															</createShipmentFetcher.Form>
-															{shipmentResult?.error && (
-																<p className="text-sm text-destructive">
-																	{shipmentResult.message || shipmentResult.error}
-																</p>
-															)}
-															{shipmentResult?.success && (
-																<p className="text-sm text-green-700">
-																	{shipmentResult.message}
-																</p>
-															)}
-														</div>
-													) : (
-														<p className="text-sm text-muted-foreground">
-															Shipment created: <strong>{order.mondialRelayShipmentNumber}</strong>
-														</p>
-													)}
-												</div>
-											)}
-
-										{/* Tracking Status Sync */}
-										{order.mondialRelayShipmentNumber &&
-											order.shippingCarrierName === 'Mondial Relay' &&
-											order.status !== 'DELIVERED' &&
-											order.status !== 'CANCELLED' && (
-												<div className="mt-4 pt-4 border-t border-border">
-													<h3 className="text-sm font-medium mb-3">Tracking Status</h3>
-													<syncTrackingFetcher.Form
-														method="POST"
-														action={`/admin/orders/${order.orderNumber}/sync-tracking`}
-													>
-														<Button
-															type="submit"
-															variant="outline"
-															size="sm"
-															className="h-9"
-															disabled={isSyncingTracking}
-															aria-busy={isSyncingTracking}
-														>
-															{isSyncingTracking ? (
-																<>
-																	<Icon
-																		name="update"
-																		className="h-4 w-4 mr-2 animate-spin"
-																	/>
-																	Syncing...
-																</>
-															) : (
-																<>
-																	<Icon name="update" className="h-4 w-4 mr-2" />
-																	Sync Tracking Status
-																</>
-															)}
-														</Button>
-													</syncTrackingFetcher.Form>
-													{syncTrackingResult?.message && (
-														<p
-															className={`text-sm mt-2 ${
-																syncTrackingResult.success && syncTrackingResult.updated
-																	? 'text-green-700'
-																	: 'text-muted-foreground'
-															}`}
-														>
-															{syncTrackingResult.message}
-														</p>
-													)}
-												</div>
-											)}
-
-										{/* Label Management */}
-										{(order.mondialRelayShipmentNumber || order.mondialRelayPickupPointId) && (
-											<div className="mt-4 pt-4 border-t border-border">
-												<h3 className="text-sm font-medium mb-3">Shipping Label</h3>
-												<div className="flex gap-2">
-													{order.mondialRelayShipmentNumber ? (
-														<Button
-															asChild
-															variant="outline"
-															size="sm"
-															className="h-9"
-														>
-															<a
-																href={`/admin/orders/${order.orderNumber}/label`}
-																target="_blank"
-																rel="noopener noreferrer"
-															>
-																<Icon name="download" className="h-4 w-4 mr-2" />
-																Download Label
-															</a>
-														</Button>
-													) : order.mondialRelayPickupPointId ? (
-														<Button
-															asChild
-															variant="default"
-															size="sm"
-															className="h-9"
-														>
-															<a
-																href={`/admin/orders/${order.orderNumber}/label?create=true`}
-																target="_blank"
-																rel="noopener noreferrer"
-															>
-																<Icon name="plus" className="h-4 w-4 mr-2" />
-																Create & Download Label
-															</a>
-														</Button>
-													) : null}
-												</div>
-												{order.mondialRelayLabelUrl && (
-													<p className="text-xs text-muted-foreground mt-2">
-														Label URL: <a href={order.mondialRelayLabelUrl} target="_blank" rel="noopener noreferrer" className="underline">{order.mondialRelayLabelUrl}</a>
-													</p>
-												)}
-											</div>
-										)}
+										<ShipmentManagementSection order={order} />
 										<div className="flex items-center justify-between pt-2 border-t border-border">
 											<span className="text-base font-normal text-foreground">Total</span>
 											<span className="text-lg font-normal text-foreground">
