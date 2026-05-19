@@ -22,8 +22,8 @@ import {
 	productImagesOrderedInclude,
 	variantsWithAttributesInclude,
 } from '#app/utils/prisma-includes.ts'
-import { ImageChooser, VariantRow } from './__product-form-components.tsx'
 import { type Route } from './+types/$productSlug_.edit.ts'
+import { ImageChooser, VariantRow } from './__product-form-components.tsx'
 
 export { action } from './__edit.server.tsx'
 

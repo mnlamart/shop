@@ -1,6 +1,6 @@
 import { getFormProps, getInputProps, getTextareaProps, useForm, type FieldMetadata } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useCallback } from 'react'
 import { Form, Link } from 'react-router'
 import { ErrorList } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
@@ -17,8 +17,8 @@ import { productSchema, type ImageFieldset } from '#app/schemas/product.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { useIsPending } from '#app/utils/misc.tsx'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
-import { ImageChooser, VariantRow } from './__product-form-components.tsx'
 import { type Route } from './+types/new.ts'
+import { ImageChooser, VariantRow } from './__product-form-components.tsx'
 
 export { action } from './__new.server.tsx'
 

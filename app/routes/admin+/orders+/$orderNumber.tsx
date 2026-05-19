@@ -6,16 +6,16 @@ import { OrderStatusBadge } from '#app/components/order-status-badge.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
-import { getOrderStatusLabel } from '#app/utils/order-status.ts'
 import { getOrderByOrderNumber } from '#app/utils/order-queries.server.ts'
+import { getOrderStatusLabel } from '#app/utils/order-status.ts'
 import { updateOrderStatus, cancelOrder } from '#app/utils/order.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
+import { type Route } from './+types/$orderNumber.ts'
 import { OrderManagementCard } from './__order-management-card.tsx'
 import { ShipmentManagementSection } from './__shipment-management-section.tsx'
-import { type Route } from './+types/$orderNumber.ts'
 
 const StatusUpdateSchema = z.object({
 	status: z.enum(['PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED'], {

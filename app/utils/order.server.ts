@@ -7,8 +7,8 @@ import { sendEmail } from './email.server.ts'
 import { getDomainUrl } from './misc.tsx'
 import { generateOrderNumber } from './order-number.server.ts'
 import { getOrderByCheckoutSessionId } from './order-queries.server.ts'
-import { StockUnavailableError } from './order-stock.server.ts'
 import { getOrderStatusLabel } from './order-status.ts'
+import { StockUnavailableError } from './order-stock.server.ts'
 import { stripe } from './stripe.server.ts'
 
 /**
