@@ -18,6 +18,10 @@ import { productSchema, type ImageFieldset, type VariantFieldset } from '#app/sc
 import { prisma } from '#app/utils/db.server.ts'
 import { useIsPending, cn, getProductImgSrc } from '#app/utils/misc.tsx'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
+import {
+	productImagesOrderedInclude,
+	variantsWithAttributesInclude,
+} from '#app/utils/prisma-includes.ts'
 import { type Route } from './+types/$productSlug_.edit.ts'
 
 export { action } from './__edit.server.tsx'
@@ -37,20 +41,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	const product = await prisma.product.findUnique({
 		where: { slug: params.productSlug },
 		include: {
-			images: {
-				orderBy: { displayOrder: 'asc' },
-			},
-			variants: {
-				include: {
-					attributeValues: {
-						include: {
-							attributeValue: {
-								include: { attribute: true },
-							},
-						},
-					},
-				},
-			},
+			...productImagesOrderedInclude,
+			...variantsWithAttributesInclude,
 			tags: {
 				include: {
 					tag: true,

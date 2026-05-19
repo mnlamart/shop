@@ -1,4 +1,5 @@
 import { type Prisma } from '@prisma/client'
+import { variantsWithAttributesInclude } from '#app/utils/prisma-includes.ts'
 
 /**
  * Product list item type for the admin products index page
@@ -33,17 +34,7 @@ export type ProductDetail = Prisma.ProductGetPayload<{
 			select: { id: true; name: true; slug: true }
 		}
 		images: true
-		variants: {
-			include: {
-				attributeValues: {
-					include: {
-						attributeValue: {
-							include: { attribute: true }
-						}
-					}
-				}
-			}
-		}
+		variants: typeof variantsWithAttributesInclude.variants
 		tags: {
 			include: {
 				tag: { select: { name: true } }

@@ -28,6 +28,10 @@ import {
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
+import {
+	productImagesOrderedInclude,
+	variantsWithAttributesInclude,
+} from '#app/utils/prisma-includes.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
 import { type Route } from './+types/$productSlug.ts'
 
@@ -48,19 +52,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 			category: {
 				select: { id: true, name: true, slug: true },
 			},
-			images: {
-				orderBy: { displayOrder: 'asc' },
-			},
+			...productImagesOrderedInclude,
 			variants: {
-				include: {
-					attributeValues: {
-						include: {
-							attributeValue: {
-								include: { attribute: true },
-							},
-						},
-					},
-				},
+				...variantsWithAttributesInclude.variants,
 				orderBy: { id: 'asc' },
 			},
 			tags: {
