@@ -4,7 +4,8 @@ import { createProductData, createVariantData } from '#tests/product-utils.ts'
 import { UNCATEGORIZED_CATEGORY_ID } from './category.ts'
 import { prisma } from './db.server.ts'
 import { sendEmail } from './email.server.ts'
-import { validateStockAvailability, updateOrderStatus } from './order.server.ts'
+import { validateStockAvailability } from './order-stock.server.ts'
+import { updateOrderStatus } from './order.server.ts'
 
 // Mock Sentry
 vi.mock('@sentry/react-router', () => ({

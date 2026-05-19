@@ -7,7 +7,7 @@
 
 import { invariantResponse } from '@epic-web/invariant'
 import { data } from 'react-router'
-import { getOrderByOrderNumber } from '#app/utils/order.server.ts'
+import { getOrderByOrderNumber } from '#app/utils/order-queries.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { syncOrderStatusFromTracking } from '#app/utils/tracking-status.server.ts'
 import { type Route } from './+types/$orderNumber.sync-tracking.ts'

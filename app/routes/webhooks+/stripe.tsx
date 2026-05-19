@@ -3,10 +3,8 @@ import * as Sentry from '@sentry/react-router'
 import { data } from 'react-router'
 import type Stripe from 'stripe'
 import { fulfillOrder } from '#app/utils/fulfillment.server.ts'
-import {
-	createOrderFromStripeSession,
-	StockUnavailableError,
-} from '#app/utils/order.server.ts'
+import { createOrderFromStripeSession } from '#app/utils/order.server.ts'
+import { StockUnavailableError } from '#app/utils/order-stock.server.ts'
 import { type StoreAddress } from '#app/utils/shipment.server.ts'
 import { stripe } from '#app/utils/stripe.server.ts'
 import { type Route } from './+types/stripe.ts'

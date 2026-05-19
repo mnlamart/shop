@@ -6,7 +6,7 @@ import { Button } from '#app/components/ui/button.tsx'
 import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { getUserId } from '#app/utils/auth.server.ts'
-import { getOrderByOrderNumber } from '#app/utils/order.server.ts'
+import { getOrderByOrderNumber } from '#app/utils/order-queries.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { type Route } from './+types/$orderNumber.ts'
 

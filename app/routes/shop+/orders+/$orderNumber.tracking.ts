@@ -1,7 +1,7 @@
 import { invariantResponse } from '@epic-web/invariant'
 import { data } from 'react-router'
 import { getUserId } from '#app/utils/auth.server.ts'
-import { getOrderByOrderNumber } from '#app/utils/order.server.ts'
+import { getOrderByOrderNumber } from '#app/utils/order-queries.server.ts'
 import { getMondialRelayTrackingInfo } from '#app/utils/tracking.server.ts'
 import { type Route } from './+types/$orderNumber.tracking.ts'
 

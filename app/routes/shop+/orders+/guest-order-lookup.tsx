@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
 import { useIsPending } from '#app/utils/misc.tsx'
-import { getGuestOrder } from '#app/utils/order.server.ts'
+import { getGuestOrder } from '#app/utils/order-queries.server.ts'
 import { type Route } from './+types/index.ts'
 
 const GuestOrderLookupSchema = z.object({

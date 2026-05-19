@@ -27,7 +27,8 @@ import {
 	SelectValue,
 } from '#app/components/ui/select.tsx'
 import { getOrderStatusLabel } from '#app/utils/order-status.ts'
-import { getOrderByOrderNumber, updateOrderStatus, cancelOrder } from '#app/utils/order.server.ts'
+import { getOrderByOrderNumber } from '#app/utils/order-queries.server.ts'
+import { updateOrderStatus, cancelOrder } from '#app/utils/order.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'

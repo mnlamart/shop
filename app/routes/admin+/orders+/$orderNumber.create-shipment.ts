@@ -8,7 +8,7 @@
 import { invariantResponse } from '@epic-web/invariant'
 import { data } from 'react-router'
 import { prisma } from '#app/utils/db.server.ts'
-import { getOrderByOrderNumber } from '#app/utils/order.server.ts'
+import { getOrderByOrderNumber } from '#app/utils/order-queries.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 import { createMondialRelayShipment, type StoreAddress } from '#app/utils/shipment.server.ts'
 import { sendShippingConfirmationEmail } from '#app/utils/shipping-email.server.tsx'

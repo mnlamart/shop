@@ -12,7 +12,7 @@ import { getDomainUrl } from '#app/utils/misc.tsx'
 import {
 	StockValidationError,
 	validateStockAvailability,
-} from '#app/utils/order.server.ts'
+} from '#app/utils/order-stock.server.ts'
 import { formatPrice } from '#app/utils/price.ts'
 import { getStoreCurrency } from '#app/utils/settings.server.ts'
 import { createCheckoutSession, handleStripeError } from '#app/utils/stripe.server.ts'
