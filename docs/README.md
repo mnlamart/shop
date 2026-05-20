@@ -28,6 +28,15 @@ Documentation of the checkout success page fallback mechanism, including polling
 ### [Schema Validation](implementation-notes.md#schema-validation)
 All schemas use Zod v4 syntax with the `error` parameter for consistent, user-friendly validation messages. See [Implementation Notes](implementation-notes.md) for details.
 
+## Architecture Decision Records
+
+Key architectural decisions are recorded as ADRs in [`decisions/`](decisions/). Each ADR captures the context, decision, alternatives considered, and consequences. ADRs are immutable once accepted — superseded decisions are linked forward, not rewritten.
+
+- [ADR 001 — Price Storage as Integer Cents](decisions/001-price-storage-as-integer-cents.md) — why prices are stored as integer cents instead of Decimal
+- [ADR 002 — Store-Level Currency Configuration](decisions/002-store-level-currency.md) — why currency is a store-level setting, not per-product
+- [ADR 003 — Carrier Coupling Deferred](decisions/003-carrier-coupling-deferred.md) — why the carrier abstraction is deferred until a second carrier is queued
+- [ADR 005 — SQLite Scaling Cliff Trigger Conditions](decisions/005-sqlite-scaling-cliff.md) — 5 measurable triggers for when to migrate from SQLite+LiteFS to Postgres
+
 ## Planning Documentation
 
 Historical implementation plans and completed work are archived under [`archive/`](archive/). They preserve context for past decisions but are no longer active references:

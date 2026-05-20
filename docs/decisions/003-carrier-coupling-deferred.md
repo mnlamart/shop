@@ -100,3 +100,8 @@ Backfill the existing `mondialRelay*` data into `OrderShipment` rows in the migr
 
 ## Re-open when
 A second carrier integration is planned. Update this ADR's status to `Superseded by ADR 00X` and link the implementation PR.
+
+## Related Decisions
+- ADR 001: Price Storage as Integer Cents (established the SQLite integer storage pattern)
+- ADR 002: Store-Level Currency Configuration (store-level settings on SQLite)
+- ADR 005: SQLite Scaling Cliff Trigger Conditions (determines when to migrate from SQLite to Postgres, which would carry all carrier-specific columns and relationships into a new database engine)
