@@ -5,6 +5,8 @@ import {
 	formatInvoiceNumber,
 	parseInvoiceNumber,
 	withInvoiceLock,
+	issueCreditNote,
+	type RefundedLineItem,
 } from './invoice.server.ts'
 import { generateOrderNumber } from './order-number.server.ts'
 
@@ -35,6 +37,43 @@ async function createTestOrder(
 }
 
 /**
+ * Creates order items linked to a given order.
+ */
+async function createTestOrderItems(orderId: string, items: Array<{
+	productId: string
+	price: number
+	quantity: number
+}>) {
+	for (const item of items) {
+		await prisma.orderItem.create({
+			data: {
+				orderId,
+				productId: item.productId,
+				price: item.price,
+				quantity: item.quantity,
+			},
+		})
+	}
+}
+
+/**
+ * Creates a test product.
+ */
+async function createTestProduct(id: string, name: string) {
+	return prisma.product.create({
+		data: {
+			id,
+			name,
+			description: `${name} description`,
+			price: 1000,
+			stockQuantity: 100,
+			slug: `test-${id}`,
+			taxKind: 'STANDARD',
+		} as never,
+	})
+}
+
+/**
  * Creates a test invoice linked to a given order.
  */
 async function createTestInvoice(
@@ -60,7 +99,12 @@ afterEach(async () => {
 	await prisma.invoice.deleteMany({})
 	await prisma.orderItem.deleteMany({})
 	await prisma.order.deleteMany({})
+	await prisma.product.deleteMany({})
 })
+
+// ---------------------------------------------------------------------------
+// Existing tests (preserved from original)
+// ---------------------------------------------------------------------------
 
 describe('formatInvoiceNumber', () => {
 	test('should format fiscal year 2025 sequence 1', () => {
@@ -315,5 +359,291 @@ describe('withInvoiceLock', () => {
 		numbers.forEach((num, idx) => {
 			expect(num).toBe(`F2025-${String(idx + 1).padStart(5, '0')}`)
 		})
+	})
+})
+
+// ---------------------------------------------------------------------------
+// Credit note tests
+// ---------------------------------------------------------------------------
+
+describe('issueCreditNote', () => {
+	test('credit note negates parent', async () => {
+		const order = await createTestOrder('order-cn-negate', {
+			total: 4800,
+			subtotal: 4000,
+			shippingCost: 800,
+		})
+
+		// Create parent invoice
+		const parentNum = await generateInvoiceNumber(2025)
+		const parentParsed = parseInvoiceNumber(parentNum)!
+		const parent = await createTestInvoice(
+			2025,
+			parentParsed.sequence,
+			order.id,
+			{
+				subtotalCents: 4000,
+				totalCents: 4800,
+				vatTotalCents: 800,
+				vatBreakdown: [
+					{ kind: 'STANDARD', rate: 2000, baseCents: 4000, vatCents: 800 },
+				],
+				status: 'FINAL',
+			},
+		)
+
+		const refundedItems: RefundedLineItem[] = [
+			{
+				description: 'Test Product A',
+				quantity: 2,
+				unitPriceCents: 1000,
+				totalCents: 2000,
+			},
+			{
+				description: 'Test Product B',
+				quantity: 1,
+				unitPriceCents: 2000,
+				totalCents: 2000,
+			},
+		]
+
+		const creditNote = await issueCreditNote(
+			parent.id,
+			refundedItems,
+			800, // refunded shipping
+		)
+
+		// Credit note should have a number in the same sequence
+		expect(creditNote.number).toMatch(/^F\d{4}-\d{5}$/)
+		expect(creditNote.fiscalYear).toBe(new Date().getFullYear())
+
+		// Verify the credit note record was created with negative amounts
+		const cn = await prisma.invoice.findUnique({
+			where: { id: creditNote.id },
+		})
+
+		expect(cn).toBeTruthy()
+		expect(cn!.kind).toBe('CREDIT_NOTE')
+		expect(cn!.parentInvoiceId).toBe(parent.id)
+		expect(cn!.orderId).toBe(order.id)
+		expect(cn!.status).toBe('FINAL')
+		expect(cn!.issuedAt).toBeTruthy()
+
+		// Amounts should be negative
+		expect(cn!.subtotalCents).toBeLessThan(0) // -(2000 + 2000)
+		expect(cn!.totalCents).toBeLessThan(0) // subtotal + shipping + VAT
+
+		// VAT breakdown should be negated
+		const vatBreakdown = cn!.vatBreakdown as Array<{
+			kind: string
+			rate: number
+			baseCents: number
+			vatCents: number
+		}>
+		expect(vatBreakdown).toHaveLength(1)
+		expect(vatBreakdown[0]!.kind).toBe('STANDARD')
+		expect(vatBreakdown[0]!.baseCents).toBe(-4000)
+		expect(vatBreakdown[0]!.vatCents).toBe(-800)
+	})
+
+	test('credit note shares the gapless invoice number sequence', async () => {
+		const currentYear = new Date().getFullYear()
+
+		const order = await createTestOrder('order-cn-seq', {
+			total: 1000,
+			subtotal: 1000,
+			shippingCost: 0,
+		})
+
+		// Create a regular invoice first
+		const parentNum = await generateInvoiceNumber(currentYear)
+		const parentParsed = parseInvoiceNumber(parentNum)!
+		const parent = await createTestInvoice(
+			currentYear,
+			parentParsed.sequence,
+			order.id,
+			{
+				status: 'FINAL',
+				vatTotalCents: 0,
+				vatBreakdown: [],
+			},
+		)
+
+		// Now issue a credit note — it should get the NEXT sequence number
+		const creditNote = await issueCreditNote(
+			parent.id,
+			[
+				{
+					description: 'Test Product',
+					quantity: 1,
+					unitPriceCents: 1000,
+					totalCents: 1000,
+				},
+			],
+			0,
+		)
+
+		// The credit note should have the next sequence in the same fiscal year
+		const expectedNum = `F${currentYear}-${String(parentParsed.sequence + 1).padStart(5, '0')}`
+		expect(creditNote.number).toBe(expectedNum)
+	})
+
+	test('credit note works within a transaction', async () => {
+		const order = await createTestOrder('order-cn-tx', {
+			total: 3000,
+			subtotal: 2500,
+			shippingCost: 500,
+		})
+
+		// Create parent invoice first
+		const parentNum = await generateInvoiceNumber(2025)
+		const parentParsed = parseInvoiceNumber(parentNum)!
+		const parent = await createTestInvoice(
+			2025,
+			parentParsed.sequence,
+			order.id,
+			{
+				status: 'FINAL',
+				totalCents: 3000,
+				subtotalCents: 2500,
+				vatTotalCents: 500,
+				vatBreakdown: [
+					{ kind: 'STANDARD', rate: 2000, baseCents: 2500, vatCents: 500 },
+				],
+			},
+		)
+
+		const refundedItems: RefundedLineItem[] = [
+			{
+				description: 'Product X',
+				quantity: 1,
+				unitPriceCents: 2500,
+				totalCents: 2500,
+			},
+		]
+
+		// Issue credit note within a transaction
+		const result = await prisma.$transaction(async (tx) => {
+			return issueCreditNote(parent.id, refundedItems, 500, tx)
+		})
+
+		expect(result.number).toMatch(/^F\d{4}-\d{5}$/)
+
+		const cn = await prisma.invoice.findUnique({
+			where: { id: result.id },
+		})
+		expect(cn).toBeTruthy()
+		expect(cn!.kind).toBe('CREDIT_NOTE')
+		expect(cn!.subtotalCents).toBe(-2500)
+		expect(cn!.totalCents).toBe(-3500) // subtotal + shipping + VAT
+	})
+
+	test('credit note throws when parent invoice does not exist', async () => {
+		await expect(
+			issueCreditNote(
+				'nonexistent-invoice-id',
+				[
+					{
+						description: 'Product',
+						quantity: 1,
+						unitPriceCents: 1000,
+						totalCents: 1000,
+					},
+				],
+				0,
+			),
+		).rejects.toThrow('Parent invoice nonexistent-invoice-id not found')
+	})
+
+	test('credit note with zero VAT breakdown', async () => {
+		const order = await createTestOrder('order-cn-zero-vat', {
+			total: 1000,
+			subtotal: 1000,
+			shippingCost: 0,
+		})
+
+		const parentNum = await generateInvoiceNumber(2025)
+		const parentParsed = parseInvoiceNumber(parentNum)!
+		const parent = await createTestInvoice(
+			2025,
+			parentParsed.sequence,
+			order.id,
+			{
+				status: 'FINAL',
+				vatTotalCents: 0,
+				vatBreakdown: [],
+			},
+		)
+
+		const creditNote = await issueCreditNote(
+			parent.id,
+			[
+				{
+					description: 'No-VAT Product',
+					quantity: 1,
+					unitPriceCents: 1000,
+					totalCents: 1000,
+				},
+			],
+			0,
+		)
+
+		const cn = await prisma.invoice.findUnique({
+			where: { id: creditNote.id },
+		})
+		expect(cn!.vatBreakdown).toEqual([])
+		expect(cn!.vatTotalCents).toBe(0)
+		expect(cn!.totalCents).toBe(-1000)
+	})
+
+	test('credit note with multiple VAT breakdown entries', async () => {
+		const order = await createTestOrder('order-cn-multi-vat', {
+			total: 3500,
+			subtotal: 3000,
+			shippingCost: 500,
+		})
+
+		const parentNum = await generateInvoiceNumber(2025)
+		const parentParsed = parseInvoiceNumber(parentNum)!
+		const parent = await createTestInvoice(
+			2025,
+			parentParsed.sequence,
+			order.id,
+			{
+				status: 'FINAL',
+				subtotalCents: 3000,
+				totalCents: 3500,
+				vatTotalCents: 500,
+				vatBreakdown: [
+					{ kind: 'STANDARD', rate: 2000, baseCents: 2500, vatCents: 500 },
+					{ kind: 'REDUCED', rate: 550, baseCents: 500, vatCents: 0 },
+				],
+			},
+		)
+
+		const creditNote = await issueCreditNote(
+			parent.id,
+			[
+				{ description: 'Item 1', quantity: 1, unitPriceCents: 2500, totalCents: 2500 },
+				{ description: 'Item 2', quantity: 1, unitPriceCents: 500, totalCents: 500 },
+			],
+			500,
+		)
+
+		const cn = await prisma.invoice.findUnique({
+			where: { id: creditNote.id },
+		})
+		const breakdown = cn!.vatBreakdown as Array<{
+			kind: string
+			rate: number
+			baseCents: number
+			vatCents: number
+		}>
+		expect(breakdown).toHaveLength(2)
+		expect(breakdown[0]!.kind).toBe('STANDARD')
+		expect(breakdown[0]!.baseCents).toBe(-2500)
+		expect(breakdown[0]!.vatCents).toBe(-500)
+		expect(breakdown[1]!.kind).toBe('REDUCED')
+		expect(breakdown[1]!.baseCents).toBe(-500)
 	})
 })

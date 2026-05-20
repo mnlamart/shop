@@ -8,6 +8,11 @@ import { getDomainUrl } from './misc.tsx'
 import { generateOrderNumber } from './order-number.server.ts'
 import { stripe } from './stripe.server.ts'
 import { calculateVat, type TaxableItem } from './tax.server.ts'
+import { issueCreditNote, type RefundedLineItem } from './invoice.server.ts'
+import {
+	generateInvoicePdf,
+	type InvoicePdfData,
+} from './invoice-pdf.server.tsx'
 
 /**
  * Type for stock availability issues
@@ -374,6 +379,27 @@ export async function cancelOrder(orderId: string, request?: Request): Promise<v
 			stripePaymentIntentId: true,
 			stripeChargeId: true,
 			total: true,
+			subtotal: true,
+			shippingCost: true,
+			shippingName: true,
+			shippingStreet: true,
+			shippingCity: true,
+			shippingPostal: true,
+			shippingCountry: true,
+			createdAt: true,
+			items: {
+				include: {
+					product: { select: { name: true } },
+					variant: {
+						select: { id: true, sku: true },
+					},
+				},
+			},
+			invoices: {
+				where: { kind: 'INVOICE' },
+				take: 1,
+				orderBy: { createdAt: 'desc' },
+			},
 		},
 	})
 
@@ -419,9 +445,90 @@ export async function cancelOrder(orderId: string, request?: Request): Promise<v
 		data: { status: 'CANCELLED' },
 	})
 
-	// Send cancellation email (non-blocking)
+	// Send cancellation email with credit note PDF if available (non-blocking)
 	try {
 		const domainUrl = request ? getDomainUrl(request) : 'http://localhost:3000'
+
+		// Attempt to generate credit note PDF for email attachment
+		let creditNotePdfBuffer: Buffer | null = null
+		let creditNoteNumber: string | null = null
+
+		const parentInvoice = order.invoices[0]
+		if (parentInvoice && order.items.length > 0) {
+			try {
+				// Build refunded line items from order items
+				const refundedItems: RefundedLineItem[] = order.items.map((oi) => ({
+					description:
+						oi.variant?.sku ?? oi.product.name,
+					quantity: oi.quantity,
+					unitPriceCents: oi.price,
+					totalCents: oi.price * oi.quantity,
+				}))
+
+				const refundedShippingCents = order.shippingCost ?? 0
+
+				// Issue credit note (shared gapless sequence)
+				const creditNote = await issueCreditNote(
+					parentInvoice.id,
+					refundedItems,
+					refundedShippingCents,
+				)
+
+				creditNoteNumber = creditNote.number
+
+				// Format parent invoice number
+				const parentInvoiceNumber = `F${parentInvoice.fiscalYear}-${String(parentInvoice.sequence).padStart(5, '0')}`
+
+				// Generate PDF for the credit note
+				const pdfData: InvoicePdfData = {
+					kind: 'CREDIT_NOTE',
+					invoiceNumber: creditNote.number,
+					parentInvoiceNumber,
+					invoiceDate: new Date().toLocaleDateString('fr-FR'),
+					invoiceStatus: 'FINAL',
+					orderNumber: order.orderNumber,
+					orderDate: order.createdAt.toLocaleDateString('fr-FR'),
+					customer: {
+						name: order.shippingName,
+						email: order.email,
+						company: null,
+						vatNumber: null,
+					},
+					shipping: {
+						name: order.shippingName,
+						street: order.shippingStreet,
+						city: order.shippingCity,
+						postal: order.shippingPostal,
+						country: order.shippingCountry,
+					},
+					items: refundedItems.map((item) => ({
+						description: item.description,
+						quantity: -item.quantity,
+						unitPriceCents: item.unitPriceCents,
+						totalCents: -item.totalCents,
+					})),
+					subtotalCents: -order.subtotal,
+					vatBreakdown: [],
+					vatTotalCents: 0,
+					shippingCostCents: -(order.shippingCost ?? 0),
+					totalCents: -order.total,
+					currency: { symbol: '€', decimals: 2 },
+					storeName: 'Epic Shop',
+					storeAddress: '123 Epic Street, 75001 Paris, France',
+					storeVatNumber: 'FR12345678901',
+					storeEmail: 'support@epicstack.dev',
+				}
+
+				creditNotePdfBuffer = await generateInvoicePdf(pdfData)
+			} catch (creditNoteError) {
+				// Log credit note error but don't fail cancellation
+				Sentry.captureException(creditNoteError, {
+					tags: { context: 'order-cancellation-credit-note' },
+					extra: { orderNumber: order.orderNumber },
+				})
+			}
+		}
+
 		await sendEmail({
 			to: order.email,
 			subject: `Order Cancelled - ${order.orderNumber}`,
@@ -430,6 +537,7 @@ export async function cancelOrder(orderId: string, request?: Request): Promise<v
 				<p>Your order has been cancelled.</p>
 				<p><strong>Order Number:</strong> ${order.orderNumber}</p>
 				${refundId ? `<p><strong>Refund ID:</strong> ${refundId}</p>` : ''}
+				${creditNoteNumber ? `<p><strong>Credit Note:</strong> ${creditNoteNumber}</p>` : ''}
 				<p>${refundId ? 'A refund has been processed and will appear in your account within 5-10 business days.' : 'If you have already been charged, please contact support for a refund.'}</p>
 				<p><a href="${domainUrl}/shop/orders/${order.orderNumber}">View Order Details</a></p>
 			`,
@@ -440,10 +548,21 @@ Your order has been cancelled.
 
 Order Number: ${order.orderNumber}
 ${refundId ? `Refund ID: ${refundId}` : ''}
+${creditNoteNumber ? `Credit Note: ${creditNoteNumber}` : ''}
 ${refundId ? 'A refund has been processed and will appear in your account within 5-10 business days.' : 'If you have already been charged, please contact support for a refund.'}
 
 View Order Details: ${domainUrl}/shop/orders/${order.orderNumber}
 			`,
+			...(creditNotePdfBuffer
+				? {
+						attachments: [
+							{
+								content: creditNotePdfBuffer,
+								filename: `Avoir-${creditNoteNumber ?? 'credit-note'}.pdf`,
+							},
+						],
+					}
+				: {}),
 		})
 	} catch (emailError) {
 		// Log email error but don't fail cancellation

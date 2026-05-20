@@ -30,6 +30,10 @@ export interface InvoicePdfData {
 	invoiceStatus: string
 	orderNumber: string
 	orderDate: string
+	/** Invoice kind: 'INVOICE' (Facture) or 'CREDIT_NOTE' (Avoir). Defaults to INVOICE. */
+	kind?: string
+	/** Original invoice number — shown on credit notes as a reference. */
+	parentInvoiceNumber?: string
 	customer: {
 		name: string | null
 		email: string | null
@@ -289,16 +293,27 @@ function formatRate(rate: number): string {
 // ---------------------------------------------------------------------------
 
 export function InvoiceDocument({ data }: { data: InvoicePdfData }) {
+	const isCreditNote = data.kind === 'CREDIT_NOTE'
+
+	const titleLabel = isCreditNote ? 'AVOIR' : 'INVOICE'
+	const titleStyle = isCreditNote
+		? { ...styles.invoiceTitle, color: '#9b2c2c' }
+		: styles.invoiceTitle
+
 	const statusStyle =
 		data.invoiceStatus === 'FINAL'
-			? styles.statusFinal
+			? isCreditNote
+				? { ...styles.statusFinal, backgroundColor: '#fed7d7', color: '#9b2c2c' }
+				: styles.statusFinal
 			: data.invoiceStatus === 'DRAFT'
 				? styles.statusDraft
 				: styles.statusCancelled
 
 	const statusLabel =
 		data.invoiceStatus === 'FINAL'
-			? 'FINAL'
+			? isCreditNote
+				? 'ISSUED'
+				: 'FINAL'
 			: data.invoiceStatus === 'DRAFT'
 				? 'DRAFT'
 				: 'CANCELLED'
@@ -319,10 +334,21 @@ export function InvoiceDocument({ data }: { data: InvoicePdfData }) {
 						</View>
 					</View>
 					<View style={styles.invoiceBadge}>
-						<Text style={styles.invoiceTitle}>INVOICE</Text>
+						<Text style={titleStyle}>{titleLabel}</Text>
 						<Text style={styles.invoiceNumber}>
 							{data.invoiceNumber}
 						</Text>
+						{isCreditNote && data.parentInvoiceNumber && (
+							<Text
+								style={{
+									...styles.invoiceNumber,
+									fontSize: 9,
+									marginTop: 2,
+								}}
+							>
+								Ref: {data.parentInvoiceNumber}
+							</Text>
+						)}
 						<View
 							style={[styles.statusBadge, statusStyle]}
 						>

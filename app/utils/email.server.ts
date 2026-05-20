@@ -22,22 +22,40 @@ const resendSuccessSchema = z.object({
 	id: z.string(),
 })
 
+export type EmailAttachment = {
+	content: Buffer | string
+	filename: string
+}
+
 export async function sendEmail({
 	react,
+	attachments,
 	...options
 }: {
 	to: string
 	subject: string
+	attachments?: EmailAttachment[]
 } & (
 	| { html: string; text: string; react?: never }
 	| { react: ReactElement; html?: never; text?: never }
 )) {
 	const from = 'hello@epicstack.dev'
 
-	const email = {
+	const email: Record<string, unknown> = {
 		from,
 		...options,
 		...(react ? await renderReactEmail(react) : null),
+	}
+
+	// Encode attachments for Resend API (Base64-encoded content)
+	if (attachments && attachments.length > 0) {
+		email.attachments = attachments.map((att) => ({
+			filename: att.filename,
+			content:
+				typeof att.content === 'string'
+					? att.content
+					: att.content.toString('base64'),
+		}))
 	}
 
 	// Skip real API call when no valid API key or in mocks mode
