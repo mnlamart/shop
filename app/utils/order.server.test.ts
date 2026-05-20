@@ -4,7 +4,8 @@ import { createProductData, createVariantData } from '#tests/product-utils.ts'
 import { UNCATEGORIZED_CATEGORY_ID } from './category.ts'
 import { prisma } from './db.server.ts'
 import { sendEmail } from './email.server.ts'
-import { validateStockAvailability, updateOrderStatus } from './order.server.ts'
+import { validateStockAvailability, updateOrderStatus, createInvoiceForOrder } from './order.server.ts'
+import { parseInvoiceNumber } from './invoice.server.ts'
 
 // Mock Sentry
 vi.mock('@sentry/react-router', () => ({
@@ -580,9 +581,177 @@ describe('updateOrderStatus', () => {
 
 			expect(order.taxCountry).toBe('US')
 			expect(order.vatTotalCents).toBe(0)
-			expect(order.vatBreakdown).toEqual([])
+				expect(order.vatBreakdown).toEqual([])
 
 			await prisma.order.delete({ where: { id: order.id } })
+		})
+	})
+
+	describe('createInvoiceForOrder', () => {
+		let orderId: string
+		let subtotalCents = 10000
+		let totalCents = 12000
+		let vatCalculation = {
+			breakdown: [
+				{ kind: 'STANDARD', rate: 2000, baseCents: 10000, vatCents: 2000 },
+			],
+			totalVatCents: 2000,
+			taxCountry: 'FR' as string | null,
+		}
+
+		beforeEach(async () => {
+			// Create a test order
+			const order = await prisma.order.create({
+				data: {
+					orderNumber: `ORD-INV-${Date.now()}`,
+					email: 'invoice-test@example.com',
+					subtotal: subtotalCents,
+					total: totalCents,
+					shippingName: 'Invoice Test',
+					shippingStreet: '123 Invoice St',
+					shippingCity: 'Paris',
+					shippingPostal: '75001',
+					shippingCountry: 'FR',
+					stripeCheckoutSessionId: `cs_inv_test_${Date.now()}`,
+				},
+			})
+			orderId = order.id
+		})
+
+		afterEach(async () => {
+			await prisma.invoice.deleteMany({ where: { orderId } })
+			await prisma.orderItem.deleteMany({ where: { orderId } })
+			await prisma.order.deleteMany({ where: { id: orderId } })
+		})
+
+		test('should create an invoice with correct fiscal year and financial data', async () => {
+			const result = await prisma.$transaction(async (tx) => {
+				return createInvoiceForOrder(tx, orderId, subtotalCents, totalCents, vatCalculation)
+			})
+
+			expect(result.id).toBeTruthy()
+			expect(result.invoiceNumber).toMatch(/^F\d{4}-\d{5}$/)
+
+			// Verify persisted invoice
+			const invoice = await prisma.invoice.findFirst({ where: { orderId } })
+			expect(invoice).toBeTruthy()
+			expect(invoice!.fiscalYear).toBe(new Date().getFullYear())
+			expect(invoice!.subtotalCents).toBe(subtotalCents)
+			expect(invoice!.totalCents).toBe(totalCents)
+			expect(invoice!.vatTotalCents).toBe(2000)
+			expect(invoice!.kind).toBe('INVOICE')
+			expect(invoice!.status).toBe('DRAFT')
+
+			// Verify VAT breakdown
+			const breakdown = invoice!.vatBreakdown as any[]
+			expect(breakdown).toHaveLength(1)
+			expect(breakdown[0]).toEqual({ kind: 'STANDARD', rate: 2000, baseCents: 10000, vatCents: 2000 })
+		})
+
+		test('should be idempotent (calling twice returns same invoice)', async () => {
+			let result1: { id: string; invoiceNumber: string }
+			let result2: { id: string; invoiceNumber: string }
+
+			await prisma.$transaction(async (tx) => {
+				result1 = await createInvoiceForOrder(tx, orderId, subtotalCents, totalCents, vatCalculation)
+			})
+
+			await prisma.$transaction(async (tx) => {
+				result2 = await createInvoiceForOrder(tx, orderId, subtotalCents, totalCents, vatCalculation)
+			})
+
+			expect(result1!.id).toBe(result2!.id)
+			expect(result1!.invoiceNumber).toBe(result2!.invoiceNumber)
+
+			// Only one invoice should exist
+			const invoices = await prisma.invoice.findMany({ where: { orderId } })
+			expect(invoices).toHaveLength(1)
+		})
+
+		test('should generate sequential invoice numbers across orders', async () => {
+			// Create a second order
+			const order2 = await prisma.order.create({
+				data: {
+					orderNumber: `ORD-INV2-${Date.now()}`,
+					email: 'invoice-test2@example.com',
+					subtotal: 5000,
+					total: 6000,
+					shippingName: 'Invoice Test 2',
+					shippingStreet: '456 Order St',
+					shippingCity: 'Lyon',
+					shippingPostal: '69001',
+					shippingCountry: 'FR',
+					stripeCheckoutSessionId: `cs_inv_test2_${Date.now()}`,
+				},
+			})
+
+			let num1: string, num2: string
+
+			await prisma.$transaction(async (tx) => {
+				const r = await createInvoiceForOrder(tx, orderId, subtotalCents, totalCents, vatCalculation)
+				num1 = r.invoiceNumber
+			})
+
+			await prisma.$transaction(async (tx) => {
+				const r = await createInvoiceForOrder(tx, order2.id, 5000, 6000, {
+					breakdown: [{ kind: 'STANDARD', rate: 2000, baseCents: 5000, vatCents: 1000 }],
+					totalVatCents: 1000,
+					taxCountry: 'FR',
+				})
+				num2 = r.invoiceNumber
+			})
+
+			expect(num1!).not.toBe(num2!)
+
+			// Parse sequences — second should be first + 1
+			const parsed1 = parseInvoiceNumber(num1!)
+			const parsed2 = parseInvoiceNumber(num2!)
+			expect(parsed2!.sequence).toBe(parsed1!.sequence + 1)
+
+			// Cleanup second order
+			await prisma.invoice.deleteMany({ where: { orderId: order2.id } })
+			await prisma.order.delete({ where: { id: order2.id } })
+		})
+
+		test('should create invoice with zero VAT for export orders', async () => {
+			const exportVat = {
+				breakdown: [] as Array<{ kind: string; rate: number; baseCents: number; vatCents: number }>,
+				totalVatCents: 0,
+				taxCountry: 'US' as string | null,
+			}
+
+			await prisma.$transaction(async (tx) => {
+				await createInvoiceForOrder(tx, orderId, 10000, 10000, exportVat)
+			})
+
+			const invoice = await prisma.invoice.findFirst({ where: { orderId } })
+			expect(invoice).toBeTruthy()
+			expect(invoice!.vatTotalCents).toBe(0)
+			expect(invoice!.vatBreakdown).toEqual([])
+		})
+
+		test('should create invoice with multiple VAT rates', async () => {
+			const multiVat = {
+				breakdown: [
+					{ kind: 'STANDARD', rate: 2000, baseCents: 5000, vatCents: 1000 },
+					{ kind: 'REDUCED', rate: 1000, baseCents: 2000, vatCents: 200 },
+				],
+				totalVatCents: 1200,
+				taxCountry: 'FR' as string | null,
+			}
+
+			await prisma.$transaction(async (tx) => {
+				await createInvoiceForOrder(tx, orderId, 7000, 8200, multiVat)
+			})
+
+			const invoice = await prisma.invoice.findFirst({ where: { orderId } })
+			expect(invoice).toBeTruthy()
+			expect(invoice!.vatTotalCents).toBe(1200)
+
+			const breakdown = invoice!.vatBreakdown as any[]
+			expect(breakdown).toHaveLength(2)
+			expect(breakdown[0]).toEqual({ kind: 'STANDARD', rate: 2000, baseCents: 5000, vatCents: 1000 })
+			expect(breakdown[1]).toEqual({ kind: 'REDUCED', rate: 1000, baseCents: 2000, vatCents: 200 })
 		})
 	})
 
