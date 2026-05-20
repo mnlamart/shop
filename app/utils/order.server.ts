@@ -770,14 +770,14 @@ export async function createOrderFromStripeSession(
 			)
 
 			// 6. Create invoice for the order (within transaction for atomicity)
-		await createInvoiceForOrder(tx, newOrder.id, calculatedSubtotal, newOrder.total, vatCalculation)
+			await createInvoiceForOrder(tx, newOrder.id, calculatedSubtotal, newOrder.total, vatCalculation)
 
-		// 7. Delete cart items (within transaction for atomicity)
-		await tx.cartItem.deleteMany({
-			where: { cartId },
-		})
+			// 7. Delete cart items (within transaction for atomicity)
+			await tx.cartItem.deleteMany({
+				where: { cartId },
+			})
 
-		// 8. Delete cart (within transaction for atomicity)
+			// 8. Delete cart (within transaction for atomicity)
 			await tx.cart.delete({
 				where: { id: cartId },
 			})
