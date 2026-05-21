@@ -231,7 +231,7 @@ export async function issueCreditNote(
 			parentInvoiceId,
 			subtotalCents,
 			totalCents,
-			vatBreakdown: creditNoteVatBreakdown,
+			vatBreakdown: creditNoteVatBreakdown as any,
 			vatTotalCents,
 			status: 'FINAL',
 			issuedAt: new Date(),
