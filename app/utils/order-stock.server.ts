@@ -1,6 +1,9 @@
 import { invariant } from '@epic-web/invariant'
 import { prisma } from './db.server.ts'
 
+/**
+ * Type for stock availability issues
+ */
 export type StockIssue = {
 	productName: string
 	requested: number
@@ -21,6 +24,12 @@ export class StockUnavailableError extends Error {
 	}
 }
 
+/**
+ * Validates that all items in the cart have sufficient stock availability.
+ * Checks variant-level stock when variant exists, product-level stock when no variant.
+ * @param cartId - The ID of the cart to validate
+ * @throws StockValidationError if any items have insufficient stock
+ */
 export async function validateStockAvailability(cartId: string): Promise<void> {
 	const cart = await prisma.cart.findUnique({
 		where: { id: cartId },
@@ -46,6 +55,7 @@ export async function validateStockAvailability(cartId: string): Promise<void> {
 
 	for (const item of cart.items) {
 		if (item.variantId) {
+			// Item has variant - check variant-level stock
 			const variant = await prisma.productVariant.findUnique({
 				where: { id: item.variantId },
 				select: { id: true, stockQuantity: true },
@@ -64,8 +74,9 @@ export async function validateStockAvailability(cartId: string): Promise<void> {
 				})
 			}
 		} else {
-			// If stockQuantity is null, treat as unlimited (no validation)
+			// Item has no variant - check product-level stock
 			if (item.product.stockQuantity !== null) {
+				// Product has stock tracking
 				if (item.product.stockQuantity < item.quantity) {
 					stockIssues.push({
 						productName: item.product.name,
@@ -74,6 +85,7 @@ export async function validateStockAvailability(cartId: string): Promise<void> {
 					})
 				}
 			}
+			// If stockQuantity is null, treat as unlimited (no validation)
 		}
 	}
 
@@ -81,3 +93,4 @@ export async function validateStockAvailability(cartId: string): Promise<void> {
 		throw new StockValidationError(stockIssues)
 	}
 }
+

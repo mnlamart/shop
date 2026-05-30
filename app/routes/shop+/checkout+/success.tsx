@@ -8,8 +8,10 @@ import { Icon } from '#app/components/ui/icon.tsx'
 import { getUserId } from '#app/utils/auth.server.ts'
 import { useTranslation } from '#app/utils/i18n.tsx'
 import { fulfillOrder } from '#app/utils/fulfillment.server.ts'
-import { getOrderByCheckoutSessionId } from '#app/utils/order-queries.server.ts'
-import { createOrderFromStripeSession } from '#app/utils/order.server.ts'
+import {
+	getOrderByCheckoutSessionId,
+	createOrderFromStripeSession,
+} from '#app/utils/order.server.ts'
 import { type StoreAddress } from '#app/utils/shipment.server.ts'
 import { stripe } from '#app/utils/stripe.server.ts'
 import { type Route } from './+types/success.ts'
