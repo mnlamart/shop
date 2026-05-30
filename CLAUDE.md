@@ -8,7 +8,7 @@ This is an Epic Stack (`epicweb.dev/epic-stack`) instance extended into an e-com
 
 ## Commands
 
-Package manager is **pnpm 10.9.0** (also has `package-lock.json` but pnpm is canonical — see `pnpm-workspace.yaml`).
+Package manager is **pnpm 9.15.0** (also has `package-lock.json` but pnpm is canonical — see `pnpm-workspace.yaml`).
 
 - `pnpm run dev` — dev server with MSW mocks on `MOCKS=true` (`server/dev-server.js` → `server/index.ts`). Use `dev:no-mocks` to hit real third parties.
 - `pnpm run build` — runs `build:remix` (React Router build) then `build:server` (`tsx other/build-server.ts` → `server-build/`).
@@ -80,7 +80,7 @@ Prisma: `pnpm exec prisma migrate dev --name <name>`, `pnpm exec prisma studio`.
 
 ## Environment
 
-Copy `.env.example` to `.env` for local config. Stripe CLI setup notes are in `STRIPE_CLI_SETUP.md`. Engines field pins Node 22 but recent commits migrated to Node 24 — check the active CI matrix (`.github/workflows/deploy.yml`) before assuming a version.
+Copy `.env.example` to `.env` for local config. Stripe CLI setup notes are in `STRIPE_CLI_SETUP.md`. Engines field pins Node 22 (verify against `.github/workflows/deploy.yml`).
 
 ## Agent skills
 
